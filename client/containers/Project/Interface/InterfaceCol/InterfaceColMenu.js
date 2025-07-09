@@ -454,6 +454,8 @@ export default class InterfaceColMenu extends Component {
               title={interfaceCase.casename}
             >
               <span className="casename">{interfaceCase.casename}</span>
+              <span className="caseId">{interfaceCase._id}</span>
+              
               <div className="btns">
                 <Tooltip title="删除用例">
                   <Icon
