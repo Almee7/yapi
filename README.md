@@ -1,93 +1,130 @@
-# ya p
+## YApi  可视化接口管理平台
+
+体验地址：
+
+[http://yapi.smart-xwork.cn/](http://yapi.smart-xwork.cn/)
+
+文档：
+<p><a target="_blank" href="https://hellosean1025.github.io/yapi">hellosean1025.github.io/yapi</a></p>
+
+### 平台介绍
+![avatar](yapi-base-flow.jpg)
+
+YApi 是<strong>高效</strong>、<strong>易用</strong>、<strong>功能强大</strong>的 api 管理平台，旨在为开发、产品、测试人员提供更优雅的接口管理服务。可以帮助开发者轻松创建、发布、维护 API，YApi 还为用户提供了优秀的交互体验，开发人员只需利用平台提供的接口数据写入工具以及简单的点击操作就可以实现接口的管理。
+
+**QQ交流群**:
+
+644642474 **主群可能已满**
+
+941802405 **群2欢迎加入**
+
+### 特性
+*  基于 Json5 和 Mockjs 定义接口返回数据的结构和文档，效率提升多倍
+*  扁平化权限设计，即保证了大型企业级项目的管理，又保证了易用性
+*  类似 postman 的接口调试
+*  自动化测试, 支持对 Response 断言
+*  MockServer 除支持普通的随机 mock 外，还增加了 Mock 期望功能，根据设置的请求过滤规则，返回期望数据
+*  支持 postman, har, swagger 数据导入
+*  免费开源，内网部署，信息再也不怕泄露了
+
+### 内网部署
+#### 环境要求
+* nodejs（7.6+)
+* mongodb（2.6+）
+* git
+#### 安装
+使用我们提供的 yapi-cli 工具，部署 YApi 平台是非常容易的。执行 yapi server 启动可视化部署程序，输入相应的配置和点击开始部署，就能完成整个网站的部署。部署完成之后，可按照提示信息，执行 node/{网站路径/server/app.js} 启动服务器。在浏览器打开指定url, 点击登录输入您刚才设置的管理员邮箱，默认密码为 ymfe.org 登录系统（默认密码可在个人中心修改）。
+
+    npm install -g yapi-cli --registry https://registry.npm.taobao.org
+    yapi server 
+    
+#### 服务管理
+利用pm2方便服务管理维护。
+
+    npm install pm2 -g  //安装pm2
+    cd  {项目目录}
+    pm2 start "vendors/server/app.js" --name yapi //pm2管理yapi服务
+    pm2 info yapi //查看服务信息
+    pm2 stop yapi //停止服务
+    pm2 restart yapi //重启服务
+
+#### 升级
+升级项目版本是非常容易的，并且不会影响已有的项目数据，只会同步 vendors 目录下的源码文件。
+    
+    cd  {项目目录}
+    yapi ls //查看版本号列表
+    yapi update //更新到最新版本
+    yapi update -v {Version} //更新到指定版本
+    
+### 教程
+* [使用 YApi 管理 API 文档，测试， mock](https://juejin.im/post/5acc879f6fb9a028c42e8822)
+* [自动更新 Swagger 接口数据到 YApi 平台](https://juejin.im/post/5af500e251882567096140dd)
+* [自动化测试](https://juejin.im/post/5a388892f265da430e4f4681)
+* [GTest(基于YApi)接口研发效能提升10倍 实战](https://mp.weixin.qq.com/s/z66f7bRX8aAOppAtBIB7Uw)
+
+### YApi 插件
+* [yapi sso 登录插件](https://github.com/YMFE/yapi-plugin-qsso)
+* [yapi cas 登录插件](https://github.com/wsfe/yapi-plugin-cas) By wsfe
+* [yapi gitlab集成插件](https://github.com/cyj0122/yapi-plugin-gitlab)
+* [oauth2.0登录](https://github.com/xwxsee2014/yapi-plugin-oauth2)
+* [rap平台数据导入](https://github.com/wxxcarl/yapi-plugin-import-rap)
+* [dingding](https://github.com/zgs225/yapi-plugin-dding) 钉钉机器人推送插件
+* [export-docx-data](https://github.com/inceptiongt/Yapi-plugin-export-docx-data) 数据导出docx文档
+* [interface-oauth-token](https://github.com/shouldnotappearcalm/yapi-plugin-interface-oauth2-token) 定时自动获取鉴权token的插件
+* [import-swagger-customize](https://github.com/follow-my-heart/yapi-plugin-import-swagger-customize) 导入指定swagger接口
+
+### 代码生成
+* [yapi-to-typescript：根据 YApi 的接口定义生成 TypeScript 的请求函数](https://github.com/fjc0k/yapi-to-typescript)
+* [yapi-gen-js-code: 根据 YApi 的接口定义生成 javascript 的请求函数](https://github.com/hellosean1025/yapi-gen-js-code)
+* [SwiftJSONModeler:根据 YApi 的接口生成 Swift 模型代码](https://github.com/CodeOcenS/SwiftJSONModeler)
+
+### YApi docker部署（非官方）
+* [使用 alpine 版 docker 镜像快速部署 yapi](https://www.jianshu.com/p/a97d2efb23c5)
+* [docker-yapi: 基于官方yapi-cli的docker-compose方案](https://github.com/Ryan-Miao/docker-yapi)
+* [docker-compose一键部署yapi](https://github.com/jinfeijie/yapi)
+* [docker-YApi: 更易用的 YApi 镜像](https://github.com/fjc0k/docker-YApi)
+* [使用DockerCompose构建部署Yapi](https://github.com/MyHerux/daily-code/blob/master/Program/%E5%B7%A5%E5%85%B7%E7%AF%87/Yapi/%E4%BD%BF%E7%94%A8DockerCompose%E6%9E%84%E5%BB%BA%E9%83%A8%E7%BD%B2Yapi.md)
+* [yapi-docker: dockerized yapi deployment all in one](https://github.com/williamlsh/yapi-docker)
+
+### YApi 一些工具
+* [Api Generator](https://github.com/Forgus/api-generator) 接口文档自动生成插件（零入侵）
+* [mysql服务http工具,可配合做自动化测试](https://github.com/hellosean1025/http-mysql-server)
+* [idea 一键上传接口到yapi插件](https://github.com/diwand/YapiIdeaUploadPlugin)
+* [idea 接口上传调试插件 easy-yapi](https://easyyapi.com/)
+* [执行 postgres sql 的服务](https://github.com/shouldnotappearcalm/http-postgres-server)
+* [SpringBoot依赖自动生成YApi](https://github.com/NoBugBoy/YDoc)
+* [Yapi X 一键生成接口文档, 上传到yapi, rap2, eolinker等（IDEA插件）](https://github.com/jetplugins/yapix)
+
+### YApi 的一些客户
+* 去哪儿
+* 携程
+* 艺龙 
+* 美团
+* 百度
+* 腾讯
+* 阿里巴巴
+* 京东
+* 今日头条
+* 唯品支付 
+* 链家网
+* 快手
+* 便利蜂
+* 中商惠民
+* 新浪
+* VIPKID
+* 马蜂窝
+* 伴鱼
+* 旷视科技
+
+### Authors
+* [hellosean1025](https://github.com/hellosean1025)
+* [gaoxiaomumu](https://github.com/gaoxiaomumu)
+* [zwjamnsss](https://github.com/amnsss)
+* [dwb1994](https://github.com/dwb1994)
+* [fungezi](https://github.com/fungezi)
+* [ariesly15](https://github.com/ariesly15)
 
 
+### License
+Apache License 2.0
 
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin http://git.yundiz.com/qa/ya-p.git
-git branch -M main
-git push -uf origin main
-```
-
-## Integrate with your tools
-
-- [ ] [Set up project integrations](http://git.yundiz.com/qa/ya-p/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
