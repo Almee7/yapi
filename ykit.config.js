@@ -34,7 +34,7 @@ function createScript(plugin, pathAlias) {
 }
 
 function initPlugins(configPlugin) {
-  configPlugin = require('../config.json').plugins;
+  configPlugin = require('/Users/mac22/Desktop/yapi/config_example.json').plugins;
   var systemConfigPlugin = require('./common/config.js').exts;
 
   var scripts = [];

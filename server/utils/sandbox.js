@@ -1,17 +1,20 @@
 const Safeify = require('safeify').default;
+const assert = require('assert');
 
-module.exports = async function sandboxFn(context, script) {
-    // 创建 safeify 实例
-    const safeVm = new Safeify({
-        timeout: 3000,
-        asyncTimeout: 60000
-    })
+module.exports = async function sandboxFn(context = {}, script) {
+  const safeVm = new Safeify({
+    timeout: 3000,
+    asyncTimeout: 60000
+  });
 
-    script += "; return this;";
-    // 执行动态代码
-    const result = await safeVm.run(script, context)
+  // 直接注入 assert 对象
+  context.assert = assert;
 
-    // 释放资源
-    safeVm.destroy()
-    return result
-}
+  script += "; return null;";
+
+  const result = await safeVm.run(script, context);
+
+  safeVm.destroy();
+
+  return result;
+};
