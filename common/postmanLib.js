@@ -8,7 +8,8 @@ const axios = require('axios');
 const qs = require('qs');
 const CryptoJS = require('crypto-js');
 const jsrsasign = require('jsrsasign');
-const https = require('https');
+const https = require('' +
+    'https');
 
 const isNode = typeof global == 'object' && global.global === global;
 const ContentTypeMap = {
@@ -299,11 +300,14 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
     axios: axios
   });
 
-  let scriptEnable = false;
-  try {
-    const yapi = require('../server/yapi');
-    scriptEnable = yapi.WEBCONFIG.scriptEnable === true;
-  } catch (err) {}
+  // let scriptEnable = true;
+  // try {
+  //   // const yapi = require('../server/yapi');
+  //   const {scriptEnable: scriptEnableOfConfig} = require('config_example.json')
+  //   scriptEnable = scriptEnableOfConfig === true;
+  // } catch (err) {
+  //   console.log('wangjunhu!!!!!+_++++++', err)
+  // }
 
   if (preScript) {
     context = await sandbox(context, preScript);
@@ -345,7 +349,7 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
     });
   }
 
-  if (afterScript && scriptEnable) {
+  if (afterScript) {
     context.responseData = data.res.body;
     context.responseHeader = data.res.header;
     context.responseStatus = data.res.status;

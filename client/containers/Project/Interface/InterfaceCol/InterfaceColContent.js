@@ -150,7 +150,6 @@ class InterfaceColContent extends Component {
       isShowCol: true,
       isRander: false
     });
-
     let result = await this.props.fetchCaseList(newColId);
     if (result.payload.data.errcode === 0) {
       this.reports = handleReport(result.payload.data.colData.test_report);
@@ -243,11 +242,10 @@ class InterfaceColContent extends Component {
     });
     this.setState({ rows: newRows });
   };
-
+///开始测试入口
   executeTests = async () => {
     for (let i = 0, l = this.state.rows.length, newRows, curitem; i < l; i++) {
       let { rows } = this.state;
-
       let envItem = _.find(this.props.envList, item => {
         return item._id === rows[i].project_id;
       });
@@ -282,7 +280,6 @@ class InterfaceColContent extends Component {
         status = 'error';
         result = e;
       }
-
       //result.body = result.data;
       this.reports[curitem._id] = result;
       this.records[curitem._id] = {
@@ -305,7 +302,6 @@ class InterfaceColContent extends Component {
   handleTest = async interfaceData => {
     let requestParams = {};
     let options = handleParams(interfaceData, this.handleValue, requestParams);
-
     let result = {
       code: 400,
       msg: '数据异常',

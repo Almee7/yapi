@@ -34,7 +34,7 @@ function simpleJsonPathParse(key, json) {
       break;
     }
   }
-
+  console.log('simpleJsonPathParsesimpleJsonPathParse',json)
   return json;
 }
 
@@ -106,7 +106,6 @@ function handleParamsValue(val, context = {}) {
     return val;
   }
   val = val.trim();
-
   let match = val.match(/^\{\{([^\}]+)\}\}$/);
   if (!match) {
     // val ==> @name 或者 $.body

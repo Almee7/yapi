@@ -144,7 +144,7 @@ function validHtml(validRes) {
   }
   let html = `
   <div>
-    <div class="row case-report">
+    <div class="row case-report">·
      <div class="col-3 case-report-title">验证结果</div>
      <div class="col-21">
       ${validRes}

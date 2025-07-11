@@ -1,11 +1,10 @@
 const path = require('path');
 const fs = require('fs-extra');
 const nodemailer = require('nodemailer');
-const config = require('/Users/mac22/Desktop/yapi/config_example.json');
+const config = require('../config_example.json');
 
 let insts = new Map();
 let mail;
-
 const WEBROOT = path.resolve(__dirname, '..'); //路径
 const WEBROOT_SERVER = __dirname;
 const WEBROOT_RUNTIME = path.resolve(__dirname, '../..');
@@ -17,6 +16,7 @@ fs.ensureDirSync(WEBROOT_LOG);
 if (WEBCONFIG.mail && WEBCONFIG.mail.enable) {
   mail = nodemailer.createTransport(WEBCONFIG.mail);
 }
+
 
 /**
  * 获取一个model实例，如果不存在则创建一个新的返回
