@@ -1,1 +1,1 @@
-$commonUrl: @import '../../styles/common.scss';
+common.$commonUrl: @use '../../styles/common.scss' as common;

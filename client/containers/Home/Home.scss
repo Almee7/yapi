@@ -1,4 +1,4 @@
-@import '../../styles/mixin.scss';
+@use '../../styles/mixin.scss';
 
 $color-white : #fff;
 $color-blue-lighter : #f1f5ff;
@@ -196,7 +196,7 @@ $color-bg-lightblue: #c6e2ff;
       background-color: $color-blue-lighter;
     }
     &:nth-child(even){
-      background-color: $color-white;
+      background-color:$color-white;
     }
   }
   .feat-part{
@@ -413,7 +413,7 @@ $color-bg-lightblue: #c6e2ff;
   }
   .mock-after {
     .ant-card-head {
-      background-color: $color-bg-lightblue;
+      background-color: $color-blue-lighter;;
     }
     .ant-card-head-title {
       color: #4074af;

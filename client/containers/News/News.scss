@@ -1,4 +1,4 @@
-@import '../../styles/mixin.scss';
+@use '../../styles/mixin.scss' as mixin;
 
 .news-box {
   @include row-width-limit;

@@ -1,4 +1,4 @@
-@import '../../../styles/mixin.scss';
+@use '../../../styles/mixin.scss' as mixin;
 
 .left-menu {
   min-height: 5rem;
@@ -15,7 +15,7 @@
   }
   .ant-tabs-nav {
     width: 100%;
-    background-color: $color-bg-gray;
+    background-color: mixin.$color-bg-gray;
   }
   .ant-tabs-tab {
     min-width: 49.4%;
@@ -35,7 +35,7 @@
   .ant-tabs.ant-tabs-card > .ant-tabs-bar .ant-tabs-tab-active {
     height: 40px;
     background-color: #ddd;
-    // color: $color-white;
+    // color: mixin.$color-white;
   }
 
   .ant-tabs.ant-tabs-card > .ant-tabs-bar .ant-tabs-nav-container {
@@ -183,7 +183,7 @@
     .ant-tabs-nav {
       width: 100%;
       // background-color: #ddd;
-      // color: $color-white;
+      // color: mixin.$color-white;
     }
     .ant-tabs-nav-wrap {
       text-align: left;

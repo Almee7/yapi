@@ -1,11 +1,11 @@
-@import '../../../styles/mixin.scss';
+@use '../../../styles/mixin.scss' as mixin;
 
 .m-panel{
   background-color: #fff;
   padding: 24px;
   min-height: 4.68rem;
   margin-top: 0;
-  // box-shadow: $box-shadow-panel;
+  // box-shadow: mixin.$box-shadow-panel;
 }
 
 .m-tab {

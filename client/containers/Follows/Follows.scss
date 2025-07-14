@@ -1,5 +1,5 @@
-@import '../../styles/common.scss';
-@import '../../styles/mixin.scss';
+@use '../../styles/common.scss' as common;
+@use '../../styles/mixin.scss' as mixin;
 
 
 .follow-box{

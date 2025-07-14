@@ -1,10 +1,11 @@
+@use "sass:math";
 $ball-color:#30a1f2;
 $ball-size:.15rem;
 $ball-margin:.02rem;
 $loader-radius:.25rem;
 
 @function delay($interval, $count, $index) {
-  @return ($index * $interval) - ($interval * $count);
+  @return math.div($index * $interval, 1) - math.div($interval * $count, 1);
 }
 
 @keyframes ball-spin-fade-loader {
@@ -20,7 +21,7 @@ $loader-radius:.25rem;
 @mixin ball-spin-fade-loader($n:8,$start:1){
   @for $i from $start through $n {
     > div:nth-child(#{$i}) {
-      $quarter: ($loader-radius/2) + ($loader-radius/5.5);
+      $quarter: math.div($loader-radius, 2) + math.div($loader-radius, 5.5);
 
       @if $i == 1 {
         top: $loader-radius;

@@ -25,7 +25,9 @@ module.exports = {
         "no-console": ["off"],
         "import/no-unresolved": ["off"],
         "react/no-find-dom-node": ["off"],
-        "no-empty": ["off"]
-        // "react/no-unescaped-entities": 0
+        "no-empty": ["off"],
+        "react/no-deprecated": "off",
+        "no-restricted-imports": ["error", {paths: ["react-dom/client"]} ]
+        // ,"react/no-unescaped-entities": 0  // 这里如果想启用记得去掉注释并加逗号
     }
 };
