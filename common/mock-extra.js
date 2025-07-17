@@ -14,6 +14,7 @@ Mock.Random.extend({
 })
 
 function mock(mockJSON, context) {
+  console.log(';ldsgkdl;sfkg;dsfgk;dsfg;dsfgdfgsgdfsdgfsgdfsdsfggdsfdsfg')
   context = context || {};
   var filtersMap = {
     regexp: handleRegexp
@@ -36,7 +37,9 @@ function mock(mockJSON, context) {
       if (p[i] && typeof p[i] === 'object') {
         c[i] = (p[i].constructor === Array) ? [] : {};
         parse(p[i], c[i]);
-      } else if(p[i] && typeof p[i] === 'string'){
+      // } else if(p[i] && typeof p[i] === 'string'){
+      } else if (p[i] && (typeof p[i] === 'string' || p[i] instanceof RegExp)) {
+
         p[i] = handleStr(p[i]);        
         var filters = i.split(mockSplit), newFilters = [].concat(filters);
         c[i] = p[i];
@@ -86,10 +89,11 @@ function mock(mockJSON, context) {
           data = '';
         }
       });
+      console.log('datadatadatadatadatadatadata',data)
       return data;
     }
+    console.log('sdfgfdsggsdfgdsfgdsfgsdfsgdfdsfg',str)
     return str;
   }
 }
-
 module.exports = mock;

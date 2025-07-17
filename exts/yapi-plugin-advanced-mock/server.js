@@ -1,7 +1,7 @@
 const controller = require('./controller');
 const advModel = require('./advMockModel.js');
 const caseModel = require('./caseModel.js');
-const yapi = require('yapi.js');
+const yapi = require('../../server/yapi.js');
 const mongoose = require('mongoose');
 const _ = require('underscore');
 const path = require('path');
@@ -181,6 +181,7 @@ module.exports = function() {
       let data = await handleByCase(caseData);
 
       context.mockJson = yapi.commons.json_parse(data.res_body);
+
       try {
         context.mockJson = Mock.mock(
           mockExtra(context.mockJson, {

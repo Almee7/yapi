@@ -17,6 +17,7 @@ const CaseReport = function(props) {
   let res_body = jsonFormat(props.res_body);
   let httpCode = props.status;
   let validRes;
+  console.log("1111111111111111111", props.validRes)
   if (props.validRes && Array.isArray(props.validRes)) {
     validRes = props.validRes.map((item, index) => {
       return <div key={index}>{item.message}</div>;

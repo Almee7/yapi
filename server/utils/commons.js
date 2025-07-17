@@ -52,7 +52,7 @@ exports.schemaToJson = function (schema, options = {}) {
   jsf.option(options);
   let result;
   try {
-    result = jsf(schema);
+    result = jsf.generate(schema);
   } catch (err) {
     result = err.message;
   }

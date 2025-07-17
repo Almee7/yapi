@@ -26,6 +26,7 @@ import CheckCrossInstall, { initCrossRequest } from './CheckCrossInstall.js';
 import './Postman.scss';
 import ProjectEnv from '../../containers/Project/Setting/ProjectEnv/index.js';
 import json5 from 'json5';
+// import {href} from "koa/lib/request";
 const { handleParamsValue, ArrayToObject, schemaValidator } = require('common/utils.js');
 const {
   handleParams,
@@ -120,7 +121,14 @@ export default class Run extends Component {
 
   constructor(props) {
     super(props);
+    // 1. 先尝试从 localStorage 读取
+    const cacheKey = `req_body_cache_${ props.data._id || 'default'}`;
+    const cachedBody = localStorage.getItem(cacheKey);
+    console.log('dfgsgdfsgdfsgdfsgsdf',cachedBody)
+    console.log('this.props.data.req_body_otherthis.props.data.req_body_other',this.props.data.req_body_other)
+      this.props.data.req_body_other=cachedBody ||  props.data.req_body_other || ''
     this.state = {
+        ...this.props.data,
       loading: false,
       resStatusCode: null,
       test_valid_msg: null,
@@ -135,9 +143,9 @@ export default class Run extends Component {
       envModalVisible: false,
       test_res_header: null,
       test_res_body: null,
-      autoPreviewHTML: true,
-      ...this.props.data
+      autoPreviewHTML: true
     };
+    console.log('RunRunRunRunRunRunRun', props,',,,,,',this.props.data);
   }
 
   get testResponseBodyIsHTML() {
@@ -314,11 +322,45 @@ export default class Run extends Component {
     this.aceEditor.editor.insertCode(code);
   };
 
-  handleRequestBody = d => {
-    this.setState({
-      req_body_other: d.text
-    });
+  componentDidUpdate(prevProps) {
+    if (prevProps.data._id !== this.props.data._id) {
+      const cacheKey = `req_body_cache_${this.props.data._id || 'default'}`;
+      const cachedBody = localStorage.getItem(cacheKey);
+
+      if (cachedBody) {
+        // 有缓存，优先用缓存
+        this.setState({ req_body_other: cachedBody });
+      } else {
+        // 没缓存，才用 props 默认值
+        this.setState({ req_body_other: this.props.data.req_body_other || '' });
+      }
+    }
+  }
+
+  componentDidMount() {
+    const cacheKey = `req_body_cache_${this.props.data._id || 'default'}`;
+    const cachedBody = localStorage.getItem(cacheKey);
+    if (cachedBody) {
+      this.setState({ req_body_other: cachedBody });
+    } else {
+      this.setState({ req_body_other: this.props.data.req_body_other || '' });
+    }
+  }
+
+  handleRequestBody = (newValue) => {
+    this.setState({ req_body_other: newValue.text });
+
+    // 3. 实时保存到 localStorage
+    const cacheKey = `req_body_cache_${this.props.data._id || 'default'}`;
+    console.log('setItemsetItemsetItemsetItemsetItem', newValue,this);
+    localStorage.setItem(cacheKey, newValue.text);
   };
+
+  // handleRequestBody = d => {
+  //   this.setState({
+  //     req_body_other: d.text
+  //   });
+  // };
 
   reqRealInterface = async () => {
     if (this.state.loading === true) {
@@ -333,14 +375,41 @@ export default class Run extends Component {
 
     let options = handleParams(this.state, this.handleValue),
       result;
-
-
+    console.log("optionsoptionsoptionsoptionsoptionsoptions",options)
     await plugin.emitHook('before_request', options, {
       type: this.props.type,
       caseId: options.caseId,
       projectId: this.props.projectId,
       interfaceId: this.props.interfaceId
     });
+
+    // try {
+    //   const res = await axios({
+    //     url: options.url,
+    //     method: options.method || 'GET',
+    //     headers: options.headers || {},
+    //     data: options.data,
+    //     timeout: options.timeout || 30000,
+    //     withCredentials: true // 如果你要带 cookie
+    //   });
+    //
+    //   result = {
+    //     res: {
+    //       header: res.headers,
+    //       body: res.data,
+    //       status: res.status,
+    //       statusText: res.statusText
+    //     },
+    //     runTime: 0
+    //   };
+    // } catch (err) {
+    //   // result = {
+    //   //   header: err.response?.headers || {},
+    //   //   body: err.response?.data || '',
+    //   //   status: err.response?.status || null,
+    //   //   statusText: err.message
+    //   // };
+    // }
 
     try {
       options.taskId = this.props.curUid;
@@ -349,7 +418,7 @@ export default class Run extends Component {
         this.props.projectId,
         this.props.interfaceId
       ));
-
+      console.log("111111111111111111111111111",result)
       await plugin.emitHook('after_request', result, {
         type: this.props.type,
         caseId: options.caseId,
@@ -364,7 +433,6 @@ export default class Run extends Component {
         statusText: result.res.statusText,
         runTime: result.runTime
       };
-
     } catch (data) {
       result = {
         header: data.header,
@@ -424,7 +492,7 @@ export default class Run extends Component {
   };
 
   changeParam = (name, v, index, key) => {
-    
+
     key = key || 'value';
     const pathParam = deepCopyJson(this.state[name]);
 
@@ -837,7 +905,7 @@ export default class Run extends Component {
                 className="pretty-editor"
                 ref={editor => (this.aceEditor = editor)}
                 data={this.state.req_body_other}
-                mode={req_body_type === 'json' ? null : 'text'}
+                mode={this.req_body_type === 'json' ? null : 'text'}
                 onChange={this.handleRequestBody}
                 fullScreen={true}
               />

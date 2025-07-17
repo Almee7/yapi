@@ -245,6 +245,7 @@ class InterfaceColContent extends Component {
 ///开始测试入口
   executeTests = async () => {
     for (let i = 0, l = this.state.rows.length, newRows, curitem; i < l; i++) {
+
       let { rows } = this.state;
       let envItem = _.find(this.props.envList, item => {
         return item._id === rows[i].project_id;
@@ -267,7 +268,6 @@ class InterfaceColContent extends Component {
         result;
       try {
         result = await this.handleTest(curitem);
-
         if (result.code === 400) {
           status = 'error';
         } else if (result.code === 0) {

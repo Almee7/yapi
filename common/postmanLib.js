@@ -247,6 +247,7 @@ function sandboxByBrowser(context = {}, script) {
  * @param {*} commonContext  负责传递一些业务信息，crossRequest 不关注具体传什么，只负责当中间人
  */
 async function crossRequest(defaultOptions, preScript, afterScript, commonContext = {}) {
+  console.log('ksdfjglkjfsdkldsfjglkdfsgjklfdsjk')
   let options = Object.assign({}, defaultOptions);
   const taskId = options.taskId || Math.random() + '';
   let urlObj = URL.parse(options.url, true),
@@ -365,6 +366,7 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
 
 function handleParams(interfaceData, handleValue, requestParams) {
   let interfaceRunData = Object.assign({}, interfaceData);
+  console.log('interfaceRunDatainterfaceRunDatainterfaceRunDatainterfaceRunData',interfaceRunData)
   function paramsToObjectWithEnable(arr) {
     const obj = {};
     safeArray(arr).forEach(item => {
