@@ -4,11 +4,11 @@
   "timeout": 120000,
   "scriptEnable": true,
   "db": {
-    "servername": "127.0.0.1",
+    "servername": "193.168.2.100",
     "DATABASE": "yapi",
-    "port": 27017,
+    "port": 30018,
     "user": "root",
-    "pass": "root",
+    "pass": "123456",
     "authSource": "admin"
   },
   "mail": {
