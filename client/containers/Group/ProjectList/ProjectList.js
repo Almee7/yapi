@@ -92,7 +92,6 @@ class ProjectList extends Component {
 
     // 切换项目列表
     if (this.props.projectList !== nextProps.projectList) {
-      // console.log(nextProps.projectList);
       const data = nextProps.projectList.map((item, index) => {
         item.key = index;
         return item;

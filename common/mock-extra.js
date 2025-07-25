@@ -14,7 +14,6 @@ Mock.Random.extend({
 })
 
 function mock(mockJSON, context) {
-  console.log(';ldsgkdl;sfkg;dsfgk;dsfg;dsfgdfgsgdfsdgfsgdfsdsfggdsfdsfg')
   context = context || {};
   var filtersMap = {
     regexp: handleRegexp
@@ -89,10 +88,8 @@ function mock(mockJSON, context) {
           data = '';
         }
       });
-      console.log('datadatadatadatadatadatadata',data)
       return data;
     }
-    console.log('sdfgfdsggsdfgdsfgdsfgsdfsgdfdsfg',str)
     return str;
   }
 }

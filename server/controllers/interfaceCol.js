@@ -134,7 +134,7 @@ class interfaceColController extends baseController {
   async getCaseList(ctx) {
     try {
       let id = ctx.query.col_id;
-      if (!id || id == 0) {
+      if (!id || id === 0) {
         return (ctx.body = yapi.commons.resReturn(null, 407, 'col_id不能为空'));
       }
 
@@ -165,7 +165,7 @@ class interfaceColController extends baseController {
   async getCaseEnvList(ctx) {
     try {
       let id = ctx.query.col_id;
-      if (!id || id == 0) {
+      if (!id || id === 0) {
         return (ctx.body = yapi.commons.resReturn(null, 407, 'col_id不能为空'));
       }
 
@@ -219,7 +219,7 @@ class interfaceColController extends baseController {
   async getCaseListByVariableParams(ctx) {
     try {
       let id = ctx.query.col_id;
-      if (!id || id == 0) {
+      if (!id || id === 0) {
         return (ctx.body = yapi.commons.resReturn(null, 407, 'col_id不能为空'));
       }
       let resultList = await this.caseModel.list(id, 'all');
@@ -233,6 +233,7 @@ class interfaceColController extends baseController {
           return (ctx.body = yapi.commons.resReturn(null, 406, '没有权限'));
         }
       }
+      debugger
       for (let index = 0; index < resultList.length; index++) {
         let result = resultList[index].toObject();
         let item = {},
@@ -718,7 +719,7 @@ class interfaceColController extends baseController {
       params.forEach(item => {
         if (item.id) {
           this.caseModel.upCaseIndex(item.id, item.index).then(
-            res => {},
+            // res => {},
             err => {
               yapi.commons.log(err.message, 'error');
             }
@@ -752,7 +753,7 @@ class interfaceColController extends baseController {
       params.forEach(item => {
         if (item.id) {
           this.colModel.upColIndex(item.id, item.index).then(
-            res => {},
+            // res => {},
             err => {
               yapi.commons.log(err.message, 'error');
             }
@@ -853,6 +854,7 @@ class interfaceColController extends baseController {
 
   async runCaseScript(ctx) {
     let params = ctx.request.body;
+    console.log()
     ctx.body = await yapi.commons.runCaseScript(params, params.col_id, params.interface_id, this.getUid());
   }
 

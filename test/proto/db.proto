@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package db;
+
+service MongoService {
+  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+}
+
+message ExecuteRequest {
+  string operation = 1; // find, insert, update, remove, aggregate, bulkInsert
+  string collection = 2;
+
+  // 这里用字符串传递复杂JSON对象，服务端解析
+  string data = 3;
+}
+
+message ExecuteResponse {
+  string result = 1;  // JSON字符串格式返回
+  bool success = 2;
+  string message = 3;
+}

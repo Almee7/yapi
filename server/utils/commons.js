@@ -16,7 +16,6 @@ const Mock = require('mockjs');
 const sandboxFn = require('./sandbox')
 
 
-
 const ejs = require('easy-json-schema');
 
 const jsf = require('json-schema-faker');
@@ -281,20 +280,25 @@ exports.verifyPath = path => {
  * @example let a = sandbox({a: 1}, 'a=2')
  * a = {a: 2}
  */
-exports.sandbox = (sandbox, script) => {
+exports.sandbox = async (sandbox, script) => {
   try {
+    sandbox = sandbox || {};
+    sandbox.console = console;
+    sandbox.execSql = require('./mysqlClient').execSql; // 注入 execSql
+
+    // 把用户脚本用 async 函数包装
+    const asyncScript = `(async () => { ${script} })()`;
+
+    // 用 vm.runInNewContext 支持 async/await
     const vm = require('vm');
-    sandbox = sandbox || {};	
-    script = new vm.Script(script);	
-    const context = new vm.createContext(sandbox);	
-    script.runInContext(context, {	
-      timeout: 3000	
-    });	      
-    return sandbox
+    const result = await vm.runInNewContext(asyncScript, sandbox, { timeout: 3000 });
+
+    return sandbox;
   } catch (err) {
-    throw err
+    throw err;
   }
 };
+
 
 function trim(str) {
   if (!str) {
@@ -537,6 +541,7 @@ exports.runCaseScript = async function runCaseScript(params, colId, interfaceId)
     header: params.response.header,
     records: params.records,
     params: params.params,
+    vars: params.vars || {},
     log: msg => {
       logs.push('log: ' + convertString(msg));
     }
@@ -580,7 +585,6 @@ ${JSON.stringify(schema, null, 2)}`)
         result = yapi.commons.sandbox(context, globalScript);
       }
     }
-
 
     let script = params.script;
     // script 是断言

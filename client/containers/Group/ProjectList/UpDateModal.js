@@ -100,7 +100,6 @@ class UpDateModal extends Component {
     } = this.props;
     form.validateFields((err, values) => {
       if (!err) {
-        // console.log(projectList[handleUpdateIndex]);
         let assignValue = Object.assign(projectList[handleUpdateIndex], values);
         values.protocol = this.state.protocol.split(':')[0];
         assignValue.env = assignValue.envs.map((item, index) => {
@@ -109,7 +108,6 @@ class UpDateModal extends Component {
             domain: values['envs-protocol-' + index] + values['envs-domain-' + index]
           };
         });
-        // console.log(assignValue);
 
         changeTableLoading(true);
         updateProject(assignValue)
@@ -174,7 +172,6 @@ class UpDateModal extends Component {
     let envMessage = [];
     // 如果列表存在且用户点击修改按钮时，设置表单默认值
     if (projectList.length !== 0 && handleUpdateIndex !== -1) {
-      // console.log(projectList[handleUpdateIndex]);
       const { name, basepath, desc, env } = projectList[handleUpdateIndex];
       initFormValues = { name, basepath, desc, env };
       if (env.length !== 0) {

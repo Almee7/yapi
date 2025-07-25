@@ -360,15 +360,12 @@ class InterfaceColContent extends Component {
 
       // 断言测试
       await this.handleScriptTest(interfaceData, responseData, validRes, requestParams);
-
-      if (validRes.length === 0) {
+      if (validRes[0].message === 0) {
+        validRes[0].message = "验证通过";
         result.code = 0;
-        result.validRes = [
-          {
-            message: '验证通过'
-          }
-        ];
-      } else if (validRes.length > 0) {
+        result.validRes = validRes;
+      } else {
+        validRes[0].message = "验证失败";
         result.code = 1;
         result.validRes = validRes;
       }
@@ -396,7 +393,11 @@ class InterfaceColContent extends Component {
   //response, validRes
   // 断言测试
   handleScriptTest = async (interfaceData, response, validRes, requestParams) => {
-    // 是否启动断言
+    // ✅ 判断是否启用测试脚本
+    if (!interfaceData.enable_script) {
+      validRes.push({ message: 2 });
+      return
+    }
     try {
       let test = await axios.post('/api/col/run_script', {
         response: response,
@@ -406,20 +407,23 @@ class InterfaceColContent extends Component {
         col_id: this.props.currColId,
         interface_id: interfaceData.interface_id
       });
-      if (test.data.errcode !== 0) {
+      // if (test.data.errcode !== 0) {
+        validRes.push({message : test.data.errcode})
         test.data.data.logs.forEach(item => {
           validRes.push({ message: item });
         });
-      }
+      // }
     } catch (err) {
       validRes.push({
         message: 'Error: ' + err.message
       });
     }
   };
-
+  // val 请求体的每个值 替换值
   handleValue = (val, global) => {
     let globalValue = ArrayToObject(global);
+    console.log("val的数值", val)
+    console.log("globalValueglobalValue",globalValue)
     let context = Object.assign({}, { global: globalValue }, this.records);
     return handleParamsValue(val, context);
   };
@@ -460,7 +464,7 @@ class InterfaceColContent extends Component {
   }
 
   onChangeTest = d => {
-    
+
     this.setState({
       commonSetting: {
         ...this.state.commonSetting,
@@ -609,7 +613,6 @@ class InterfaceColContent extends Component {
       ...setting
 
     };
-    console.log(params)
 
     axios.post('/api/col/up_col', params).then(async res => {
       if (res.data.errcode) {
@@ -653,7 +656,7 @@ class InterfaceColContent extends Component {
       })
     }
   }
-  
+
   render() {
     const currProjectId = this.props.currProject._id;
     const columns = [
@@ -956,7 +959,7 @@ class InterfaceColContent extends Component {
                   <Icon type="question-circle-o" style={{ width: '10px' }} />
                 </Tooltip></label>
               </Col>
-              <Col className="col-item"  span="14">
+              <Col className="col-item" span="14">
                 <div><Switch onChange={e=>{
                   let {commonSetting} = this.state;
                   this.setState({
@@ -969,15 +972,17 @@ class InterfaceColContent extends Component {
                     }
                   })
                 }} checked={this.state.commonSetting.checkScript.enable}  checkedChildren="开" unCheckedChildren="关"  /></div>
+
                 <AceEditor
-                  onChange={this.onChangeTest}
-                  className="case-script"
-                  data={this.state.commonSetting.checkScript.content}
-                  ref={aceEditor => {
-                    this.aceEditor = aceEditor;
-                  }}
+                    onChange={this.onChangeTest}
+                    className="case-script"
+                    data={this.state.commonSetting.checkScript.content}
+                    ref={aceEditor => {
+                      this.aceEditor = aceEditor;
+                    }}
                 />
               </Col>
+
               <Col span="6">
                 <div className="insert-code">
                   {InsertCodeMap.map(item => {
@@ -1227,7 +1232,7 @@ class InterfaceColContent extends Component {
             </Row>
             <Row type="flex" justify="space-around" className="row" align="middle">
               <Col span={21} className="autoTestUrl">
-                <a 
+                <a
                   target="_blank"
                   rel="noopener noreferrer"
                   href={localUrl + autoTestsUrl} >
