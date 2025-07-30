@@ -15,12 +15,13 @@ const Ajv = require('ajv');
 const Mock = require('mockjs');
 const sandboxFn = require('./sandbox')
 
-
 const ejs = require('easy-json-schema');
 
 const jsf = require('json-schema-faker');
 const { schemaValidator } = require('../../common/utils');
 const http = require('http');
+const mysqlClient = require('./mysqlClient.js');
+const logger = require("./commons");
 
 jsf.extend('mock', function () {
   return {
@@ -271,6 +272,38 @@ exports.verifyPath = path => {
   return /^\/[a-zA-Z0-9\-\/_:!\.\{\}\=]*$/.test(path);
 };
 
+// 变量替换，支持表达式和数组转字符串
+function replaceVars(template, vars) {
+  return template.replace(/\$\{([^}]+)\}/g, (_, expr) => {
+    try {
+      const fn = new Function('vars', `with(vars) { return ${expr}; }`);
+      const val = fn(vars);
+      if (Array.isArray(val)) {
+        return val.join(',');
+      }
+      return val;
+    } catch(e) {
+      return '';
+    }
+  });
+}
+
+// 核心断言执行函数
+async function runSqlAsserts(asserts = [], vars = {}, mysqlClient) {
+  const assert = require('assert');
+  for (const item of asserts) {
+    const sql = replaceVars(item.sql, vars);
+    const result = await mysqlClient.execSql(sql);
+    console.log('✅ SQL 预期值：', item.expect);
+    if (Array.isArray(item.expect)) {
+      assert.deepStrictEqual(result, item.expect, `SQL断言失败，SQL: ${sql}`);
+    } else {
+      assert.strictEqual(result[0], item.expect, `SQL断言失败，SQL: ${sql}`);
+    }
+    console.log(`✅ SQL断言成功: ${sql}`);
+  }
+}
+
 /**
  * 沙盒执行 js 代码
  * @sandbox Object context
@@ -282,20 +315,25 @@ exports.verifyPath = path => {
  */
 exports.sandbox = async (sandbox, script) => {
   try {
-    sandbox = sandbox || {};
-    sandbox.console = console;
-    sandbox.execSql = require('./mysqlClient').execSql; // 注入 execSql
-
-    // 把用户脚本用 async 函数包装
-    const asyncScript = `(async () => { ${script} })()`;
-
-    // 用 vm.runInNewContext 支持 async/await
     const vm = require('vm');
-    const result = await vm.runInNewContext(asyncScript, sandbox, { timeout: 3000 });
-
-    return sandbox;
+    sandbox = sandbox || {};
+    // ✅ 注入 console
+    sandbox.vars = sandbox.vars || {};
+    sandbox.sqlassert = sandbox.sqlassert || [];
+    sandbox.console = console;
+    script = new vm.Script(script);
+    const context = new vm.createContext(sandbox);
+    script.runInContext(context, {
+      timeout: 3000
+    });
+    // 执行断言
+    if (Array.isArray(sandbox.sqlassert) && sandbox.sqlassert.length > 0) {
+      await runSqlAsserts(sandbox.sqlassert, sandbox.vars, mysqlClient);
+    }
+    return sandbox
   } catch (err) {
-    throw err;
+    err.__sandboxFailed = true;
+    throw err
   }
 };
 
@@ -530,6 +568,7 @@ function convertString(variable) {
 }
 
 
+
 exports.runCaseScript = async function runCaseScript(params, colId, interfaceId) {
   const colInst = yapi.getInst(interfaceColModel);
   let colData = await colInst.get(colId);
@@ -542,6 +581,7 @@ exports.runCaseScript = async function runCaseScript(params, colId, interfaceId)
     records: params.records,
     params: params.params,
     vars: params.vars || {},
+    sqlAssert: [],
     log: msg => {
       logs.push('log: ' + convertString(msg));
     }
@@ -582,7 +622,7 @@ ${JSON.stringify(schema, null, 2)}`)
       // script 是断言
       if (globalScript) {
         logs.push('执行脚本：' + globalScript)
-        result = yapi.commons.sandbox(context, globalScript);
+        result = await yapi.commons.sandbox(context, globalScript);
       }
     }
 
@@ -590,7 +630,7 @@ ${JSON.stringify(schema, null, 2)}`)
     // script 是断言
     if (script) {
       logs.push('执行脚本:' + script)
-      result = yapi.commons.sandbox(context, script);
+      result = await yapi.commons.sandbox(context, script);
     }
     result.logs = logs;
     return yapi.commons.resReturn(result);

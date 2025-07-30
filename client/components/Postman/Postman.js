@@ -1005,7 +1005,7 @@ export default class Run extends Component {
                   onChange={e => this.setState({ enable_script: e })}
                 />
               </h3>
-              <p style={{ margin: '10px' }}>注：Test 脚本只有做自动化测试才执行</p>
+              <p style={{ margin: '10px' }}>注：Test脚本只有做自动化测试才执行</p>
               <Row>
                 <Col span="18">
                   <AceEditor

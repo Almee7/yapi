@@ -360,15 +360,16 @@ class InterfaceColContent extends Component {
 
       // 断言测试
       await this.handleScriptTest(interfaceData, responseData, validRes, requestParams);
-      if (validRes[0].message === 0) {
-        validRes[0].message = "验证通过";
-        result.code = 0;
-        result.validRes = validRes;
-      } else {
-        validRes[0].message = "验证失败";
-        result.code = 1;
-        result.validRes = validRes;
-      }
+        if ([0, 2].includes(validRes[0].message)) {
+            validRes[0].message = validRes[0].message === 0 ? "验证通过" : "无脚本";
+            result.code = 0;
+            result.validRes = validRes.slice(0, 1)
+        } else {
+            validRes[0].message = "验证失败";
+            result.code = 1;
+            validRes.splice(1, 1)
+            result.validRes = validRes
+        }
     } catch (data) {
       result = {
         ...options,
@@ -393,6 +394,7 @@ class InterfaceColContent extends Component {
   //response, validRes
   // 断言测试
   handleScriptTest = async (interfaceData, response, validRes, requestParams) => {
+    console.log('-----------+++++++++++++++', interfaceData)
     // ✅ 判断是否启用测试脚本
     if (!interfaceData.enable_script) {
       validRes.push({ message: 2 });

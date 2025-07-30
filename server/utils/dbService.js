@@ -10,7 +10,7 @@ const packageDefinition = protoLoader.loadSync(PROTO_PATH, {
     longs: String,
     enums: String,
     defaults: true,
-    oneofs: true,
+    oneofs: true
 });
 
 const dbProto = grpc.loadPackageDefinition(packageDefinition).DatabaseService;
@@ -54,5 +54,5 @@ async function truncateTableIfExists(tableName) {
 
 module.exports = {
     executeSQL,
-    truncateTableIfExists,
+    truncateTableIfExists
 };

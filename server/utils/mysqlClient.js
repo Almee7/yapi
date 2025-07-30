@@ -18,9 +18,34 @@ function execSql(sql) {
     return new Promise((resolve, reject) => {
         client.Execute({ sql }, (err, res) => {
             if (err) return reject(err);
+
+            const raw = res && res.result;
+
+            console.log('🟡 执行 SQL：', sql);
+            console.log('🟡 gRPC 返回结果：', raw);
+
             try {
-                resolve(JSON.parse(res.result));
+                if (!raw || typeof raw !== 'string' || raw.trim() === '') {
+                    throw new Error('gRPC 返回了空或非法 JSON');
+                }
+
+                const parsed = JSON.parse(raw);
+
+                if (!Array.isArray(parsed) || parsed.length === 0) {
+                    throw new Error('SQL 返回为空数组');
+                }
+
+                const row = parsed[0];
+                if (typeof row !== 'object') {
+                    throw new Error('SQL 行数据格式非法');
+                }
+
+                const values = Object.values(row); // ✅ 提取 value 数组
+                console.log('✅ SQL 返回值：', values);
+                resolve(values); // ✅ 返回纯值数组
+
             } catch (e) {
+                console.error('❌ SQL 结果解析失败:', e.message);
                 reject(e);
             }
         });
@@ -28,5 +53,5 @@ function execSql(sql) {
 }
 
 module.exports = {
-    execSql,
+    execSql
 };
