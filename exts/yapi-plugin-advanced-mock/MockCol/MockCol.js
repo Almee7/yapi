@@ -51,6 +51,8 @@ export default class MockCol extends Component {
   openModal = (record, isAdd) => {
     return async () => {
       if (this.props.currInterface.res_body_is_json_schema && isAdd) {
+        // 强制禁止额外属性，避免多余字段
+        this.props.currInterface.res_body.additionalProperties = false;
         let result = await axios.post('/api/interface/schema2json', {
           schema: json5_parse(this.props.currInterface.res_body),
           required: true
@@ -59,6 +61,7 @@ export default class MockCol extends Component {
       }
       // 参数过滤schema形式
       if (this.props.currInterface.req_body_is_json_schema) {
+        this.props.currInterface.req_body_other.additionalProperties = false;
         let result = await axios.post('/api/interface/schema2json', {
           schema: json5_parse(this.props.currInterface.req_body_other),
           required: true

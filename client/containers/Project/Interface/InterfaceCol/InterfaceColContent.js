@@ -41,6 +41,9 @@ const createContext = require('common/createContext')
 
 import copy from 'copy-to-clipboard';
 
+export let scriptVars = {};
+
+
 const defaultModalStyle = {
   top: 10
 }
@@ -280,7 +283,6 @@ class InterfaceColContent extends Component {
         status = 'error';
         result = e;
       }
-      //result.body = result.data;
       this.reports[curitem._id] = result;
       this.records[curitem._id] = {
         status: result.status,
@@ -302,6 +304,7 @@ class InterfaceColContent extends Component {
   handleTest = async interfaceData => {
     let requestParams = {};
     let options = handleParams(interfaceData, this.handleValue, requestParams);
+    options.vars = scriptVars
     let result = {
       code: 400,
       msg: '数据异常',
@@ -338,7 +341,7 @@ class InterfaceColContent extends Component {
         projectId: interfaceData.project_id,
         interfaceId: interfaceData.interface_id
       });
-
+      // 将 options.data 中的数据合并进 requestParams，准备给下一个接口用
       if (options.data && typeof options.data === 'object') {
         requestParams = {
           ...requestParams,
@@ -359,17 +362,17 @@ class InterfaceColContent extends Component {
       );
 
       // 断言测试
-      await this.handleScriptTest(interfaceData, responseData, validRes, requestParams);
-        if ([0, 2].includes(validRes[0].message)) {
-            validRes[0].message = validRes[0].message === 0 ? "验证通过" : "无脚本";
-            result.code = 0;
-            result.validRes = validRes.slice(0, 1)
-        } else {
-            validRes[0].message = "验证失败";
-            result.code = 1;
-            validRes.splice(1, 1)
-            result.validRes = validRes
-        }
+      await this.handleScriptTest(interfaceData, responseData, validRes, requestParams, scriptVars);
+      if ([0, 2].includes(validRes[0].message)) {
+          validRes[0].message = validRes[0].message === 0 ? "验证通过" : "无脚本";
+          result.code = 0;
+          result.validRes = validRes.slice(0, 1)
+      } else {
+          validRes[0].message = "验证失败";
+          result.code = 1;
+          validRes.splice(1, 1)
+          result.validRes = validRes
+      }
     } catch (data) {
       result = {
         ...options,
@@ -393,8 +396,7 @@ class InterfaceColContent extends Component {
 
   //response, validRes
   // 断言测试
-  handleScriptTest = async (interfaceData, response, validRes, requestParams) => {
-    console.log('-----------+++++++++++++++', interfaceData)
+  handleScriptTest = async (interfaceData, response, validRes, requestParams, scriptVars) => {
     // ✅ 判断是否启用测试脚本
     if (!interfaceData.enable_script) {
       validRes.push({ message: 2 });
@@ -409,12 +411,12 @@ class InterfaceColContent extends Component {
         col_id: this.props.currColId,
         interface_id: interfaceData.interface_id
       });
-      // if (test.data.errcode !== 0) {
-        validRes.push({message : test.data.errcode})
-        test.data.data.logs.forEach(item => {
-          validRes.push({ message: item });
-        });
-      // }
+      validRes.push({message : test.data.errcode})
+      test.data.data.logs.forEach(item => {
+        validRes.push({ message: item });
+      });
+      // ✅ 变量注入到 scriptVars（引用类型）
+      Object.assign(scriptVars, test.data.data.vars || {});
     } catch (err) {
       validRes.push({
         message: 'Error: ' + err.message
@@ -424,8 +426,6 @@ class InterfaceColContent extends Component {
   // val 请求体的每个值 替换值
   handleValue = (val, global) => {
     let globalValue = ArrayToObject(global);
-    console.log("val的数值", val)
-    console.log("globalValueglobalValue",globalValue)
     let context = Object.assign({}, { global: globalValue }, this.records);
     return handleParamsValue(val, context);
   };
