@@ -22,7 +22,7 @@ import axios from 'axios';
 import CaseReport from './CaseReport.js';
 import _ from 'underscore';
 import { initCrossRequest } from 'client/components/Postman/CheckCrossInstall.js';
-// import produce from 'immer';
+import produce from 'immer';
 import {InsertCodeMap} from 'client/components/Postman/Postman.js'
 
 const plugin = require('client/plugin.js');
@@ -40,6 +40,9 @@ const Option = Select.Option;
 const createContext = require('common/createContext')
 
 import copy from 'copy-to-clipboard';
+
+export let scriptVars = {};
+
 
 const defaultModalStyle = {
   top: 10
@@ -116,6 +119,7 @@ class InterfaceColContent extends Component {
       visible: false,
       curCaseid: null,
       hasPlugin: false,
+
       advVisible: false,
       curScript: '',
       enableScript: false,
@@ -316,6 +320,7 @@ class InterfaceColContent extends Component {
   handleTest = async interfaceData => {
     let requestParams = {};
     let options = handleParams(interfaceData, this.handleValue, requestParams);
+    options.vars = scriptVars
     let result = {
       code: 400,
       msg: '数据异常',
@@ -373,19 +378,17 @@ class InterfaceColContent extends Component {
       );
 
       // 断言测试
-      await this.handleScriptTest(interfaceData, responseData, validRes, requestParams);
-
-      if (validRes.length === 0) {
-        result.code = 0;
-        result.validRes = [
-          {
-            message: '验证通过'
-          }
-        ];
-      } else if (validRes.length > 0) {
-        result.code = 1;
-        result.validRes = validRes;
-      }
+        await this.handleScriptTest(interfaceData, responseData, validRes, requestParams, scriptVars);
+        if ([0, 2].includes(validRes[0].message)) {
+            validRes[0].message = validRes[0].message === 0 ? "验证通过" : "无脚本";
+            result.code = 0;
+            result.validRes = validRes.slice(0, 1)
+        } else {
+            validRes[0].message = "验证失败";
+            result.code = 1;
+            validRes.splice(1, 1)
+            result.validRes = validRes
+        }
     } catch (data) {
       result = {
         ...options,
@@ -409,8 +412,12 @@ class InterfaceColContent extends Component {
 
   //response, validRes
   // 断言测试
-  handleScriptTest = async (interfaceData, response, validRes, requestParams) => {
-    // 是否启动断言
+  handleScriptTest = async (interfaceData, response, validRes, requestParams, scriptVars) => {
+    // ✅ 判断是否启用测试脚本
+    if (!interfaceData.enable_script) {
+      validRes.push({ message: 2 });
+      return
+    }
     try {
       let test = await axios.post('/api/col/run_script', {
         response: response,
@@ -420,18 +427,19 @@ class InterfaceColContent extends Component {
         col_id: this.props.currColId,
         interface_id: interfaceData.interface_id
       });
-      if (test.data.errcode !== 0) {
-        test.data.data.logs.forEach(item => {
-          validRes.push({ message: item });
-        });
-      }
+      validRes.push({message : test.data.errcode})
+      test.data.data.logs.forEach(item => {
+        validRes.push({ message: item });
+      });
+      // ✅ 变量注入到 scriptVars（引用类型）
+      Object.assign(scriptVars, test.data.data.vars || {});
     } catch (err) {
       validRes.push({
         message: 'Error: ' + err.message
       });
     }
   };
-
+  // val 请求体的每个值 替换值
   handleValue = (val, global) => {
     let globalValue = ArrayToObject(global);
     let context = Object.assign({}, { global: globalValue }, this.records);
@@ -474,7 +482,7 @@ class InterfaceColContent extends Component {
   }
 
   onChangeTest = d => {
-    
+
     this.setState({
       commonSetting: {
         ...this.state.commonSetting,
@@ -623,7 +631,6 @@ class InterfaceColContent extends Component {
       ...setting
 
     };
-    console.log(params)
 
     axios.post('/api/col/up_col', params).then(async res => {
       if (res.data.errcode) {
@@ -1334,7 +1341,7 @@ class InterfaceColContent extends Component {
             </Row>
             <Row type="flex" justify="space-around" className="row" align="middle">
               <Col span={21} className="autoTestUrl">
-                <a 
+                <a
                   target="_blank"
                   rel="noopener noreferrer"
                   href={localUrl + autoTestsUrl} >

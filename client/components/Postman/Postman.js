@@ -207,6 +207,8 @@ export default class Run extends Component {
       let schema = {};
       try {
         schema = json5.parse(req_body_other);
+        // 强制禁止额外属性，避免多余字段
+        schema.additionalProperties = false;
       } catch (e) {
         console.log('e', e);
         return;

@@ -1,21 +1,40 @@
 syntax = "proto3";
 
-package db;
+package grpc;
+option java_multiple_files = true;
 
-service MongoService {
-  rpc Execute(ExecuteRequest) returns (ExecuteResponse);
+service GrpcAgentService {
+  rpc invoke (AgentRequest) returns (AgentResponse) {
+  }
 }
 
-message ExecuteRequest {
-  string operation = 1; // find, insert, update, remove, aggregate, bulkInsert
-  string collection = 2;
-
-  // 这里用字符串传递复杂JSON对象，服务端解析
-  string data = 3;
+/* 该上下文用于java,python,go异构平台的GRPC服务 */
+message AgentContext {
+  string cookieId = 1;
+  string server = 2;
+  string userId = 3;
+  string userName = 4;
+  int64  timestamp = 5;
+  string traceId = 6;
 }
 
-message ExecuteResponse {
-  string result = 1;  // JSON字符串格式返回
-  bool success = 2;
-  string message = 3;
+message AgentResponse {
+  bool isSuccess = 1;
+  string serverName = 2;
+  int64 timestamp = 3;
+  int32 dataType = 4;
+  bytes dataBody = 5;
+}
+
+message AgentRequest {
+  AgentContext ctx = 1;
+  int32 langType = 2;
+  string module = 3;
+  string serviceName = 4;
+  string methodName = 5;
+  bytes params = 6;
+  bytes stream = 7;
+  string url = 8;
+  string methodType = 9;
+  string headers = 10;
 }

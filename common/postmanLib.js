@@ -21,6 +21,7 @@ const ContentTypeMap = {
   other: 'text'
 };
 
+
 const getStorage = async (id)=>{
   try{
     if(isNode){
@@ -187,7 +188,6 @@ function sandboxByNode(sandbox = {}, script) {
 }
 
 async function  sandbox(context = {}, script) {
-
   if (isNode) {
     try {
       context.context = context;
@@ -286,13 +286,13 @@ function sandboxByBrowser(context = {}, script ) {
  * @param {*} commonContext  负责传递一些业务信息，crossRequest 不关注具体传什么，只负责当中间人
  */
 async function crossRequest(defaultOptions, preScript, afterScript, commonContext = {}) {
-  let options = Object.assign({}, defaultOptions);
+  let options = {
+    ...defaultOptions
+  }
   const taskId = options.taskId || Math.random() + '';
   let urlObj = URL.parse(options.url, true),
     query = {};
   query = Object.assign(query, urlObj.query);
-
-  const vars = {};
 
   let context = {
     isNode,
@@ -324,7 +324,7 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
     requestBody: options.data,
     promise: false,
     storage: await getStorage(taskId),
-    vars: vars
+    vars: defaultOptions.vars
   };
   Object.assign(context, commonContext)
 
@@ -343,14 +343,6 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
     axios: axios
   });
 
-  // let scriptEnable = true;
-  // try {
-  //   // const yapi = require('../server/yapi');
-  //   const {scriptEnable: scriptEnableOfConfig} = require('config_example.json')
-  //   scriptEnable = scriptEnableOfConfig === true;
-  // } catch (err) {
-  //   console.log('wangjunhu!!!!!+_++++++', err)
-  // }
   if (preScript) {
     context = await sandbox(context, preScript);
     defaultOptions.url = options.url = URL.format({
@@ -390,8 +382,6 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
       window.crossRequest(options);
     });
   }
-
-
   if (afterScript) {
     context.responseData = data.res.body;
     context.responseHeader = data.res.header;

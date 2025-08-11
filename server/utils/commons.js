@@ -8,21 +8,16 @@ const interfaceColModel = require('../models/interfaceCol.js');
 const interfaceCaseModel = require('../models/interfaceCase.js');
 const interfaceModel = require('../models/interface.js');
 const userModel = require('../models/user.js');
-const followModel = require('../models/follow.js');
 const json5 = require('json5');
 const _ = require('underscore');
 const Ajv = require('ajv');
 const Mock = require('mockjs');
 const sandboxFn = require('./sandbox')
-
 const ejs = require('easy-json-schema');
-
 const jsf = require('json-schema-faker');
 const { schemaValidator } = require('../../common/utils');
 const http = require('http');
-const mysqlClient = require('./mysqlClient.js');
-const logger = require("./commons");
-
+const { runTestScript } = require('./dbClient');
 jsf.extend('mock', function () {
   return {
     mock: function (xx) {
@@ -35,16 +30,6 @@ const defaultOptions = {
   failOnInvalidTypes: false,
   failOnInvalidFormat: false
 };
-
-// formats.forEach(item => {
-//   item = item.name;
-//   jsf.format(item, () => {
-//     if (item === 'mobile') {
-//       return jsf.random.randexp('^[1][34578][0-9]{9}$');
-//     }
-//     return Mock.mock('@' + item);
-//   });
-// });
 
 exports.schemaToJson = function (schema, options = {}) {
   Object.assign(options, defaultOptions);
@@ -289,20 +274,23 @@ function replaceVars(template, vars) {
 }
 
 // 核心断言执行函数
-async function runSqlAsserts(asserts = [], vars = {}, mysqlClient) {
-  const assert = require('assert');
-  for (const item of asserts) {
-    const sql = replaceVars(item.sql, vars);
-    const result = await mysqlClient.execSql(sql);
-    console.log('✅ SQL 预期值：', item.expect);
-    if (Array.isArray(item.expect)) {
-      assert.deepStrictEqual(result, item.expect, `SQL断言失败，SQL: ${sql}`);
-    } else {
-      assert.strictEqual(result[0], item.expect, `SQL断言失败，SQL: ${sql}`);
-    }
-    console.log(`✅ SQL断言成功: ${sql}`);
+async function runSqlAsserts(asserts = [], vars = {}) {
+  // 替换变量，构造新数组，避免修改原始 asserts
+  const replacedAsserts = asserts.map(item => {
+    const replacedQuery = replaceVars(item.query, vars);
+    return { ...item, query: replacedQuery };
+  });
+
+  try {
+    // 一次性调用 runTestScript 传入所有替换后的断言
+    await runTestScript(replacedAsserts);
+    console.log('所有断言通过');
+  } catch (err) {
+    console.error('断言失败', err.message);
+    throw err; // 抛出异常，外层可感知失败
   }
 }
+
 
 /**
  * 沙盒执行 js 代码
@@ -326,9 +314,10 @@ exports.sandbox = async (sandbox, script) => {
     script.runInContext(context, {
       timeout: 3000
     });
+    console.log(sandbox.sqlAssert, typeof sandbox.sqlAssert)
     // 执行断言
-    if (Array.isArray(sandbox.sqlassert) && sandbox.sqlassert.length > 0) {
-      await runSqlAsserts(sandbox.sqlassert, sandbox.vars, mysqlClient);
+    if (Array.isArray(sandbox.sqlAssert) && sandbox.sqlAssert.length > 0) {
+      await runSqlAsserts(sandbox.sqlAssert, sandbox.vars);
     }
     return sandbox
   } catch (err) {
@@ -623,6 +612,7 @@ ${JSON.stringify(schema, null, 2)}`)
       if (globalScript) {
         logs.push('执行脚本：' + globalScript)
         result = await yapi.commons.sandbox(context, globalScript);
+        result.vars = context.vars;
       }
     }
 
@@ -631,6 +621,7 @@ ${JSON.stringify(schema, null, 2)}`)
     if (script) {
       logs.push('执行脚本:' + script)
       result = await yapi.commons.sandbox(context, script);
+      result.vars = context.vars;
     }
     result.logs = logs;
     return yapi.commons.resReturn(result);

@@ -1,16 +1,17 @@
-const crypto = require('crypto');
+// 假设这是你的 JSON 对象
+const jsonObject = {
+    type: "object",
+    properties: {
+        id: { type: "string", description: "" },
+        name: { type: "string" },
+    },
+    required: ["id"]
+};
 
-function sha1(input) {
-    return crypto.createHash('sha1').update(input).digest('hex');
-}
+// 序列化：把对象转换成字符串（存库时用）
+const jsonString = JSON.stringify(jsonObject);
+console.log("序列化后字符串:", jsonString);
 
-function generatePassword(password, salt) {
-    return sha1(password + sha1(salt));
-}
-
-// 测试数据
-const password = 'qwer1234';
-const salt = 'f9l1fe19jgk';
-
-const encrypted = generatePassword(password, salt);
-console.log(encrypted);
+// 反序列化：把字符串再解析成对象（读取时用）
+const parsedObject = JSON.parse(jsonString);
+console.log("反序列化回对象:", parsedObject);
