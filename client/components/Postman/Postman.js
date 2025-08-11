@@ -1,5 +1,6 @@
 import React, { PureComponent as Component } from 'react';
 import PropTypes from 'prop-types';
+// import MonacoEditor from 'react-monaco-editor';
 import {
   Button,
   Input,
@@ -136,6 +137,7 @@ export default class Run extends Component {
       test_res_header: null,
       test_res_body: null,
       autoPreviewHTML: true,
+      // selectedIds:[],
       ...this.props.data
     };
   }
@@ -802,6 +804,27 @@ export default class Run extends Component {
               添加Header
             </Button>
           </Panel>
+          {/*<Panel*/}
+          {/*    header={*/}
+          {/*      <div style={{ display: 'flex', justifyContent: 'space-between' }}>*/}
+          {/*        <Tooltip title="F9 全屏编辑">前置操作</Tooltip>*/}
+          {/*      </div>*/}
+          {/*    }*/}
+          {/*    key="preScript"*/}
+          {/*>*/}
+          {/*  <MonacoEditor*/}
+          {/*      height="300"*/}
+          {/*      language="javascript"*/}
+          {/*      theme="vs-dark"*/}
+          {/*      value={this.state.preScript}*/}
+          {/*      options={{*/}
+          {/*        selectOnLineNumbers: true,*/}
+          {/*        automaticLayout: true,*/}
+          {/*        minimap: { enabled: false }*/}
+          {/*      }}*/}
+          {/*      onChange={(newValue) => this.setState({ preScript: newValue })}*/}
+          {/*  />*/}
+          {/*</Panel>*/}
           <Panel
             header={
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>

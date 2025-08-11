@@ -22,7 +22,7 @@ import axios from 'axios';
 import CaseReport from './CaseReport.js';
 import _ from 'underscore';
 import { initCrossRequest } from 'client/components/Postman/CheckCrossInstall.js';
-import produce from 'immer';
+// import produce from 'immer';
 import {InsertCodeMap} from 'client/components/Postman/Postman.js'
 
 const plugin = require('client/plugin.js');
@@ -104,7 +104,6 @@ class InterfaceColContent extends Component {
     envList: PropTypes.array,
     curUid: PropTypes.number
   };
-
   constructor(props) {
     super(props);
     this.reports = {};
@@ -112,10 +111,10 @@ class InterfaceColContent extends Component {
     this.state = {
       rows: [],
       reports: {},
+      selectedIds: [],
       visible: false,
       curCaseid: null,
       hasPlugin: false,
-
       advVisible: false,
       curScript: '',
       enableScript: false,
@@ -140,16 +139,20 @@ class InterfaceColContent extends Component {
         }
       }
     };
+    console.log("1111111111111111111",this.state)
     this.onRow = this.onRow.bind(this);
     this.onMoveRow = this.onMoveRow.bind(this);
   }
-
+  // 当用户选择（点击）一个新的接口集合（Col）时，更新当前的集合状态
   async handleColIdChange(newColId){
     this.props.setColData({
       currColId: +newColId,
       isShowCol: true,
       isRander: false
     });
+    console.log("11111",newColId)
+    console.log("11111",this.setColData)
+    // 异步根据newColId调用接口获取集合下的测试用例列表
     let result = await this.props.fetchCaseList(newColId);
     if (result.payload.data.errcode === 0) {
       this.reports = handleReport(result.payload.data.colData.test_report);
@@ -164,15 +167,21 @@ class InterfaceColContent extends Component {
     await this.props.fetchCaseList(newColId);
     await this.props.fetchCaseEnvList(newColId);
     this.changeCollapseClose();
+    // 处理测试用例数据
     this.handleColdata(this.props.currCaseList);
+    console.log("传入CaseList",this.props.currCaseList)
   }
 
   async componentWillMount() {
+    // 获取项目下集合列表
     const result = await this.props.fetchInterfaceColList(this.props.match.params.id);
     await this.props.getToken(this.props.match.params.id);
     let { currColId } = this.props;
     const params = this.props.match.params;
+    console.log('match', this.props.match)
+    console.log('params', this.props.match.params)
     const { actionId } = params;
+    // 优先使用actionId（集合 ID），如果没有，则使用接口集合列表中的第一个集合 ID 作为默认值。
     this.currColId = currColId = +actionId || result.payload.data.data[0]._id;
     // this.props.history.push('/project/' + params.id + '/interface/col/' + currColId);
     if (currColId && currColId != 0) {
@@ -208,14 +217,17 @@ class InterfaceColContent extends Component {
 
   // 整合header信息
   handleReqHeader = (project_id, req_header, case_env) => {
+    console.log("起始_header:", req_header);
     let envItem = _.find(this.props.envList, item => {
       return item._id === project_id;
     });
 
     let currDomain = handleCurrDomain(envItem && envItem.env, case_env);
     let header = currDomain.header;
+    console.log("header", header)
     header.forEach(item => {
       if (!checkNameIsExistInArray(item.name, req_header)) {
+        console.log("req_header", req_header)
         // item.abled = true;
         item = {
           ...item,
@@ -224,45 +236,65 @@ class InterfaceColContent extends Component {
         req_header.push(item);
       }
     });
+    console.log("最终返回的 req_header:", req_header);
     return req_header;
   };
 
   handleColdata = (rows, currColEnvObj = {}) => {
+    console.log('处理前rows：', rows);
+    console.log('处理前currColEnvObj：', currColEnvObj);
     let that = this;
-    let newRows = produce(rows, draftRows => {
-      draftRows.map(item => {
-        item.id = item._id;
-        item._test_status = item.test_status;
-        if(currColEnvObj[item.project_id]){
-          item.case_env =currColEnvObj[item.project_id];
-        }
-        item.req_headers = that.handleReqHeader(item.project_id, item.req_headers, item.case_env);
-        return item;
-      });
-    });
+    let newRows =  rows || []
+    newRows.forEach(item => {
+      item.id = item._id;
+      item._test_status = item.test_status;
+
+      if (currColEnvObj[item.project_id]) {
+        item.case_env = currColEnvObj[item.project_id];
+      }
+      console.log('item.req_headers：', item.req_headers);
+      console.log('item.case_env：', item.case_env);
+      item.req_headers = that.handleReqHeader(item.project_id, item.req_headers, item.case_env);
+      console.log('处理后的 row：', item);
+    })
+    // produce(rows || [], draftRows => {
+    //   draftRows.forEach(item => {
+    //
+    //   });
+    // });
     this.setState({ rows: newRows });
   };
 ///开始测试入口
   executeTests = async () => {
+    const rows_w = {};
     for (let i = 0, l = this.state.rows.length, newRows, curitem; i < l; i++) {
+      const b = this.state.selectedIds;
+      const curRow = this.state.rows[i];
       let { rows } = this.state;
+      if (!b.includes(rows[i]._id)) continue;
+      // rows_w.push(curRow);
+      rows_w[curRow._id] = curRow;
+      console.log('符合条件的行:', rows_w);
+        // 你可以根据需要做进一步处理，比如推入数组等
       let envItem = _.find(this.props.envList, item => {
-        return item._id === rows[i].project_id;
+        return item._id === curRow.project_id;
       });
 
+      // 把多个对象的属性合并成一个新对象
       curitem = Object.assign(
         {},
-        rows[i],
+          curRow,
         {
+          // 覆盖或添加新字段
           env: envItem.env,
           pre_script: this.props.currProject.pre_script,
           after_script: this.props.currProject.after_script
         },
         { test_status: 'loading' }
       );
-      newRows = [].concat([], rows);
-      newRows[i] = curitem;
-      this.setState({ rows: newRows });
+      newRows = [].concat([], curRow);
+      newRows[i]= curitem;
+      // this.setState({ rows: curRow });
       let status = 'error',
         result;
       try {
@@ -299,9 +331,13 @@ class InterfaceColContent extends Component {
     });
   };
 
+  // 根据接口数据 interfaceData 构造请求参数、调试输出、并准备返回测试结果对象。
   handleTest = async interfaceData => {
+    console.log('handleTest 接收到的 interfaceData:', interfaceData);
     let requestParams = {};
     let options = handleParams(interfaceData, this.handleValue, requestParams);
+    console.log('handleTest 接收到的 options:', options);
+    console.log('handleTest 接收到的 requestParams:', requestParams);
     let result = {
       code: 400,
       msg: '数据异常',
@@ -439,6 +475,7 @@ class InterfaceColContent extends Component {
   };
 
   onRow(row) {
+    console.log("11dd",row.id)
     return { rowId: row.id, onMove: this.onMoveRow, onDrop: this.onDrop };
   }
 
@@ -452,8 +489,9 @@ class InterfaceColContent extends Component {
     });
   };
   onMoveRow({ sourceRowId, targetRowId }) {
+    console.log("wewewe",sourceRowId)
+    console.log("wewewe1111",targetRowId)
     let rows = dnd.moveRows({ sourceRowId, targetRowId })(this.state.rows);
-
     if (rows) {
       this.setState({ rows });
     }
@@ -545,7 +583,9 @@ class InterfaceColContent extends Component {
     await this.props.fetchCaseList(currColId);
 
     this.handleColdata(this.props.currCaseList);
+    console.log('测试111',this.props.currCaseList)
   };
+
 
   handleCancel = () => {
     this.setState({ visible: false });
@@ -651,12 +691,81 @@ class InterfaceColContent extends Component {
           }
         }
       })
+
     }
   }
-  
+  isAllSelected = () => {
+    const { rows } = this.state;
+    return rows.length > 0 && rows.every(row => this.state.selectedIds.includes(row._id));
+  };
+
+  // 处理全选点击事件
+  handleSelectAll = () => {
+    const { rows } = this.state;
+    const allSelected = this.isAllSelected();
+    const selectedIds = allSelected ? [] : rows.map(row => row._id);
+    this.setState({ selectedIds });
+    console.log("当前选中的 ID：", selectedIds);
+  };
+
+  // 处理单个选择事件
+  handleSelectRow = (id) => {
+    const { selectedIds } = this.state;
+    const next = selectedIds.includes(id)
+        ? selectedIds.filter(item => item !== id)
+        : [...selectedIds, id];
+    this.setState({ selectedIds: next });
+  };
+
+  // 切换启用状态
+  handleToggleEnableScript = (id, checked) => {
+    // 更新数据的方法，例如：
+    const newRows = this.state.rows.map(item =>
+        item._id === id ? {...item, enable_async: checked} : item
+    );
+    this.setState({rows: newRows});
+    console.log("rows----------------","rows");
+  };
+
   render() {
+    // const { currProject } = this.state;
     const currProjectId = this.props.currProject._id;
+    // const { rows } = this.state;
+    // const allSelected = this.state.rows.length > 0 && this.state.selectedIds.length === this.state.rows.length;
     const columns = [
+        {
+        header: {
+          label: (
+              <input
+                  type="checkbox"
+                  checked={this.isAllSelected()}
+                  onChange={this.handleSelectAll}
+                  style={{
+                    accentColor: 'green'  // ✅ 现代浏览器支持自定义 checkbox 颜色
+                  }}
+              />
+          )
+        },
+        cell: {
+          formatters: [
+            (text, { rowData }) => {
+              return (
+                  <input
+                      type="checkbox"
+                      checked={this.state.selectedIds.includes(rowData._id)}
+                      onChange={() => this.handleSelectRow(rowData._id)}
+                      style={{
+                        accentColor: 'green'  // ✅ 现代浏览器支持自定义 checkbox 颜色
+                      }}
+                  />
+              );
+            }
+          ]
+        },
+        props: {
+          style: { width: '50px' }
+        }
+      },
       {
         property: 'casename',
         header: {
@@ -671,9 +780,11 @@ class InterfaceColContent extends Component {
           formatters: [
             (text, { rowData }) => {
               let record = rowData;
+              console.log("rowData",record);
+              console.log("hahahhaha",record.casename);
               return (
                 <Link to={'/project/' + currProjectId + '/interface/case/' + record._id}>
-                  {record.casename.length > 23
+                  {record.casename && record.casename.length > 23
                     ? record.casename.substr(0, 20) + '...'
                     : record.casename}
                 </Link>
@@ -713,7 +824,7 @@ class InterfaceColContent extends Component {
         },
         props: {
           style: {
-            width: '100px'
+            width: '350px'
           }
         },
         cell: {
@@ -731,7 +842,7 @@ class InterfaceColContent extends Component {
         },
         props: {
           style: {
-            width: '100px'
+            width: '350px'
           }
         },
         cell: {
@@ -812,12 +923,41 @@ class InterfaceColContent extends Component {
           formatters: [
             (text, { rowData }) => {
               let record = rowData;
+              console.log("rowDatapath",record.path);
               return (
                 <Tooltip title="跳转到对应接口">
                   <Link to={`/project/${record.project_id}/interface/api/${record.interface_id}`}>
-                    {record.path.length > 23 ? record.path + '...' : record.path}
+                    {record.path && record.path.length > 23 ? record.path + '...' : record.path}
                   </Link>
                 </Tooltip>
+              );
+            }
+          ]
+        }
+      },
+      {
+        property: 'enable_async',
+        header: {
+          label: '是否异步'
+        },
+        props: {
+          style: {
+            width: '350px',
+            textAlign: 'center'
+          }
+        },
+        cell: {
+          formatters: [
+            (value, { rowData }) => {
+              return (
+                  <Switch
+                      checked={rowData.enable_async}
+                      onChange={(checked) => {
+                        console.log('切换开关', rowData._id, '为', checked);
+                        // 在此处调用修改方法，例如传入 rowData._id 与新值 checked
+                        this.handleToggleEnableScript(rowData._id, checked);
+                      }}
+                  />
               );
             }
           ]

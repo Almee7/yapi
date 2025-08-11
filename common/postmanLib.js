@@ -155,6 +155,7 @@ function checkRequestBodyIsRaw(method, reqBodyType) {
   return false;
 }
 
+// 判断重复项函数
 function checkNameIsExistInArray(name, arr) {
   let isRepeat = false;
   for (let i = 0; i < arr.length; i++) {
@@ -166,7 +167,7 @@ function checkNameIsExistInArray(name, arr) {
   }
   return isRepeat;
 }
-
+// 根据给定的环境名称从域名配置数组中查找匹配的配置对象
 function handleCurrDomain(domains, case_env) {
   let currDomain = _.find(domains, item => item.name === case_env);
 
@@ -364,7 +365,9 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
 }
 
 function handleParams(interfaceData, handleValue, requestParams) {
+  console.log('interfaceData =', interfaceData);
   let interfaceRunData = Object.assign({}, interfaceData);
+  console.log("处理前---------------interfaceRunData",interfaceRunData)
   function paramsToObjectWithEnable(arr) {
     const obj = {};
     safeArray(arr).forEach(item => {
@@ -375,6 +378,7 @@ function handleParams(interfaceData, handleValue, requestParams) {
         }
       }
     });
+    console.log("这是obj",obj)
     return obj;
   }
 
@@ -390,8 +394,14 @@ function handleParams(interfaceData, handleValue, requestParams) {
     });
     return obj;
   }
-
+  // 从对象 interfaceRunData 中提取若干字段，赋值给对应的变量：
+  console.log('interfaceRunData 解构前值:', interfaceRunData);
   let { case_env, path, env, _id } = interfaceRunData;
+  // let case_env = interfaceRunData[0].case_env;
+  // let path = interfaceRunData[0].path;
+  // let env = interfaceRunData.env;
+  // let _id = interfaceRunData[0]._id;
+  console.log("处理后---------------interfaceRunData",interfaceRunData)
   let currDomain,
     requestBody,
     requestOptions = {};
@@ -406,7 +416,9 @@ function handleParams(interfaceData, handleValue, requestParams) {
     path = path.replace(`{${item.name}}`, val || `{${item.name}}`);
   });
 
+  // 处理 URL 拼接与查询参数的注入
   const urlObj = URL.parse(joinPath(currDomain.domain, path), true);
+  console.log("interfaceRunData-------------------", interfaceRunData)
   const url = URL.format({
     protocol: urlObj.protocol || 'http',
     host: urlObj.host,
@@ -449,7 +461,7 @@ function handleParams(interfaceData, handleValue, requestParams) {
   } catch (e) {
     console.error('err', e);
   }
-
+  console.log("method--------",interfaceRunData.method)
   if (HTTP_METHOD[interfaceRunData.method].request_body) {
     if (interfaceRunData.req_body_type === 'form') {
       requestBody = paramsToObjectWithEnable(
@@ -459,6 +471,7 @@ function handleParams(interfaceData, handleValue, requestParams) {
       );
     } else if (interfaceRunData.req_body_type === 'json') {
       let reqBody = isJson5(interfaceRunData.req_body_other);
+      console.log("解析后的 reqBody：", reqBody);
       if (reqBody === false) {
         requestBody = interfaceRunData.req_body_other;
       } else {
@@ -481,6 +494,7 @@ function handleParams(interfaceData, handleValue, requestParams) {
       requestOptions.file = 'single-file';
     }
   }
+  console.log("--------------requestOptions" ,requestOptions)
   return requestOptions;
 }
 

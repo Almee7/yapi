@@ -127,14 +127,35 @@ exports.handleParamsValue = handleParamsValue;
 exports.simpleJsonPathParse = simpleJsonPathParse;
 exports.handleMockWord = handleMockWord;
 
+// exports.joinPath = (domain, joinPath) => {
+//   let l = domain.length;
+//   if (domain[l - 1] === '/') {
+//     domain = domain.substr(0, l - 1);
+//   }
+//   if (joinPath[0] !== '/') {
+//     joinPath = joinPath.substr(1);
+//   }
+//   return domain + joinPath;
+// };
 exports.joinPath = (domain, joinPath) => {
+  if (typeof domain !== 'string') {
+    console.warn('joinPath: domain 不是字符串', domain);
+    domain = '';
+  }
+
+  if (typeof joinPath !== 'string') {
+    console.warn('joinPath: joinPath 不是字符串，强制置空', joinPath);
+    joinPath = '';
+  }
+
   let l = domain.length;
   if (domain[l - 1] === '/') {
     domain = domain.substr(0, l - 1);
   }
   if (joinPath[0] !== '/') {
-    joinPath = joinPath.substr(1);
+    joinPath = '/' + joinPath;
   }
+
   return domain + joinPath;
 };
 
