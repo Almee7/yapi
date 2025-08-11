@@ -20,7 +20,7 @@ const CaseReport = function(props) {
   if (props.validRes && Array.isArray(props.validRes)) {
     validRes = props.validRes.map((item, index) => {
       return <div key={index}>{item.message}</div>;
-    });
+    })
   }
 
   return (

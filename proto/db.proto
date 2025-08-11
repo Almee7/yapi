@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package db;
+
+service MongoService {
+  rpc RunCommand (CommandRequest) returns (CommandResponse);
+  rpc InsertOne (InsertRequest) returns (CommandResponse);
+  rpc CreateIndex (IndexRequest) returns (CommandResponse);
+}
+
+message CommandRequest {
+  string db = 1;
+  string command = 2; // JSON 字符串，例如：{"create": "user"}
+}
+
+message InsertRequest {
+  string db = 1;
+  string collection = 2;
+  string document = 3; // JSON 字符串
+}
+
+message IndexRequest {
+  string db = 1;
+  string collection = 2;
+  string index = 3; // JSON 字符串，如 {"username":1}
+  bool unique = 4;
+}
+
+message CommandResponse {
+  bool success = 1;
+  string message = 2;
+}

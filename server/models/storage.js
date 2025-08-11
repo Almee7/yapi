@@ -38,7 +38,7 @@ class stroageModel extends baseModel {
       let r = new this.model(saveData);
       return r.save();
     }
-    return this.model.updateOne({
+    return this.model.update({
       key
     }, saveData)
   }

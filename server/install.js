@@ -1,12 +1,13 @@
-const fs = require('fs-extra');
-const yapi = require('./yapi.js');
-const commons = require('./utils/commons');
-const dbModule = require('./utils/db.js');
-const userModel = require('./models/user.js');
-const mongoose = require('mongoose');
+const fs = require('fs-extra');            // 文件操作工具，增强版 fs
+const yapi = require('./yapi.js');         // YApi 主入口文件，包含全局配置与工具
+const commons = require('./utils/commons');// 公共工具方法，如生成随机字符串等
+const dbModule = require('./utils/db.js'); // 数据库连接模块
+const userModel = require('./models/user.js'); // 用户模型（定义用户数据结构）
+const mongoose = require('mongoose');      // MongoDB 驱动
+
 
 yapi.commons = commons;
-yapi.connect = dbModule.connect();
+yapi.connect = dbModule.connect(); // 是个 Promise，连接数据库
 
 function install() {
   let exist = yapi.commons.fileExist(yapi.path.join(yapi.WEBROOT_RUNTIME, 'init.lock'));

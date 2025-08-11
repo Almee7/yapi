@@ -102,13 +102,11 @@ class GroupSetting extends Component {
   };
 
   componentWillMount() {
-    // console.log('custom_field1',this.props.currGroup.custom_field1)
     this.initState(this.props);
   }
 
   // 点击“查看危险操作”按钮
   toggleDangerOptions = () => {
-    // console.log(this.state.showDangerOptions);
     this.setState({
       showDangerOptions: !this.state.showDangerOptions
     });

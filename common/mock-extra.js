@@ -36,7 +36,9 @@ function mock(mockJSON, context) {
       if (p[i] && typeof p[i] === 'object') {
         c[i] = (p[i].constructor === Array) ? [] : {};
         parse(p[i], c[i]);
-      } else if(p[i] && typeof p[i] === 'string'){
+      // } else if(p[i] && typeof p[i] === 'string'){
+      } else if (p[i] && (typeof p[i] === 'string' || p[i] instanceof RegExp)) {
+
         p[i] = handleStr(p[i]);        
         var filters = i.split(mockSplit), newFilters = [].concat(filters);
         c[i] = p[i];
@@ -91,5 +93,4 @@ function mock(mockJSON, context) {
     return str;
   }
 }
-
 module.exports = mock;

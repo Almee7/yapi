@@ -170,7 +170,6 @@ function checkNameIsExistInArray(name, arr) {
 // 根据给定的环境名称从域名配置数组中查找匹配的配置对象
 function handleCurrDomain(domains, case_env) {
   let currDomain = _.find(domains, item => item.name === case_env);
-
   if (!currDomain) {
     currDomain = domains[0];
   }
@@ -187,7 +186,8 @@ function sandboxByNode(sandbox = {}, script) {
   return sandbox;
 }
 
-async function sandbox(context = {}, script) {
+async function  sandbox(context = {}, script) {
+
   if (isNode) {
     try {
       context.context = context;
@@ -215,16 +215,54 @@ async function sandbox(context = {}, script) {
   return context;
 }
 
-function sandboxByBrowser(context = {}, script) {
+function evalExpression(expr, context) {
+  try {
+    // 创建一个新的函数，并传入 context 对象作为作用域
+    return new Function('env', `with(env) { return ${expr}; }`)(context);
+  } catch (e) {
+    return expr; // 无法解析时原样返回
+  }
+}
+
+function replaceWithEnv(obj, env) {
+  if (typeof obj === 'string') {
+    const templateExpr = /\{\{\s*([^}]+?)\s*\}\}/g;
+
+    // 先判断整个字符串是不是单纯 {{ expr }}，是就返回结果的原类型
+    if (/^\{\{\s*([^}]+?)\s*\}\}$/.test(obj)) {
+      const expr = obj.match(/^\{\{\s*([^}]+?)\s*\}\}$/)[1];
+      const result = evalExpression(expr, env);
+      return result !== undefined ? result : obj;
+    }
+
+    // 否则替换模板字符串，整体是字符串
+    return obj.replace(templateExpr, (_, expr) => {
+      const result = evalExpression(expr, env);
+      return result !== undefined ? result : `{{${expr}}}`;
+    });
+  } else if (Array.isArray(obj)) {
+    return obj.map(item => replaceWithEnv(item, env));
+  } else if (typeof obj === 'object' && obj !== null) {
+    const result = {};
+    for (const k in obj) {
+      result[k] = replaceWithEnv(obj[k], env);
+    }
+    return result;
+  } else {
+    return obj;
+  }
+}
+
+function sandboxByBrowser(context = {}, script ) {
   if (!script || typeof script !== 'string') {
     return context;
   }
   let beginScript = '';
-  for (var i in context) {
-    beginScript += `var ${i} = context.${i};`;
-  }
+  beginScript += `var vars = context.vars;\n`;
   try {
     eval(beginScript + script);
+    //替换变量
+    context.requestBody = replaceWithEnv(context.requestBody, context.vars);
   } catch (err) {
     let message = `Script:
                    ----CodeBegin----:
@@ -253,6 +291,9 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
   let urlObj = URL.parse(options.url, true),
     query = {};
   query = Object.assign(query, urlObj.query);
+
+  const vars = {};
+
   let context = {
     isNode,
     get href() {
@@ -282,7 +323,8 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
     requestHeader: options.headers || {},
     requestBody: options.data,
     promise: false,
-    storage: await getStorage(taskId)
+    storage: await getStorage(taskId),
+    vars: vars
   };
   Object.assign(context, commonContext)
 
@@ -309,7 +351,6 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
   // } catch (err) {
   //   console.log('wangjunhu!!!!!+_++++++', err)
   // }
-
   if (preScript) {
     context = await sandbox(context, preScript);
     defaultOptions.url = options.url = URL.format({
@@ -321,8 +362,8 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
     defaultOptions.headers = options.headers = context.requestHeader;
     defaultOptions.data = options.data = context.requestBody;
   }
-
   let data;
+
 
   if (isNode) {
     data = await httpRequestByNode(options);
@@ -349,6 +390,7 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
       window.crossRequest(options);
     });
   }
+
 
   if (afterScript) {
     context.responseData = data.res.body;
@@ -404,7 +446,7 @@ function handleParams(interfaceData, handleValue, requestParams) {
   console.log("处理后---------------interfaceRunData",interfaceRunData)
   let currDomain,
     requestBody,
-    requestOptions = {};
+    requestOptions;
   currDomain = handleCurrDomain(env, case_env);
   interfaceRunData.req_params = interfaceRunData.req_params || [];
   interfaceRunData.req_params.forEach(item => {
@@ -466,7 +508,7 @@ function handleParams(interfaceData, handleValue, requestParams) {
     if (interfaceRunData.req_body_type === 'form') {
       requestBody = paramsToObjectWithEnable(
         safeArray(interfaceRunData.req_body_form).filter(item => {
-          return item.type == 'text';
+          return item.type === 'text';
         })
       );
     } else if (interfaceRunData.req_body_type === 'json') {
@@ -487,7 +529,7 @@ function handleParams(interfaceData, handleValue, requestParams) {
     if (interfaceRunData.req_body_type === 'form') {
       requestOptions.files = paramsToObjectWithEnable(
         safeArray(interfaceRunData.req_body_form).filter(item => {
-          return item.type == 'file';
+          return item.type === 'file';
         })
       );
     } else if (interfaceRunData.req_body_type === 'file') {

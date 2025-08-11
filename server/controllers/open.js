@@ -190,6 +190,7 @@ class openController extends baseController {
     return result;
   }
   async runAutoTest(ctx) {
+    console.log('runAutoTest 执行时间:', new Date().toISOString());
     if (!this.$tokenAuth) {
       return (ctx.body = yapi.commons.resReturn(null, 40022, 'token 验证失败'));
     }
@@ -249,11 +250,11 @@ class openController extends baseController {
     function getMessage(testList) {
       let successNum = 0,
         failedNum = 0,
-        len = 0,
+        len = testList.length,
         msg = '';
       testList.forEach(item => {
-        len++;
-        if (item.code === 0) {
+        const firstMessage = item.validRes && item.validRes[0] && item.validRes[0].message;;
+        if (firstMessage === 0) {
           successNum++;
         }
         else {
@@ -362,7 +363,7 @@ class openController extends baseController {
       result.params = requestParams;
       if (validRes.length === 0) {
         result.code = 0;
-        result.validRes = [{ message: '验证通过' }];
+        result.validRes = validRes;
       } else if (validRes.length > 0) {
         result.code = 1;
         result.validRes = validRes;

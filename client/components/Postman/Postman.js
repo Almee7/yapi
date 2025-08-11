@@ -27,6 +27,7 @@ import CheckCrossInstall, { initCrossRequest } from './CheckCrossInstall.js';
 import './Postman.scss';
 import ProjectEnv from '../../containers/Project/Setting/ProjectEnv/index.js';
 import json5 from 'json5';
+// import {href} from "koa/lib/request";
 const { handleParamsValue, ArrayToObject, schemaValidator } = require('common/utils.js');
 const {
   handleParams,
@@ -141,7 +142,6 @@ export default class Run extends Component {
       ...this.props.data
     };
   }
-
   get testResponseBodyIsHTML() {
     const hd = this.state.test_res_header
     return hd != null
@@ -322,6 +322,7 @@ export default class Run extends Component {
     });
   };
 
+
   reqRealInterface = async () => {
     if (this.state.loading === true) {
       this.setState({
@@ -335,8 +336,6 @@ export default class Run extends Component {
 
     let options = handleParams(this.state, this.handleValue),
       result;
-
-
     await plugin.emitHook('before_request', options, {
       type: this.props.type,
       caseId: options.caseId,
@@ -351,7 +350,6 @@ export default class Run extends Component {
         this.props.projectId,
         this.props.interfaceId
       ));
-
       await plugin.emitHook('after_request', result, {
         type: this.props.type,
         caseId: options.caseId,
@@ -366,7 +364,6 @@ export default class Run extends Component {
         statusText: result.res.statusText,
         runTime: result.runTime
       };
-
     } catch (data) {
       result = {
         header: data.header,
@@ -426,7 +423,7 @@ export default class Run extends Component {
   };
 
   changeParam = (name, v, index, key) => {
-    
+
     key = key || 'value';
     const pathParam = deepCopyJson(this.state[name]);
 
@@ -497,7 +494,6 @@ export default class Run extends Component {
   // 根据鼠标位置往req_body中动态插入数据
   changeInstallBody = (type, value) => {
     const pathParam = deepCopyJson(this.state[type]);
-    // console.log(pathParam)
     let oldValue = pathParam || '';
     let newValue = this.getInstallValue(oldValue, this.state.cursurPosition);
     let left = newValue.left;
@@ -515,7 +511,6 @@ export default class Run extends Component {
     let leftPostion = left.lastIndexOf('{{');
     let leftPostion2 = left.lastIndexOf('}}');
     let rightPostion = right.indexOf('}}');
-    // console.log(leftPostion, leftPostion2,rightPostion, rightPostion2);
     let val = '';
     // 需要切除原来的变量
     if (leftPostion !== -1 && rightPostion !== -1 && leftPostion > leftPostion2) {
@@ -584,7 +579,6 @@ export default class Run extends Component {
       inputValue,
       hasPlugin
     } = this.state;
-    // console.log(env);
     return (
       <div className="interface-test postman">
         {this.state.modalVisible && (
@@ -860,7 +854,7 @@ export default class Run extends Component {
                 className="pretty-editor"
                 ref={editor => (this.aceEditor = editor)}
                 data={this.state.req_body_other}
-                mode={req_body_type === 'json' ? null : 'text'}
+                mode={this.req_body_type === 'json' ? null : 'text'}
                 onChange={this.handleRequestBody}
                 fullScreen={true}
               />
@@ -1034,7 +1028,7 @@ export default class Run extends Component {
                   onChange={e => this.setState({ enable_script: e })}
                 />
               </h3>
-              <p style={{ margin: '10px' }}>注：Test 脚本只有做自动化测试才执行</p>
+              <p style={{ margin: '10px' }}>注：Test脚本只有做自动化测试才执行</p>
               <Row>
                 <Col span="18">
                   <AceEditor

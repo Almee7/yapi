@@ -76,7 +76,6 @@ class ErrMsg extends Component {
           icon = 'meh-o';
           break;
         default:
-          console.log('default');
       }
     }
     return (

@@ -12,7 +12,6 @@ import createStore from './reducer/create';
 import zhCN from 'antd/lib/locale-provider/zh_CN';
 
 const store = createStore();
-
 ReactDOM.render(
   <Provider store={store}>
     <LocaleProvider locale={zhCN}>
