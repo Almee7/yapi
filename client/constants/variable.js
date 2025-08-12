@@ -29,6 +29,10 @@ module.exports = {
     'PATCH': {
       request_body: true,
       default_tab: 'body'
+    },
+    'WS': {
+      request_body: false,
+      default_tab: 'query'
     }
   },
   PROJECT_COLOR: {
@@ -114,6 +118,10 @@ module.exports = {
     options: {
       bac: "#fff3cf",
       color: "#ffbf00"
+    },
+    ws: {
+      bac: "#f0e6ff",
+      color: "#6a4bdb"
     }
   },
   MOCK_SOURCE: [

@@ -326,6 +326,7 @@ class ProjectEnvContent extends Component {
                   <Select>
                     <Option value="http://">{'http://'}</Option>
                     <Option value="https://">{'https://'}</Option>
+                    <Option value="ws://">{'ws://'}</Option>
                   </Select>
                 )}
               />
