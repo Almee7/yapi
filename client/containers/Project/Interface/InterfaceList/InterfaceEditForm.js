@@ -420,8 +420,11 @@ class InterfaceEditForm extends Component {
     try {
       if (this.props.form.getFieldValue('res_body_is_json_schema')) {
         let schema = json5.parse(this.props.form.getFieldValue('res_body'));
+        // 强制禁止额外属性，避免多余字段
+        schema.additionalProperties = false;
         let result = await axios.post('/api/interface/schema2json', {
-          schema: schema
+          schema: schema,
+          additionalProperties: false
         });
         return this.mockPreview.setValue(JSON.stringify(result.data));
       }
