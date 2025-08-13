@@ -17,10 +17,10 @@ const ejs = require('easy-json-schema');
 const jsf = require('json-schema-faker');
 const { schemaValidator } = require('../../common/utils');
 const http = require('http');
-const { runTestScript } = require('./dbClient');
+const { GrpcAgentClient } = require('../grpc/dbClient.js')
+const assert = require("assert");
 const WsTestController = require("../controllers/wsTest");
 const vm = require('vm');
-const assert = require('assert');
 jsf.extend('mock', function () {
   return {
     mock: function (xx) {
@@ -276,21 +276,56 @@ function replaceVars(template, vars) {
   });
 }
 
-// 核心断言执行函数
-async function runSqlAsserts(asserts = [], vars = {}) {
+
+//执行sql
+async function executeQuery(params = [], vars = {}) {
+  const client = new GrpcAgentClient();
   // 替换变量，构造新数组，避免修改原始 asserts
-  const replacedAsserts = asserts.map(item => {
+  const replacedAsserts = params.map(item => {
     const replacedQuery = replaceVars(item.query, vars);
     return { ...item, query: replacedQuery };
   });
+  return client.invoke(replacedAsserts);
+}
+//执行断言
+function assertResult(actualResult, params) {
+  for (let i = 0; i < params.length; i++) {
+    const testItem = params[i];
+    const expect = testItem.expect;
+    const fields = testItem.fields;
+    const query = testItem.query;
+    const actualRows = actualResult[i];
 
-  try {
-    // 一次性调用 runTestScript 传入所有替换后的断言
-    await runTestScript(replacedAsserts);
-    console.log('所有断言通过');
-  } catch (err) {
-    console.error('断言失败', err.message);
-    throw err; // 抛出异常，外层可感知失败
+    if (Array.isArray(expect)) {
+      if (!actualRows || !Array.isArray(actualRows)) {
+        throw new Error(`断言失败：返回结果为空或格式不正确，SQL: ${query}`);
+      }
+
+      const actualFlat = actualRows.map(row =>
+          fields.map(f => row[f])
+      );
+
+      if (actualFlat.length === 0) {
+        throw new Error(`断言失败：没有查询到数据，SQL: ${query}`);
+      }
+
+      try {
+        assert.deepStrictEqual(actualFlat[0], expect);
+        console.log(`✅ 断言通过: ${JSON.stringify(expect)} == ${JSON.stringify(actualFlat[0])}`);
+      } catch (e) {
+        console.error(`❌ 断言失败: ${JSON.stringify(expect)} != ${JSON.stringify(actualFlat[0])}\nSQL: ${query}`);
+        throw e;
+      }
+    } else {
+      const actualValue = actualRows && actualRows[0] ? actualRows[0][fields[0]] : undefined;
+
+      try {
+        assert.strictEqual(actualValue, expect);
+        console.log(`✅ 断言通过: "${expect}" == "${actualValue}"`);
+      } catch (e) {
+        throw new Error(`❌ 断言失败: ${expect} != ${actualValue}\nSQL: ${query}`);
+      }
+    }
   }
 }
 
@@ -311,6 +346,16 @@ exports.sandbox = async (sandbox, script) => {
     sandbox.vars = sandbox.vars || {};
     sandbox.sqlassert = sandbox.sqlassert || [];
     sandbox.console = console;
+    script = new vm.Script(script);
+    const context = new vm.createContext(sandbox);
+    script.runInContext(context, {
+      timeout: 3000
+    });
+    console.log(sandbox.sqlAssert, typeof sandbox.sqlAssert)
+    // 执行断言
+    if (Array.isArray(sandbox.sqlAssert) && sandbox.sqlAssert.length > 0) {
+      const actualValue =  await executeQuery(sandbox.sqlAssert, sandbox.vars);
+      assertResult(actualValue, sandbox.sqlAssert)
     sandbox.wsLog = null; // 脚本里可以直接赋值
     const regex = /readWS\s*\(\s*["']([^"']+)["']\s*\)/;
     const match = script.match(regex);
@@ -342,14 +387,14 @@ exports.sandbox = async (sandbox, script) => {
     await wrappedScript.runInContext(context);
 
     // 执行 sqlassert
-    if (Array.isArray(sandbox.sqlassert) && sandbox.sqlassert.length > 0) {
-      await runSqlAsserts(sandbox.sqlassert, sandbox.vars);
+    if (Array.isArray(sandbox.sqlAssert) && sandbox.sqlAssert.length > 0) {
+        const actualValue =  await executeQuery(sandbox.sqlAssert, sandbox.vars);
+        assertResult(actualValue, sandbox.sqlAssert)
     }
-
     return sandbox;
   } catch (err) {
     err.__sandboxFailed = true;
-    throw err;
+    throw err
   }
 };
 
@@ -642,8 +687,6 @@ ${JSON.stringify(schema, null, 2)}`)
         result.vars = context.vars;
       }
     }
-
-
 
     let script = params.script;
     // script 是断言
