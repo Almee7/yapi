@@ -125,7 +125,9 @@ export default class InterfaceCaseContent extends Component {
       test_script,
       enable_script,
       test_res_body,
-      test_res_header
+      test_res_header,
+      pre_request_script
+
     } = this.postman.state;
 
     const { editCasename: casename } = this.state;
@@ -143,7 +145,8 @@ export default class InterfaceCaseContent extends Component {
       test_script,
       enable_script,
       test_res_body,
-      test_res_header
+      test_res_header,
+      pre_request_script
     };
 
     const res = await axios.post('/api/col/up_case', params);

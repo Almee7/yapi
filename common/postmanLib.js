@@ -1,4 +1,4 @@
-const { isJson5, json_parse, handleJson, joinPath, safeArray } = require('./utils');
+const { isJson5, json_parse, handleJson, joinPath, safeArray, isEmptyString} = require('./utils');
 const constants = require('../client/constants/variable.js');
 const _ = require('underscore');
 const URL = require('url');
@@ -224,6 +224,7 @@ function evalExpression(expr, context) {
   }
 }
 
+
 function replaceWithEnv(obj, env) {
   if (typeof obj === 'string') {
     const templateExpr = /\{\{\s*([^}]+?)\s*\}\}/g;
@@ -263,6 +264,7 @@ function sandboxByBrowser(context = {}, script ) {
     eval(beginScript + script);
     //替换变量
     context.requestBody = replaceWithEnv(context.requestBody, context.vars);
+    console.log("context.requestBody---------",context)
   } catch (err) {
     let message = `Script:
                    ----CodeBegin----:
@@ -278,20 +280,23 @@ function sandboxByBrowser(context = {}, script ) {
   return context;
 }
 
+
+
 /**
  * 
  * @param {*} defaultOptions 
  * @param {*} preScript 
  * @param {*} afterScript 
  * @param {*} commonContext  负责传递一些业务信息，crossRequest 不关注具体传什么，只负责当中间人
+ * @param {*} pre_request_script
  */
-async function crossRequest(defaultOptions, preScript, afterScript, commonContext = {}) {
+async function crossRequest(defaultOptions, preScript, afterScript, pre_request_script,commonContext = {}) {
   let options = {
     ...defaultOptions
   }
   const taskId = options.taskId || Math.random() + '';
   let urlObj = URL.parse(options.url, true),
-    query = {};
+      query = {};
   query = Object.assign(query, urlObj.query);
 
   let context = {
@@ -324,7 +329,7 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
     requestBody: options.data,
     promise: false,
     storage: await getStorage(taskId),
-    vars: defaultOptions.vars
+    vars: defaultOptions.vars || {}
   };
   Object.assign(context, commonContext)
 
@@ -343,7 +348,7 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
     axios: axios
   });
 
-  if (preScript) {
+  if (!isEmptyString(preScript)) {
     context = await sandbox(context, preScript);
     defaultOptions.url = options.url = URL.format({
       protocol: urlObj.protocol,
@@ -354,185 +359,189 @@ async function crossRequest(defaultOptions, preScript, afterScript, commonContex
     defaultOptions.headers = options.headers = context.requestHeader;
     defaultOptions.data = options.data = context.requestBody;
   }
+  if (!isEmptyString(pre_request_script)) {
+    context = await sandbox(context, pre_request_script);
+    defaultOptions.data = options.data = context.requestBody;
+  }
+
   let data;
 
 
-  if (isNode) {
-    data = await httpRequestByNode(options);
-    data.req = options;
-  } else {
-    data = await new Promise((resolve, reject) => {
-      options.error = options.success = function(res, header, data) {
-        let message = '';
-        if (res && typeof res === 'string') {
-          res = json_parse(data.res.body);
-          data.res.body = res;
-        }
-        if (!isNode) message = '请求异常，请检查 chrome network 错误信息... https://juejin.im/post/5c888a3e5188257dee0322af 通过该链接查看教程"）';
-        if (isNaN(data.res.status)) {
-          reject({
-            body: res || message,
-            header,
-            message
-          });
-        }
-        resolve(data);
-      };
-
-      window.crossRequest(options);
-    });
-  }
-  if (afterScript) {
-    context.responseData = data.res.body;
-    context.responseHeader = data.res.header;
-    context.responseStatus = data.res.status;
-    context.runTime = data.runTime;
-    context = await sandbox(context, afterScript);
-    data.res.body = context.responseData;
-    data.res.header = context.responseHeader;
-    data.res.status = context.responseStatus;
-    data.runTime = context.runTime;
-  }
-  return data;
-}
-
-function handleParams(interfaceData, handleValue, requestParams) {
-  console.log('interfaceData =', interfaceData);
-  let interfaceRunData = Object.assign({}, interfaceData);
-  console.log("处理前---------------interfaceRunData",interfaceRunData)
-  function paramsToObjectWithEnable(arr) {
-    const obj = {};
-    safeArray(arr).forEach(item => {
-      if (item && item.name && (item.enable || item.required === '1')) {
-        obj[item.name] = handleValue(item.value, currDomain.global);
-        if (requestParams) {
-          requestParams[item.name] = obj[item.name];
-        }
-      }
-    });
-    console.log("这是obj",obj)
-    return obj;
-  }
-
-  function paramsToObjectUnWithEnable(arr) {
-    const obj = {};
-    safeArray(arr).forEach(item => {
-      if (item && item.name) {
-        obj[item.name] = handleValue(item.value, currDomain.global);
-        if (requestParams) {
-          requestParams[item.name] = obj[item.name];
-        }
-      }
-    });
-    return obj;
-  }
-  // 从对象 interfaceRunData 中提取若干字段，赋值给对应的变量：
-  console.log('interfaceRunData 解构前值:', interfaceRunData);
-  let { case_env, path, env, _id } = interfaceRunData;
-  // let case_env = interfaceRunData[0].case_env;
-  // let path = interfaceRunData[0].path;
-  // let env = interfaceRunData.env;
-  // let _id = interfaceRunData[0]._id;
-  console.log("处理后---------------interfaceRunData",interfaceRunData)
-  let currDomain,
-    requestBody,
-    requestOptions;
-  currDomain = handleCurrDomain(env, case_env);
-  interfaceRunData.req_params = interfaceRunData.req_params || [];
-  interfaceRunData.req_params.forEach(item => {
-    let val = handleValue(item.value, currDomain.global);
-    if (requestParams) {
-      requestParams[item.name] = val;
-    }
-    path = path.replace(`:${item.name}`, val || `:${item.name}`);
-    path = path.replace(`{${item.name}}`, val || `{${item.name}}`);
-  });
-
-  // 处理 URL 拼接与查询参数的注入
-  const urlObj = URL.parse(joinPath(currDomain.domain, path), true);
-  console.log("interfaceRunData-------------------", interfaceRunData)
-  const url = URL.format({
-    protocol: urlObj.protocol || 'http',
-    host: urlObj.host,
-    pathname: urlObj.pathname,
-    query: Object.assign(urlObj.query, paramsToObjectWithEnable(interfaceRunData.req_query))
-  });
-
-  let headers = paramsToObjectUnWithEnable(interfaceRunData.req_headers);
-  requestOptions = {
-    url,
-    caseId: _id,
-    method: interfaceRunData.method,
-    headers,
-    timeout: 82400000
-  };
-
-  // 对 raw 类型的 form 处理
-  try {
-    if (interfaceRunData.req_body_type === 'raw') {
-      if (headers && headers['Content-Type']) {
-        if (headers['Content-Type'].indexOf('application/x-www-form-urlencoded') >= 0) {
-          interfaceRunData.req_body_type = 'form';
-          let reqData = json_parse(interfaceRunData.req_body_other);
-          if (reqData && typeof reqData === 'object') {
-            interfaceRunData.req_body_form = [];
-            Object.keys(reqData).forEach(key => {
-              interfaceRunData.req_body_form.push({
-                name: key,
-                type: 'text',
-                value: JSON.stringify(reqData[key]),
-                enable: true
-              });
+    if (isNode) {
+      data = await httpRequestByNode(options);
+      data.req = options;
+    } else {
+      data = await new Promise((resolve, reject) => {
+        options.error = options.success = function (res, header, data) {
+          let message = '';
+          if (res && typeof res === 'string') {
+            res = json_parse(data.res.body);
+            data.res.body = res;
+          }
+          if (!isNode) message = '请求异常，请检查 chrome network 错误信息... https://juejin.im/post/5c888a3e5188257dee0322af 通过该链接查看教程"）';
+          if (isNaN(data.res.status)) {
+            reject({
+              body: res || message,
+              header,
+              message
             });
           }
-        } else if (headers['Content-Type'].indexOf('application/json') >= 0) {
-          interfaceRunData.req_body_type = 'json';
-        }
-      }
-    }
-  } catch (e) {
-    console.error('err', e);
-  }
-  console.log("method--------",interfaceRunData.method)
-  if (HTTP_METHOD[interfaceRunData.method].request_body) {
-    if (interfaceRunData.req_body_type === 'form') {
-      requestBody = paramsToObjectWithEnable(
-        safeArray(interfaceRunData.req_body_form).filter(item => {
-          return item.type === 'text';
-        })
-      );
-    } else if (interfaceRunData.req_body_type === 'json') {
-      let reqBody = isJson5(interfaceRunData.req_body_other);
-      console.log("解析后的 reqBody：", reqBody);
-      if (reqBody === false) {
-        requestBody = interfaceRunData.req_body_other;
-      } else {
-        if (requestParams) {
-          requestParams = Object.assign(requestParams, reqBody);
-        }
-        requestBody = handleJson(reqBody, val => handleValue(val, currDomain.global));
-      }
-    } else {
-      requestBody = interfaceRunData.req_body_other;
-    }
-    requestOptions.data = requestBody;
-    if (interfaceRunData.req_body_type === 'form') {
-      requestOptions.files = paramsToObjectWithEnable(
-        safeArray(interfaceRunData.req_body_form).filter(item => {
-          return item.type === 'file';
-        })
-      );
-    } else if (interfaceRunData.req_body_type === 'file') {
-      requestOptions.file = 'single-file';
-    }
-  }
-  console.log("--------------requestOptions" ,requestOptions)
-  return requestOptions;
-}
+          resolve(data);
+        };
 
-exports.checkRequestBodyIsRaw = checkRequestBodyIsRaw;
-exports.handleParams = handleParams;
-exports.handleContentType = handleContentType;
-exports.crossRequest = crossRequest;
-exports.handleCurrDomain = handleCurrDomain;
-exports.checkNameIsExistInArray = checkNameIsExistInArray;
+        window.crossRequest(options);
+      });
+    }
+    if (afterScript) {
+      context.responseData = data.res.body;
+      context.responseHeader = data.res.header;
+      context.responseStatus = data.res.status;
+      context.runTime = data.runTime;
+      context = await sandbox(context, afterScript);
+      data.res.body = context.responseData;
+      data.res.header = context.responseHeader;
+      data.res.status = context.responseStatus;
+      data.runTime = context.runTime;
+    }
+    return data;
+  }
+
+  function handleParams(interfaceData, handleValue, requestParams) {
+    console.log('interfaceData =', interfaceData);
+    let interfaceRunData = Object.assign({}, interfaceData);
+    console.log("处理前---------------interfaceRunData", interfaceRunData)
+
+    function paramsToObjectWithEnable(arr) {
+      const obj = {};
+      safeArray(arr).forEach(item => {
+        if (item && item.name && (item.enable || item.required === '1')) {
+          obj[item.name] = handleValue(item.value, currDomain.global);
+          if (requestParams) {
+            requestParams[item.name] = obj[item.name];
+          }
+        }
+      });
+      console.log("这是obj", obj)
+      return obj;
+    }
+
+    function paramsToObjectUnWithEnable(arr) {
+      const obj = {};
+      safeArray(arr).forEach(item => {
+        if (item && item.name) {
+          obj[item.name] = handleValue(item.value, currDomain.global);
+          if (requestParams) {
+            requestParams[item.name] = obj[item.name];
+          }
+        }
+      });
+      return obj;
+    }
+
+    // 从对象 interfaceRunData 中提取若干字段，赋值给对应的变量：
+    console.log('interfaceRunData 解构前值:', interfaceRunData);
+    let {case_env, path, env, _id} = interfaceRunData;
+    console.log("处理后---------------interfaceRunData", interfaceRunData)
+    let currDomain,
+        requestBody,
+        requestOptions;
+    currDomain = handleCurrDomain(env, case_env);
+    interfaceRunData.req_params = interfaceRunData.req_params || [];
+    interfaceRunData.req_params.forEach(item => {
+      let val = handleValue(item.value, currDomain.global);
+      if (requestParams) {
+        requestParams[item.name] = val;
+      }
+      path = path.replace(`:${item.name}`, val || `:${item.name}`);
+      path = path.replace(`{${item.name}}`, val || `{${item.name}}`);
+    });
+
+    // 处理 URL 拼接与查询参数的注入
+    const urlObj = URL.parse(joinPath(currDomain.domain, path), true);
+    console.log("interfaceRunData-------------------", interfaceRunData)
+    const url = URL.format({
+      protocol: urlObj.protocol || 'http',
+      host: urlObj.host,
+      pathname: urlObj.pathname,
+      query: Object.assign(urlObj.query, paramsToObjectWithEnable(interfaceRunData.req_query))
+    });
+
+    let headers = paramsToObjectUnWithEnable(interfaceRunData.req_headers);
+    requestOptions = {
+      url,
+      caseId: _id,
+      method: interfaceRunData.method,
+      headers,
+      timeout: 82400000
+    };
+
+    // 对 raw 类型的 form 处理
+    try {
+      if (interfaceRunData.req_body_type === 'raw') {
+        if (headers && headers['Content-Type']) {
+          if (headers['Content-Type'].indexOf('application/x-www-form-urlencoded') >= 0) {
+            interfaceRunData.req_body_type = 'form';
+            let reqData = json_parse(interfaceRunData.req_body_other);
+            if (reqData && typeof reqData === 'object') {
+              interfaceRunData.req_body_form = [];
+              Object.keys(reqData).forEach(key => {
+                interfaceRunData.req_body_form.push({
+                  name: key,
+                  type: 'text',
+                  value: JSON.stringify(reqData[key]),
+                  enable: true
+                });
+              });
+            }
+          } else if (headers['Content-Type'].indexOf('application/json') >= 0) {
+            interfaceRunData.req_body_type = 'json';
+          }
+        }
+      }
+    } catch (e) {
+      console.error('err', e);
+    }
+    console.log("method--------", interfaceRunData.method)
+    if (HTTP_METHOD[interfaceRunData.method].request_body) {
+      if (interfaceRunData.req_body_type === 'form') {
+        requestBody = paramsToObjectWithEnable(
+            safeArray(interfaceRunData.req_body_form).filter(item => {
+              return item.type === 'text';
+            })
+        );
+      } else if (interfaceRunData.req_body_type === 'json') {
+        let reqBody = isJson5(interfaceRunData.req_body_other);
+        console.log("解析后的 reqBody：", reqBody);
+        if (reqBody === false) {
+          requestBody = interfaceRunData.req_body_other;
+        } else {
+          if (requestParams) {
+            requestParams = Object.assign(requestParams, reqBody);
+          }
+          requestBody = handleJson(reqBody, val => handleValue(val, currDomain.global));
+          console.log("data---------",requestBody)
+        }
+      } else {
+        requestBody = interfaceRunData.req_body_other;
+      }
+      requestOptions.data = requestBody;
+      if (interfaceRunData.req_body_type === 'form') {
+        requestOptions.files = paramsToObjectWithEnable(
+            safeArray(interfaceRunData.req_body_form).filter(item => {
+              return item.type === 'file';
+            })
+        );
+      } else if (interfaceRunData.req_body_type === 'file') {
+        requestOptions.file = 'single-file';
+      }
+    }
+    console.log("--------------requestOptions", requestOptions)
+    return requestOptions;
+  }
+
+  exports.checkRequestBodyIsRaw = checkRequestBodyIsRaw;
+  exports.handleParams = handleParams;
+  exports.handleContentType = handleContentType;
+  exports.crossRequest = crossRequest;
+  exports.handleCurrDomain = handleCurrDomain;
+  exports.checkNameIsExistInArray = checkNameIsExistInArray;

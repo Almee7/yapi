@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import './index.scss';
-import { Alert, Modal, Row, Col, Icon, Collapse, Input, Tooltip, Tabs } from 'antd';
+import { Alert, Modal, Row, Col, Icon, Collapse, Input, Tooltip } from 'antd';
 import MockList from './MockList.js';
 import MethodsList from './MethodsList.js';
 import VariablesSelect from './VariablesSelect.js';

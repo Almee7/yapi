@@ -27,6 +27,7 @@ import CheckCrossInstall, { initCrossRequest } from './CheckCrossInstall.js';
 import './Postman.scss';
 import ProjectEnv from '../../containers/Project/Setting/ProjectEnv/index.js';
 import json5 from 'json5';
+import {scriptVars} from "../../containers/Project/Interface/InterfaceCol/InterfaceColContent";
 // import {href} from "koa/lib/request";
 const { handleParamsValue, ArrayToObject, schemaValidator } = require('common/utils.js');
 const {
@@ -131,6 +132,7 @@ export default class Run extends Component {
       mock_verify: false,
       enable_script: false,
       test_script: '',
+      pre_script: '',
       hasPlugin: true,
       inputValue: '',
       cursurPosition: { row: 1, column: -1 },
@@ -139,8 +141,9 @@ export default class Run extends Component {
       test_res_body: null,
       autoPreviewHTML: true,
       // selectedIds:[],
-      ...this.props.data
-    };
+      ...this.props.data,
+      pre_request_script:''
+    }
   }
   get testResponseBodyIsHTML() {
     const hd = this.state.test_res_header
@@ -342,12 +345,14 @@ export default class Run extends Component {
       type: this.props.type,
       caseId: options.caseId,
       projectId: this.props.projectId,
-      interfaceId: this.props.interfaceId
+      interfaceId: this.props.interfaceId,
+      scriptVars: options.vars
     });
 
     try {
       options.taskId = this.props.curUid;
-      result = await crossRequest(options, options.pre_script || this.state.pre_script, options.after_script || this.state.after_script, createContext(
+      console.log("options--------",options)
+      result = await crossRequest(options, options.pre_script || this.state.pre_script, options.after_script || this.state.after_script ,options.pre_request_script || this.state.pre_request_script , createContext(
         this.props.curUid,
         this.props.projectId,
         this.props.interfaceId
@@ -565,6 +570,15 @@ export default class Run extends Component {
       envModalVisible: false
     });
   };
+
+  handlePreRequestScript = code => {
+    // code 是 AceEditor 传来的纯字符串
+    this.setState({ pre_request_script: code.text});
+    // 如果要本地持久化
+    localStorage.setItem('pre_request_script', code);
+  };
+
+
 
   render() {
     const {
@@ -800,27 +814,32 @@ export default class Run extends Component {
               添加Header
             </Button>
           </Panel>
-          {/*<Panel*/}
-          {/*    header={*/}
-          {/*      <div style={{ display: 'flex', justifyContent: 'space-between' }}>*/}
-          {/*        <Tooltip title="F9 全屏编辑">前置操作</Tooltip>*/}
-          {/*      </div>*/}
-          {/*    }*/}
-          {/*    key="preScript"*/}
-          {/*>*/}
-          {/*  <MonacoEditor*/}
-          {/*      height="300"*/}
-          {/*      language="javascript"*/}
-          {/*      theme="vs-dark"*/}
-          {/*      value={this.state.preScript}*/}
-          {/*      options={{*/}
-          {/*        selectOnLineNumbers: true,*/}
-          {/*        automaticLayout: true,*/}
-          {/*        minimap: { enabled: false }*/}
-          {/*      }}*/}
-          {/*      onChange={(newValue) => this.setState({ preScript: newValue })}*/}
-          {/*  />*/}
-          {/*</Panel>*/}
+          <Panel
+              header={
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Tooltip title="F9 全屏编辑">前置操作</Tooltip>
+                </div>
+              }
+              key="pre_request_script"
+          >
+            <AceEditor
+                mode="javascript" // 设置 JS 语法高亮
+                theme="monokai"   // 主题，可换
+                name="pre-script-editor"
+                width="100%"
+                height="300px"
+                fontSize={14}
+                showPrintMargin={false}
+                showGutter={true}
+                highlightActiveLine={true}
+                data={this.state.pre_request_script}
+                onChange={(newValue) => this.handlePreRequestScript(newValue)}
+                setOptions={{
+                  useWorker: false // 关闭语法检查避免报错
+                }}
+                ref={(aceEditor) => { this.aceEditor = aceEditor; }}
+            />
+          </Panel>
           <Panel
             header={
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>

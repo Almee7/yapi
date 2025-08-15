@@ -49,6 +49,7 @@ class AceEditor extends React.PureComponent {
     }
   }
 
+
   componentWillReceiveProps(nextProps) {
     if (!this.editor) {
       return;

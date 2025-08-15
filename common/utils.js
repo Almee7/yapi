@@ -3,6 +3,12 @@ const filter = require('./power-string.js').filter;
 const stringUtils = require('./power-string.js').utils;
 const json5 = require('json5');
 const Ajv = require('ajv');
+// const {options} = require("../ydocfile");
+
+function isEmptyString(str) {
+  return str == null || (typeof str === 'string' && !str.replace(/[\s\n\t\r\u200B\u200C]/g, ''));
+}
+
 /**
  * 作用：解析规则串 key ，然后根据规则串的规则以及路径找到在 json 中对应的数据
  * 规则串：$.{key}.{body||params}.{dataPath} 其中 body 为返回数据，params 为请求数据，datapath 为数据的路径
@@ -64,6 +70,9 @@ function handleJson(data, handleValueFn) {
     return data;
   }
   if (typeof data === 'string') {
+    if (/^\{\{.*\}\}$/.test(data)) {
+      return data;
+    }
     return handleValueFn(data);
   } else if (typeof data === 'object') {
     for (let i in data) {
@@ -121,11 +130,34 @@ function handleParamsValue(val, context = {}) {
   });
 }
 
+function StopCollection() {
+  let stopFlag = false; // 私有变量
+
+  return {
+    // 设置终止标志
+    setStopFlag(value) {
+      stopFlag = value;
+    },
+
+    // 获取终止标志
+    getStopFlag() {
+      return stopFlag;
+    },
+
+    // 重置标志位
+    reset() {
+      stopFlag = false;
+    }
+  };
+}
+
 exports.handleJson = handleJson;
 exports.handleParamsValue = handleParamsValue;
 
 exports.simpleJsonPathParse = simpleJsonPathParse;
 exports.handleMockWord = handleMockWord;
+exports.isEmptyString = isEmptyString
+exports.StopCollection = StopCollection;
 
 // exports.joinPath = (domain, joinPath) => {
 //   let l = domain.length;

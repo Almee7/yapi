@@ -22,7 +22,7 @@ import axios from 'axios';
 import CaseReport from './CaseReport.js';
 import _ from 'underscore';
 import { initCrossRequest } from 'client/components/Postman/CheckCrossInstall.js';
-import produce from 'immer';
+// import produce from 'immer';
 import {InsertCodeMap} from 'client/components/Postman/Postman.js'
 
 const plugin = require('client/plugin.js');
@@ -54,6 +54,10 @@ function handleReport(json) {
   } catch (e) {
     return {};
   }
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 @connect(
@@ -117,9 +121,9 @@ class InterfaceColContent extends Component {
       reports: {},
       selectedIds: [],
       visible: false,
+      loading: false,
       curCaseid: null,
       hasPlugin: false,
-
       advVisible: false,
       curScript: '',
       enableScript: false,
@@ -253,52 +257,61 @@ class InterfaceColContent extends Component {
     // });
     this.setState({ rows: newRows });
   };
+
 ///开始测试入口
   executeTests = async () => {
+    // 如果正在运行，点击就是取消
+    if (this.state.loading) {
+      this.setState({ loading: false });
+      return;
+    }
+
+    // 切换按钮状态
+    this.setState({ loading: true });
+
+    // 让 React 有一次渲染机会（按钮立即变取消）
+    await Promise.resolve();
+
     const rows_w = {};
-    for (let i = 0, l = this.state.rows.length, newRows, curitem; i < l; i++) {
-      const b = this.state.selectedIds;
+
+    for (let i = 0; i < this.state.rows.length; i++) {
+      // 如果点击了取消，直接中断循环
+      if (!this.state.loading) break;
+
       const curRow = this.state.rows[i];
-      let { rows } = this.state;
-      if (!b.includes(rows[i]._id)) continue;
-      // rows_w.push(curRow);
+      const b = this.state.selectedIds;
+      if (!b.includes(curRow._id)) continue;
+
       rows_w[curRow._id] = curRow;
       console.log('符合条件的行:', rows_w);
-        // 你可以根据需要做进一步处理，比如推入数组等
+
       let envItem = _.find(this.props.envList, item => {
         return item._id === curRow.project_id;
       });
 
-      curitem = Object.assign(
-        {},
-          curRow,
-        {
-          env: envItem.env,
-          pre_script: this.props.currProject.pre_script,
-          after_script: this.props.currProject.after_script
-        },
-        { test_status: 'loading' }
-      );
-      newRows = [].concat([], curRow);
-      newRows[i]= curitem;
-      // this.setState({ rows: curRow });
-      let status = 'error',
-        result;
+      let curitem = {
+        ...curRow,
+        env: envItem.env,
+        pre_script: this.props.currProject.pre_script,
+        after_script: this.props.currProject.after_script,
+        test_status: 'loading'
+      };
+
+      let status = 'error';
+      let result;
+
       try {
         result = await this.handleTest(curitem);
-        if (result.code === 400) {
-          status = 'error';
-        } else if (result.code === 0) {
+        if (result.code === 0) {
           status = 'ok';
         } else if (result.code === 1) {
           status = 'invalid';
         }
       } catch (e) {
         console.error(e);
-        status = 'error';
         result = e;
       }
-      //result.body = result.data;
+
       this.reports[curitem._id] = result;
       this.records[curitem._id] = {
         status: result.status,
@@ -306,21 +319,28 @@ class InterfaceColContent extends Component {
         body: result.res_body
       };
 
-      curitem = Object.assign({}, rows[i], { test_status: status });
-      newRows = [].concat([], rows);
-      newRows[i] = curitem;
+      const newRows = [...this.state.rows];
+      newRows[i] = { ...curitem, test_status: status };
       this.setState({ rows: newRows });
+
+      await sleep(5000);
     }
-    await axios.post('/api/col/up_col', {
-      col_id: this.props.currColId,
-      test_report: JSON.stringify(this.reports)
-    });
+
+    if (this.state.loading) {
+      await axios.post('/api/col/up_col', {
+        col_id: this.props.currColId,
+        test_report: JSON.stringify(this.reports)
+      });
+    }
+
+    this.setState({ loading: false });
   };
 
   handleTest = async interfaceData => {
     let requestParams = {};
     let options = handleParams(interfaceData, this.handleValue, requestParams);
     options.vars = scriptVars
+    console.log("scriptVars----------",scriptVars)
     let result = {
       code: 400,
       msg: '数据异常',
@@ -333,9 +353,9 @@ class InterfaceColContent extends Component {
       projectId: interfaceData.project_id,
       interfaceId: interfaceData.interface_id
     }));
-
+    console.log('options----------',options)
     try {
-      let data = await crossRequest(options, interfaceData.pre_script, interfaceData.after_script, createContext(
+      let data = await crossRequest(options, interfaceData.pre_script, interfaceData.after_script,interfaceData.pre_request_script, createContext(
         this.props.curUid,
         this.props.match.params.id,
         interfaceData.interface_id
@@ -708,17 +728,21 @@ class InterfaceColContent extends Component {
   };
 
   render() {
+    const {
+      loading,
+      hasPlugin
+    } = this.state;
     const currProjectId = this.props.currProject._id;
     const columns = [
-        {
+      {
         header: {
           label: (
-              <input
+            <input
                   type="checkbox"
                   checked={this.isAllSelected()}
                   onChange={this.handleSelectAll}
                   style={{
-                    accentColor: 'green'  // ✅ 现代浏览器支持自定义 checkbox 颜色
+                    accentColor: 'green' // ✅ 现代浏览器支持自定义 checkbox 颜色
                   }}
               />
           )
@@ -727,7 +751,7 @@ class InterfaceColContent extends Component {
           formatters: [
             (text, { rowData }) => {
               return (
-                  <input
+                <input
                       type="checkbox"
                       checked={this.state.selectedIds.includes(rowData._id)}
                       onChange={() => this.handleSelectRow(rowData._id)}
@@ -924,7 +948,7 @@ class InterfaceColContent extends Component {
           formatters: [
             (value, { rowData }) => {
               return (
-                  <Switch
+                <Switch
                       checked={rowData.enable_async}
                       onChange={(checked) => {
                         console.log('切换开关', rowData._id, '为', checked);
@@ -1168,8 +1192,15 @@ class InterfaceColContent extends Component {
                         marginRight: '8px'
                       }} >通用规则配置</Button>
                 &nbsp;
-                <Button type="primary" onClick={this.executeTests}>
-                  开始测试
+                <Button
+                    type="primary"
+                    onClick={this.executeTests}      // 原来的方法
+                    disabled={!hasPlugin}            // 根据条件禁用
+                    style={{ marginLeft: 10 }}       // 样式
+                    icon={loading ? 'loading' : ''} // 图标，loading 时显示加载
+                >
+                  {/*根据 loading 状态切换*/}
+                  {loading ? '取消' : '开始测试'}
                 </Button>
               </div>
             ) : (

@@ -31,10 +31,10 @@ async function runTestScript(testScript) {
                 const actualFlat = actualRows.map(row =>
                     testItem.fields.map(f => row[f])
                 );
-                console.log("actualFlat",actualFlat[0])
+                console.log("actualFlat---------", resultData, testItem, actualFlat[0], expect[0])
                 try {
                     assert.deepStrictEqual(actualFlat[0], expect);
-                    console.log(`✅ 断言通过: ${JSON.stringify(expect[0])} == ${JSON.stringify(actualFlat[0])}`);
+                    console.log(`✅ 断言通过: ${JSON.stringify(expect)} == ${JSON.stringify(actualFlat[0])}`);
                 } catch (e) {
                     throw new Error(`❌ 数据库断言失败: ${JSON.stringify(expect[0])} == ${JSON.stringify(actualFlat[0])} \nSQL: ${query}`);
                 }
