@@ -258,7 +258,7 @@ class InterfaceColContent extends Component {
     this.setState({ rows: newRows });
   };
 
-///开始测试入口
+//开始测试入口
   executeTests = async () => {
     // 如果正在运行，点击就是取消
     if (this.state.loading) {
@@ -326,7 +326,7 @@ class InterfaceColContent extends Component {
       newRows[i] = { ...curitem, test_status: status };
       this.setState({ rows: newRows });
 
-      await sleep(5000);
+      await sleep(2000);
     }
 
     if (this.state.loading) {
@@ -345,11 +345,46 @@ class InterfaceColContent extends Component {
       msg: '数据异常',
       validRes: []
     };
-    result = {
-      res_header: interfaceData.req_headers,
-      status: 0,
-      code: 0
-    };
+    let requestParams = {};
+    let options = handleParams(interfaceData, this.handleValue, requestParams);
+    try {
+      const postData = {
+        url: options.url,              // ws:// or wss://
+        query: options.query || {},   // 如果有 query 参数
+        headers: options.headers || {} // headers 里可能有 cookieId 等
+      };
+
+      // 调用后端接口
+      const res = await fetch('/api/ws-test/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(postData)
+      });
+
+      if (!res.ok) {
+        throw new Error(`后端接口请求失败，状态码 ${res.status}`);
+      }
+      const data = await res.json();
+
+      // data 格式示例:
+      // { header: {}, body: "...", status: 101, statusText: 'WebSocket连接关闭', messages: [...] }
+      result = result = {
+        header: data.header,
+        body: data.body,
+        status: 200,
+        statusText: data.message
+      };
+
+    } catch (e) {
+      result = {
+        header: {},
+        body: null,
+        status: null,
+        statusText: 'WebSocket请求异常',
+        error: e.message,
+        messages: []
+      };
+    }
     return result
   }
 
