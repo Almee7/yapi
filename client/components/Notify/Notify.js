@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
-import axios from 'axios';
-import { Alert, message } from 'antd';
+// import axios from 'axios';
+import { Alert } from 'antd';
 
 export default class Notify extends Component {
   constructor(props) {
@@ -12,14 +12,14 @@ export default class Notify extends Component {
   }
 
   componentDidMount() {
-    const versions = 'https://www.fastmock.site/mock/1529fa78fa4c4880ad153d115084a940/yapi/versions';
-    axios.get(versions).then(req => {
-      if (req.status === 200) {
-        this.setState({ newVersion: req.data.data[0] });
-      } else {
-        message.error('无法获取新版本信息！');
-      }
-    });
+    // const versions = 'https://www.fastmock.site/mock/1529fa78fa4c4880ad153d115084a940/yapi/versions';
+    // axios.get(versions).then(req => {
+    //   if (req.status === 200) {
+    //     this.setState({ newVersion: req.data.data[0] });
+    //   } else {
+    //     message.error('无法获取新版本信息！');
+    //   }
+    // });
   }
 
   render() {

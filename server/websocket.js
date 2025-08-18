@@ -25,6 +25,7 @@ function addPluginRouter(config) {
 function websocket(app) {
   createAction(router, "/api", interfaceController, "solveConflict", "/interface/solve_conflict", "get")
 
+
   yapi.emitHookSync('add_ws_router', addPluginRouter);
 
 

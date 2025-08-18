@@ -329,17 +329,16 @@ export default class Run extends Component {
 
 
   reqRealInterface = async () => {
+    console.log("this.state", this.state);
+
     if (this.state.loading === true) {
-      this.setState({
-        loading: false
-      });
+      this.setState({ loading: false });
       return null;
     }
-    this.setState({
-      loading: true
-    });
+    this.setState({ loading: true });
 
     let options = handleParams(this.state, this.handleValue),
+<<<<<<< Updated upstream
       result;
     await plugin.emitHook('before_request', options, {
       type: this.props.type,
@@ -358,53 +357,112 @@ export default class Run extends Component {
         this.props.interfaceId
       ));
       await plugin.emitHook('after_request', result, {
+=======
+        result;
+
+    // 新增：WebSocket 测试分支
+    if (options.method === 'WS') {
+      try {
+        const postData = {
+          url: options.url,              // ws:// or wss://
+          query: options.query || {},   // 如果有 query 参数
+          headers: options.headers || {} // headers 里可能有 cookieId 等
+        };
+
+        // 调用后端接口
+        const res = await fetch('/api/ws-test/connect', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(postData)
+        });
+
+        if (!res.ok) {
+          throw new Error(`后端接口请求失败，状态码 ${res.status}`);
+        }
+        const data = await res.json();
+
+        // data 格式示例:
+        // { header: {}, body: "...", status: 101, statusText: 'WebSocket连接关闭', messages: [...] }
+        result = result = {
+          header: data.header,
+          body: data.body,
+          status: 200,
+          statusText: data.message
+        };
+
+      } catch (e) {
+        result = {
+          header: {},
+          body: null,
+          status: null,
+          statusText: 'WebSocket请求异常',
+          error: e.message,
+          messages: []
+        };
+      }
+    } else {
+      // 原有 HTTP 请求逻辑
+      await plugin.emitHook("before_request", options, {
+>>>>>>> Stashed changes
         type: this.props.type,
         caseId: options.caseId,
         projectId: this.props.projectId,
         interfaceId: this.props.interfaceId
       });
 
-      result = {
-        header: result.res.header,
-        body: result.res.body,
-        status: result.res.status,
-        statusText: result.res.statusText,
-        runTime: result.runTime
-      };
-    } catch (data) {
-      result = {
-        header: data.header,
-        body: data.body,
-        status: null,
-        statusText: data.message
-      };
+      try {
+        options.taskId = this.props.curUid;
+        result = await crossRequest(
+            options,
+            options.pre_script || this.state.pre_script,
+            options.after_script || this.state.after_script,
+            createContext(this.props.curUid, this.props.projectId, this.props.interfaceId)
+        );
+        await plugin.emitHook("after_request", result, {
+          type: this.props.type,
+          caseId: options.caseId,
+          projectId: this.props.projectId,
+          interfaceId: this.props.interfaceId
+        });
+
+        result = {
+          header: result.res.header,
+          body: result.res.body,
+          status: result.res.status,
+          statusText: result.res.statusText,
+          runTime: result.runTime
+        };
+      } catch (data) {
+        result = {
+          header: data.header,
+          body: data.body,
+          status: null,
+          statusText: data.message
+        };
+      }
     }
+
+    // 请求结束，关闭 loading
     if (this.state.loading === true) {
-      this.setState({
-        loading: false
-      });
+      this.setState({ loading: false });
     } else {
       return null;
     }
 
+    // 统一响应数据格式化 & 校验
     let tempJson = result.body;
-    if (tempJson && typeof tempJson === 'object') {
-      result.body = JSON.stringify(tempJson, null, '  ');
-      this.setState({
-        res_body_type: 'json'
-      });
+    if (tempJson && typeof tempJson === "object") {
+      result.body = JSON.stringify(tempJson, null, "  ");
+      this.setState({ res_body_type: "json" });
     } else if (isJson(result.body)) {
-      this.setState({
-        res_body_type: 'json'
-      });
+      this.setState({ res_body_type: "json" });
     }
 
-    // 对 返回值数据结构 和定义的 返回数据结构 进行 格式校验
     let validResult = this.resBodyValidator(this.props.data, result.body);
     if (!validResult.valid) {
       this.setState({ test_valid_msg: `返回参数 ${validResult.message}` });
     } else {
-      this.setState({ test_valid_msg: '' });
+      this.setState({ test_valid_msg: "" });
     }
 
     this.setState({
@@ -414,6 +472,8 @@ export default class Run extends Component {
       test_res_body: result.body
     });
   };
+
+
 
   // 返回数据与定义数据的比较判断
   resBodyValidator = (interfaceData, test_res_body) => {

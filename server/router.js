@@ -11,6 +11,7 @@ const logController = require('./controllers/log.js');
 const followController = require('./controllers/follow.js');
 const openController = require('./controllers/open.js');
 const { createAction } = require('./utils/commons.js');
+const wsTestController = require('./controllers/wsTest');
 
 const router = koaRouter();
 
@@ -50,6 +51,10 @@ let INTERFACE_CONFIG = {
   open: {
     prefix: '/open/',
     controller: openController
+  },
+  wsTest: {
+    prefix: '/ws-test/',
+    controller: wsTestController
   }
 };
 
@@ -577,6 +582,34 @@ let routerConfig = {
       action: 'importData',
       path: 'import_data',
       method: 'post'
+    }
+  ],
+  wsTest: [
+    {
+      action: 'connect',   // wsTestController 里的方法名
+      path: 'connect',         // 空字符串表示根路径 /ws-test/
+      method: 'post'
+    },
+    {
+      action: 'getConnection',   // wsTestController 里的方法名
+      path: 'getConnection',         // 空字符串表示根路径 /ws-test/
+      method: 'get'
+    },
+    {
+      action: 'disconnect',   // wsTestController 里的方法名
+      path: 'disconnect',         // 空字符串表示根路径 /ws-test/
+      method: 'post'
+    },
+    {
+      action: 'list',   // wsTestController 里的方法名
+      path: 'list',         // 空字符串表示根路径 /ws-test/
+      method: 'get'
+    },
+    {
+      action: 'frontendWs',          // WsTestController 里的方法名
+      path: 'frontend',               // 对应前端 WS 的路径
+      method: 'get',                  // 前端 WS 一般用 GET
+      websocket: true                 // 标记这是 WebSocket 接口（YApi 里支持 websocket）
     }
   ]
 };

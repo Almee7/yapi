@@ -1264,6 +1264,7 @@ class interfaceController extends baseController {
       ctx.body = yapi.commons.resReturn(null, 402, err.message);
     }
   }
+
 }
 
 module.exports = interfaceController;
