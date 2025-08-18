@@ -27,7 +27,6 @@ import CheckCrossInstall, { initCrossRequest } from './CheckCrossInstall.js';
 import './Postman.scss';
 import ProjectEnv from '../../containers/Project/Setting/ProjectEnv/index.js';
 import json5 from 'json5';
-import {scriptVars} from "../../containers/Project/Interface/InterfaceCol/InterfaceColContent";
 // import {href} from "koa/lib/request";
 const { handleParamsValue, ArrayToObject, schemaValidator } = require('common/utils.js');
 const {
@@ -338,26 +337,6 @@ export default class Run extends Component {
     this.setState({ loading: true });
 
     let options = handleParams(this.state, this.handleValue),
-<<<<<<< Updated upstream
-      result;
-    await plugin.emitHook('before_request', options, {
-      type: this.props.type,
-      caseId: options.caseId,
-      projectId: this.props.projectId,
-      interfaceId: this.props.interfaceId,
-      scriptVars: options.vars
-    });
-
-    try {
-      options.taskId = this.props.curUid;
-      console.log("options--------",options)
-      result = await crossRequest(options, options.pre_script || this.state.pre_script, options.after_script || this.state.after_script ,options.pre_request_script || this.state.pre_request_script , createContext(
-        this.props.curUid,
-        this.props.projectId,
-        this.props.interfaceId
-      ));
-      await plugin.emitHook('after_request', result, {
-=======
         result;
 
     // 新增：WebSocket 测试分支
@@ -403,7 +382,6 @@ export default class Run extends Component {
     } else {
       // 原有 HTTP 请求逻辑
       await plugin.emitHook("before_request", options, {
->>>>>>> Stashed changes
         type: this.props.type,
         caseId: options.caseId,
         projectId: this.props.projectId,

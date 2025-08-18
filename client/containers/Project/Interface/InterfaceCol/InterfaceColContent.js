@@ -283,13 +283,11 @@ class InterfaceColContent extends Component {
       if (!b.includes(curRow._id)) continue;
 
       rows_w[curRow._id] = curRow;
-      console.log('符合条件的行:', rows_w);
 
       let envItem = _.find(this.props.envList, item => {
         return item._id === curRow.project_id;
       });
 
-<<<<<<< Updated upstream
       let curitem = {
         ...curRow,
         env: envItem.env,
@@ -302,35 +300,12 @@ class InterfaceColContent extends Component {
       let result;
 
       try {
-        result = await this.handleTest(curitem);
-        if (result.code === 0) {
-=======
-      curitem = Object.assign(
-          {},
-          rows[i],
-          {
-            env: envItem.env,
-            pre_script: this.props.currProject.pre_script,
-            after_script: this.props.currProject.after_script
-          },
-          { test_status: 'loading' }
-      );
-      newRows = [].concat([], rows);
-      newRows[i] = curitem;
-      this.setState({ rows: newRows });
-      let status = 'error',
-          result;
-      try {
         if (curitem.method === 'WS'){
           result = await this.handleWSTest(curitem);
-        }else {
+        }else{
           result = await this.handleTest(curitem);
         }
-        // result = await this.handleTest(curitem);
-        if (result.code === 400) {
-          status = 'error';
-        } else if (result.code === 0) {
->>>>>>> Stashed changes
+        if (result.code === 0) {
           status = 'ok';
         } else if (result.code === 1) {
           status = 'invalid';
@@ -365,7 +340,6 @@ class InterfaceColContent extends Component {
   };
 
   handleWSTest = async interfaceData => {
-    console.log("handleWSTest",interfaceData);
     let result = {
       code: 400,
       msg: '数据异常',
@@ -374,7 +348,7 @@ class InterfaceColContent extends Component {
     result = {
       res_header: interfaceData.req_headers,
       status: 0,
-      code: 200
+      code: 0
     };
     return result
   }
@@ -398,17 +372,11 @@ class InterfaceColContent extends Component {
     }));
     console.log('options----------',options)
     try {
-<<<<<<< Updated upstream
       let data = await crossRequest(options, interfaceData.pre_script, interfaceData.after_script,interfaceData.pre_request_script, createContext(
         this.props.curUid,
         this.props.match.params.id,
         interfaceData.interface_id
-=======
-      let data = await crossRequest(options, interfaceData.pre_script, interfaceData.after_script, createContext(
-          this.props.curUid,
-          this.props.match.params.id,
-          interfaceData.interface_id
->>>>>>> Stashed changes
+
       ));
       options.taskId = this.props.curUid;
       let res = (data.res.body = json_parse(data.res.body));
@@ -448,7 +416,6 @@ class InterfaceColContent extends Component {
       );
 
       // 断言测试
-<<<<<<< Updated upstream
         await this.handleScriptTest(interfaceData, responseData, validRes, requestParams, scriptVars);
         if ([0, 2].includes(validRes[0].message)) {
             validRes[0].message = validRes[0].message === 0 ? "验证通过" : "无脚本";
@@ -460,19 +427,6 @@ class InterfaceColContent extends Component {
             validRes.splice(1, 1)
             result.validRes = validRes
         }
-=======
-      await this.handleScriptTest(interfaceData, responseData, validRes, requestParams, scriptVars);
-      if ([0, 2].includes(validRes[0].message)) {
-        validRes[0].message = validRes[0].message === 0 ? "验证通过" : "无脚本";
-        result.code = 0;
-        result.validRes = validRes.slice(0, 1)
-      } else {
-        validRes[0].message = "验证失败";
-        result.code = 1;
-        validRes.splice(1, 1)
-        result.validRes = validRes
-      }
->>>>>>> Stashed changes
     } catch (data) {
       result = {
         ...options,
@@ -847,15 +801,10 @@ class InterfaceColContent extends Component {
               let record = rowData;
               return (
                 <Link to={'/project/' + currProjectId + '/interface/case/' + record._id}>
-<<<<<<< Updated upstream
                   {record.casename && record.casename.length > 23
                     ? record.casename.substr(0, 20) + '...'
                     : record.casename}
-=======
-                  {record.casename.length > 23
-                        ? record.casename.substr(0, 20) + '...'
-                        : record.casename}
->>>>>>> Stashed changes
+
                 </Link>
               );
             }
@@ -1164,59 +1113,46 @@ class InterfaceColContent extends Component {
                   <Icon type="question-circle-o" style={{ width: '10px' }} />
                 </Tooltip></label>
               </Col>
-              <Col className="col-item"  span="14">
+              <Col className="col-item" span="14">
                 <div><Switch onChange={e=>{
-                    let {commonSetting} = this.state;
-                    this.setState({
-                      commonSetting :{
-                        ...commonSetting,
-                        checkScript: {
-                          ...this.state.checkScript,
-                          enable: e
-                        }
+                  let {commonSetting} = this.state;
+                  this.setState({
+                    commonSetting :{
+                      ...commonSetting,
+                      checkScript: {
+                        ...this.state.checkScript,
+                        enable: e
                       }
-<<<<<<< Updated upstream
                     }
                   })
                 }} checked={this.state.commonSetting.checkScript.enable}  checkedChildren="开" unCheckedChildren="关"  /></div>
-                <AceEditor
-                  onChange={this.onChangeTest}
-                  className="case-script"
-                  data={this.state.commonSetting.checkScript.content}
-                  ref={aceEditor => {
-                    this.aceEditor = aceEditor;
-                  }}
-                />
-=======
-                    })
-                  }} checked={this.state.commonSetting.checkScript.enable}  checkedChildren="开" unCheckedChildren="关"  /></div>
 
                 <AceEditor
-                      onChange={this.onChangeTest}
-                      className="case-script"
-                      data={this.state.commonSetting.checkScript.content}
-                      ref={aceEditor => {
-                        this.aceEditor = aceEditor;
-                      }}
-                  />
->>>>>>> Stashed changes
+                    onChange={this.onChangeTest}
+                    className="case-script"
+                    data={this.state.commonSetting.checkScript.content}
+                    ref={aceEditor => {
+                      this.aceEditor = aceEditor;
+                    }}
+                />
               </Col>
+
               <Col span="6">
                 <div className="insert-code">
                   {InsertCodeMap.map(item => {
-                      return (
-                        <div
-                              style={{ cursor: 'pointer' }}
-                              className="code-item"
-                              key={item.title}
-                              onClick={() => {
-                                this.handleInsertCode('\n' + item.code);
-                              }}
-                          >
-                          {item.title}
-                        </div>
-                      );
-                    })}
+                    return (
+                      <div
+                            style={{ cursor: 'pointer' }}
+                            className="code-item"
+                            key={item.title}
+                            onClick={() => {
+                              this.handleInsertCode('\n' + item.code);
+                            }}
+                        >
+                        {item.title}
+                      </div>
+                    );
+                  })}
                 </div>
               </Col>
             </Row>
@@ -1274,7 +1210,6 @@ class InterfaceColContent extends Component {
                 </Tooltip>
                     )}
                 <Button onClick={this.openCommonSetting} style={{
-<<<<<<< Updated upstream
                         marginRight: '8px'
                       }} >通用规则配置</Button>
                 &nbsp;
@@ -1287,13 +1222,7 @@ class InterfaceColContent extends Component {
                 >
                   {/*根据 loading 状态切换*/}
                   {loading ? '取消' : '开始测试'}
-=======
-                      marginRight: '8px'
-                    }} >通用规则配置</Button>
-                    &nbsp;
-                <Button type="primary" onClick={this.executeTests}>
-                  开始测试
->>>>>>> Stashed changes
+
                 </Button>
               </div>
               ) : (
