@@ -65,7 +65,7 @@ class interfaceModel extends baseModel {
       ],
       req_body_type: {
         type: String,
-        enum: ['form', 'json', 'text', 'file', 'raw']
+        enum: ['form', 'json', 'text', 'file', 'raw' , 'xml']
       },
       req_body_is_json_schema: { type: Boolean, default: false },
       req_body_form: [

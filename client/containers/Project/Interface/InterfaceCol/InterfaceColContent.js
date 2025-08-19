@@ -242,6 +242,7 @@ class InterfaceColContent extends Component {
       item.id = item._id;
       item._test_status = item.test_status;
 
+
       if (currColEnvObj[item.project_id]) {
         item.case_env = currColEnvObj[item.project_id];
       }
@@ -265,6 +266,11 @@ class InterfaceColContent extends Component {
       this.setState({ loading: false });
       return;
     }
+    // 开始测试前，清空之前的状态
+    this.setState({
+      loading: true,
+      rows: this.state.rows.map(row => ({ ...row, test_status: '' }))
+    });
 
     // 切换按钮状态
     this.setState({ loading: true });
@@ -323,7 +329,8 @@ class InterfaceColContent extends Component {
       newRows[i] = { ...curitem, test_status: status };
       this.setState({ rows: newRows });
 
-      await sleep(5000);
+      await sleep(1000);
+
     }
 
     if (this.state.loading) {
@@ -848,6 +855,8 @@ class InterfaceColContent extends Component {
           formatters: [
             (value, { rowData }) => {
               let id = rowData._id;
+              let code1 = this.reports[id]
+              console.log("code", code1)
               let code = this.reports[id] ? this.reports[id].code : 0;
               if (rowData.test_status === 'loading') {
                 return (
@@ -898,16 +907,7 @@ class InterfaceColContent extends Component {
                     </div>
                   );
                 default:
-                  return (
-                    <div>
-                      <Icon
-                        style={{
-                          color: '#00a854'
-                        }}
-                        type="check-circle"
-                      />
-                    </div>
-                  );
+                  return null
               }
             }
           ]
