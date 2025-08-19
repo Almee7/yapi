@@ -61,30 +61,30 @@ function sleep(ms) {
 }
 
 @connect(
-  state => {
-    return {
-      interfaceColList: state.interfaceCol.interfaceColList,
-      currColId: state.interfaceCol.currColId,
-      currCaseId: state.interfaceCol.currCaseId,
-      isShowCol: state.interfaceCol.isShowCol,
-      isRander: state.interfaceCol.isRander,
-      currCaseList: state.interfaceCol.currCaseList,
-      currProject: state.project.currProject,
-      token: state.project.token,
-      envList: state.interfaceCol.envList,
-      curProjectRole: state.project.currProject.role,
-      projectEnv: state.project.projectEnv,
-      curUid: state.user.uid
-    };
-  },
-  {
-    fetchInterfaceColList,
-    fetchCaseList,
-    setColData,
-    getToken,
-    getEnv,
-    fetchCaseEnvList
-  }
+    state => {
+      return {
+        interfaceColList: state.interfaceCol.interfaceColList,
+        currColId: state.interfaceCol.currColId,
+        currCaseId: state.interfaceCol.currCaseId,
+        isShowCol: state.interfaceCol.isShowCol,
+        isRander: state.interfaceCol.isRander,
+        currCaseList: state.interfaceCol.currCaseList,
+        currProject: state.project.currProject,
+        token: state.project.token,
+        envList: state.interfaceCol.envList,
+        curProjectRole: state.project.currProject.role,
+        projectEnv: state.project.projectEnv,
+        curUid: state.user.uid
+      };
+    },
+    {
+      fetchInterfaceColList,
+      fetchCaseList,
+      setColData,
+      getToken,
+      getEnv,
+      fetchCaseEnvList
+    }
 )
 @withRouter
 @DragDropContext(HTML5Backend)
@@ -242,7 +242,6 @@ class InterfaceColContent extends Component {
       item.id = item._id;
       item._test_status = item.test_status;
 
-
       if (currColEnvObj[item.project_id]) {
         item.case_env = currColEnvObj[item.project_id];
       }
@@ -307,7 +306,11 @@ class InterfaceColContent extends Component {
       let result;
 
       try {
-        result = await this.handleTest(curitem);
+        if (curitem.method === 'WS'){
+          result = await this.handleWSTest(curitem);
+        }else{
+          result = await this.handleTest(curitem);
+        }
         if (result.code === 0) {
           status = 'ok';
         } else if (result.code === 1) {
@@ -342,6 +345,55 @@ class InterfaceColContent extends Component {
 
     this.setState({ loading: false });
   };
+
+  handleWSTest = async interfaceData => {
+    let result = {
+      code: 400,
+      msg: '数据异常',
+      validRes: []
+    };
+    let requestParams = {};
+    let options = handleParams(interfaceData, this.handleValue, requestParams);
+    try {
+      const postData = {
+        url: options.url,              // ws:// or wss://
+        query: options.query || {},   // 如果有 query 参数
+        headers: options.headers || {} // headers 里可能有 cookieId 等
+      };
+
+      // 调用后端接口
+      const res = await fetch('/api/ws-test/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(postData)
+      });
+
+      if (!res.ok) {
+        throw new Error(`后端接口请求失败，状态码 ${res.status}`);
+      }
+      const data = await res.json();
+
+      // data 格式示例:
+      // { header: {}, body: "...", status: 101, statusText: 'WebSocket连接关闭', messages: [...] }
+      result = result = {
+        header: data.header,
+        body: data.body,
+        status: 200,
+        statusText: data.message
+      };
+
+    } catch (e) {
+      result = {
+        header: {},
+        body: null,
+        status: null,
+        statusText: 'WebSocket请求异常',
+        error: e.message,
+        messages: []
+      };
+    }
+    return result
+  }
 
   handleTest = async interfaceData => {
     let requestParams = {};
@@ -395,13 +447,13 @@ class InterfaceColContent extends Component {
       let validRes = [];
 
       let responseData = Object.assign(
-        {},
-        {
-          status: data.res.status,
-          body: res,
-          header: data.res.header,
-          statusText: data.res.statusText
-        }
+          {},
+          {
+            status: data.res.status,
+            body: res,
+            header: data.res.header,
+            statusText: data.res.statusText
+          }
       );
 
       // 断言测试
@@ -606,8 +658,8 @@ class InterfaceColContent extends Component {
       [project_id]: envName
     };
     this.setState({ currColEnvObj });
-   // this.handleColdata(this.props.currCaseList, envName, project_id);
-   this.handleColdata(this.props.currCaseList,currColEnvObj);
+    // this.handleColdata(this.props.currCaseList, envName, project_id);
+    this.handleColdata(this.props.currCaseList,currColEnvObj);
   };
 
   autoTests = () => {
@@ -806,22 +858,22 @@ class InterfaceColContent extends Component {
             () => {
               return (
                 <Tooltip
-                  title={
-                    <span>
-                      {' '}
-                      每个用例都有唯一的key，用于获取所匹配接口的响应数据，例如使用{' '}
-                      <a
-                        href="https://hellosean1025.github.io/yapi/documents/case.html#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%8C%E7%BC%96%E8%BE%91%E6%B5%8B%E8%AF%95%E7%94%A8%E4%BE%8B"
-                        className="link-tooltip"
-                        target="blank"
-                      >
-                        {' '}
-                        变量参数{' '}
-                      </a>{' '}
-                      功能{' '}
-                    </span>
-                  }
-                >
+                      title={
+                        <span>
+                          {' '}
+                          每个用例都有唯一的key，用于获取所匹配接口的响应数据，例如使用{' '}
+                          <a
+                              href="https://hellosean1025.github.io/yapi/documents/case.html#%E7%AC%AC%E4%BA%8C%E6%AD%A5%EF%BC%8C%E7%BC%96%E8%BE%91%E6%B5%8B%E8%AF%95%E7%94%A8%E4%BE%8B"
+                              className="link-tooltip"
+                              target="blank"
+                          >
+                            {' '}
+                            变量参数{' '}
+                          </a>{' '}
+                          功能{' '}
+                        </span>
+                      }
+                  >
                   Key
                 </Tooltip>
               );
@@ -872,11 +924,11 @@ class InterfaceColContent extends Component {
                     <div>
                       <Tooltip title="Pass">
                         <Icon
-                          style={{
-                            color: '#00a854'
-                          }}
-                          type="check-circle"
-                        />
+                              style={{
+                                color: '#00a854'
+                              }}
+                              type="check-circle"
+                          />
                       </Tooltip>
                     </div>
                   );
@@ -885,11 +937,11 @@ class InterfaceColContent extends Component {
                     <div>
                       <Tooltip title="请求异常">
                         <Icon
-                          type="info-circle"
-                          style={{
-                            color: '#f04134'
-                          }}
-                        />
+                              type="info-circle"
+                              style={{
+                                color: '#f04134'
+                              }}
+                          />
                       </Tooltip>
                     </div>
                   );
@@ -898,16 +950,25 @@ class InterfaceColContent extends Component {
                     <div>
                       <Tooltip title="验证失败">
                         <Icon
-                          type="exclamation-circle"
-                          style={{
-                            color: '#ffbf00'
-                          }}
-                        />
+                              type="exclamation-circle"
+                              style={{
+                                color: '#ffbf00'
+                              }}
+                          />
                       </Tooltip>
                     </div>
                   );
                 default:
-                  return null
+                  return (
+                    <div>
+                      <Icon
+                            style={{
+                              color: '#00a854'
+                            }}
+                            type="check-circle"
+                        />
+                    </div>
+                  );
               }
             }
           ]
@@ -996,19 +1057,19 @@ class InterfaceColContent extends Component {
     };
     const resolvedColumns = resolve.columnChildren({ columns });
     const resolvedRows = resolve.resolve({ columns: resolvedColumns, method: resolve.nested })(
-      rows
+        rows
     );
 
     const localUrl =
-      location.protocol +
-      '//' +
-      location.hostname +
-      (location.port !== '' ? ':' + location.port : '');
+        location.protocol +
+        '//' +
+        location.hostname +
+        (location.port !== '' ? ':' + location.port : '');
     let currColEnvObj = this.handleColEnvObj(this.state.currColEnvObj);
     const autoTestsUrl = `/api/open/run_auto_test?id=${this.props.currColId}&token=${
-      this.props.token
+        this.props.token
     }${currColEnvObj ? currColEnvObj : ''}&mode=${this.state.mode}&email=${
-      this.state.email
+        this.state.email
     }&download=${this.state.download}`;
 
     let col_name = '';
@@ -1025,12 +1086,12 @@ class InterfaceColContent extends Component {
     return (
       <div className="interface-col">
         <Modal
-            title="通用规则配置"
-            visible={this.state.commonSettingModalVisible}
-            onOk={this.handleCommonSetting}
-            onCancel={this.cancelCommonSetting}
-            width={'1000px'}
-            style={defaultModalStyle}
+              title="通用规则配置"
+              visible={this.state.commonSettingModalVisible}
+              onOk={this.handleCommonSetting}
+              onCancel={this.cancelCommonSetting}
+              width={'1000px'}
+              style={defaultModalStyle}
           >
           <div className="common-setting-modal">
             <Row className="setting-item">
@@ -1041,14 +1102,14 @@ class InterfaceColContent extends Component {
               </Col>
               <Col className="col-item"  span="18">
                 <Switch onChange={e=>{
-                  let {commonSetting} = this.state;
-                  this.setState({
-                    commonSetting :{
-                      ...commonSetting,
-                      checkHttpCodeIs200: e
-                    }
-                  })
-                }} checked={this.state.commonSetting.checkHttpCodeIs200}  checkedChildren="开" unCheckedChildren="关" />
+                    let {commonSetting} = this.state;
+                    this.setState({
+                      commonSetting :{
+                        ...commonSetting,
+                        checkHttpCodeIs200: e
+                      }
+                    })
+                  }} checked={this.state.commonSetting.checkHttpCodeIs200}  checkedChildren="开" unCheckedChildren="关" />
               </Col>
             </Row>
 
@@ -1077,14 +1138,14 @@ class InterfaceColContent extends Component {
               </Col>
               <Col className="col-item"  span="18">
                 <Switch onChange={e=>{
-                  let {commonSetting} = this.state;
-                  this.setState({
-                    commonSetting :{
-                      ...commonSetting,
-                      checkResponseSchema: e
-                    }
-                  })
-                }} checked={this.state.commonSetting.checkResponseSchema}  checkedChildren="开" unCheckedChildren="关" />
+                    let {commonSetting} = this.state;
+                    this.setState({
+                      commonSetting :{
+                        ...commonSetting,
+                        checkResponseSchema: e
+                      }
+                    })
+                  }} checked={this.state.commonSetting.checkResponseSchema}  checkedChildren="开" unCheckedChildren="关" />
               </Col>
             </Row>
 
@@ -1094,7 +1155,7 @@ class InterfaceColContent extends Component {
                   <Icon type="question-circle-o" style={{ width: '10px' }} />
                 </Tooltip></label>
               </Col>
-              <Col className="col-item"  span="14">
+              <Col className="col-item" span="14">
                 <div><Switch onChange={e=>{
                   let {commonSetting} = this.state;
                   this.setState({
@@ -1107,13 +1168,14 @@ class InterfaceColContent extends Component {
                     }
                   })
                 }} checked={this.state.commonSetting.checkScript.enable}  checkedChildren="开" unCheckedChildren="关"  /></div>
+
                 <AceEditor
-                  onChange={this.onChangeTest}
-                  className="case-script"
-                  data={this.state.commonSetting.checkScript.content}
-                  ref={aceEditor => {
-                    this.aceEditor = aceEditor;
-                  }}
+                    onChange={this.onChangeTest}
+                    className="case-script"
+                    data={this.state.commonSetting.checkScript.content}
+                    ref={aceEditor => {
+                      this.aceEditor = aceEditor;
+                    }}
                 />
               </Col>
               <Col span="6">
@@ -1121,13 +1183,13 @@ class InterfaceColContent extends Component {
                   {InsertCodeMap.map(item => {
                     return (
                       <div
-                        style={{ cursor: 'pointer' }}
-                        className="code-item"
-                        key={item.title}
-                        onClick={() => {
-                          this.handleInsertCode('\n' + item.code);
-                        }}
-                      >
+                            style={{ cursor: 'pointer' }}
+                            className="code-item"
+                            key={item.title}
+                            onClick={() => {
+                              this.handleInsertCode('\n' + item.code);
+                            }}
+                        >
                         {item.title}
                       </div>
                     );
@@ -1142,16 +1204,16 @@ class InterfaceColContent extends Component {
         <Row type="flex" justify="center" align="top">
           <Col span={5}>
             <h2
-              className="interface-title"
-              style={{
-                display: 'inline-block',
-                margin: '8px 20px 16px 0px'
-              }}
-            >
-              测试集合&nbsp;<a
-                target="_blank"
-                rel="noopener noreferrer"
-                href="https://hellosean1025.github.io/yapi/documents/case.html"
+                  className="interface-title"
+                  style={{
+                    display: 'inline-block',
+                    margin: '8px 20px 16px 0px'
+                  }}
+              >
+              测试集合 <a
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  href="https://hellosean1025.github.io/yapi/documents/case.html"
               >
                 <Tooltip title="点击查看文档">
                   <Icon type="question-circle-o" />
@@ -1161,33 +1223,33 @@ class InterfaceColContent extends Component {
           </Col>
           <Col span={10}>
             <CaseEnv
-              envList={this.props.envList}
-              currProjectEnvChange={this.currProjectEnvChange}
-              envValue={this.state.currColEnvObj}
-              collapseKey={this.state.collapseKey}
-              changeClose={this.changeCollapseClose}
-            />
+                  envList={this.props.envList}
+                  currProjectEnvChange={this.currProjectEnvChange}
+                  envValue={this.state.currColEnvObj}
+                  collapseKey={this.state.collapseKey}
+                  changeClose={this.changeCollapseClose}
+              />
           </Col>
           <Col span={9}>
             {this.state.hasPlugin ? (
               <div
-                style={{
-                  float: 'right',
-                  paddingTop: '8px'
-                }}
-              >
-                {this.props.curProjectRole !== 'guest' && (
-                  <Tooltip title="在 YApi 服务端跑自动化测试，测试环境不能为私有网络，请确保 YApi 服务器可以访问到自动化测试环境domain">
-                    <Button
                       style={{
-                        marginRight: '8px'
+                        float: 'right',
+                        paddingTop: '8px'
                       }}
-                      onClick={this.autoTests}
-                    >
-                      服务端测试
-                    </Button>
-                  </Tooltip>
-                )}
+                  >
+                {this.props.curProjectRole !== 'guest' && (
+                <Tooltip title="在 YApi 服务端跑自动化测试，测试环境不能为私有网络，请确保 YApi 服务器可以访问到自动化测试环境domain">
+                  <Button
+                              style={{
+                                marginRight: '8px'
+                              }}
+                              onClick={this.autoTests}
+                          >
+                    服务端测试
+                  </Button>
+                </Tooltip>
+                    )}
                 <Button onClick={this.openCommonSetting} style={{
                         marginRight: '8px'
                       }} >通用规则配置</Button>
@@ -1203,20 +1265,20 @@ class InterfaceColContent extends Component {
                   {loading ? '取消' : '开始测试'}
                 </Button>
               </div>
-            ) : (
-              <Tooltip title="请安装 cross-request Chrome 插件">
-                <Button
-                  disabled
-                  type="primary"
-                  style={{
-                    float: 'right',
-                    marginTop: '8px'
-                  }}
-                >
-                  开始测试
-                </Button>
-              </Tooltip>
-            )}
+              ) : (
+                <Tooltip title="请安装 cross-request Chrome 插件">
+                  <Button
+                        disabled
+                        type="primary"
+                        style={{
+                          float: 'right',
+                          marginTop: '8px'
+                        }}
+                    >
+                    开始测试
+                  </Button>
+                </Tooltip>
+              )}
           </Col>
         </Row>
 
@@ -1225,90 +1287,90 @@ class InterfaceColContent extends Component {
         </div>
 
         <Table.Provider
-          components={components}
-          columns={resolvedColumns}
-          style={{
-            width: '100%',
-            borderCollapse: 'collapse'
-          }}
-        >
+              components={components}
+              columns={resolvedColumns}
+              style={{
+                width: '100%',
+                borderCollapse: 'collapse'
+              }}
+          >
           <Table.Header
-            className="interface-col-table-header"
-            headerRows={resolve.headerRows({ columns })}
-          />
+                className="interface-col-table-header"
+                headerRows={resolve.headerRows({ columns })}
+            />
 
           <Table.Body
-            className="interface-col-table-body"
-            rows={resolvedRows}
-            rowKey="id"
-            onRow={this.onRow}
-          />
+                className="interface-col-table-body"
+                rows={resolvedRows}
+                rowKey="id"
+                onRow={this.onRow}
+            />
         </Table.Provider>
         <Modal
-          title="测试报告"
-          width="900px"
-          style={{
-            minHeight: '500px'
-          }}
-          visible={this.state.visible}
-          onCancel={this.handleCancel}
-          footer={null}
-        >
+              title="测试报告"
+              width="900px"
+              style={{
+                minHeight: '500px'
+              }}
+              visible={this.state.visible}
+              onCancel={this.handleCancel}
+              footer={null}
+          >
           <CaseReport {...this.reports[this.state.curCaseid]} />
         </Modal>
 
         <Modal
-          title="自定义测试脚本"
-          width="660px"
-          style={{
-            minHeight: '500px'
-          }}
-          visible={this.state.advVisible}
-          onCancel={this.handleAdvCancel}
-          onOk={this.handleAdvOk}
-          maskClosable={false}
-        >
+              title="自定义测试脚本"
+              width="660px"
+              style={{
+                minHeight: '500px'
+              }}
+              visible={this.state.advVisible}
+              onCancel={this.handleAdvCancel}
+              onOk={this.handleAdvOk}
+              maskClosable={false}
+          >
           <h3>
-            是否开启:&nbsp;
+            是否开启: 
             <Switch
-              checked={this.state.enableScript}
-              onChange={e => this.setState({ enableScript: e })}
-            />
+                  checked={this.state.enableScript}
+                  onChange={e => this.setState({ enableScript: e })}
+              />
           </h3>
           <AceEditor
-            className="case-script"
-            data={this.state.curScript}
-            onChange={this.handleScriptChange}
-          />
+                className="case-script"
+                data={this.state.curScript}
+                onChange={this.handleScriptChange}
+            />
         </Modal>
         {this.state.autoVisible && (
           <Modal
-            title="服务端自动化测试"
-            width="780px"
-            style={{
-              minHeight: '500px'
-            }}
-            visible={this.state.autoVisible}
-            onCancel={this.handleAuto}
-            className="autoTestsModal"
-            footer={null}
-          >
+                  title="服务端自动化测试"
+                  width="780px"
+                  style={{
+                    minHeight: '500px'
+                  }}
+                  visible={this.state.autoVisible}
+                  onCancel={this.handleAuto}
+                  className="autoTestsModal"
+                  footer={null}
+              >
             <Row type="flex" justify="space-around" className="row" align="top">
               <Col span={3} className="label" style={{ paddingTop: '16px' }}>
                 选择环境
                 <Tooltip title="默认使用测试用例选择的环境">
                   <Icon type="question-circle-o" />
                 </Tooltip>
-                &nbsp;：
+                    &nbsp;：
               </Col>
               <Col span={21}>
                 <CaseEnv
-                  envList={this.props.envList}
-                  currProjectEnvChange={this.currProjectEnvChange}
-                  envValue={this.state.currColEnvObj}
-                  collapseKey={this.state.collapseKey}
-                  changeClose={this.changeCollapseClose}
-                />
+                        envList={this.props.envList}
+                        currProjectEnvChange={this.currProjectEnvChange}
+                        envValue={this.state.currColEnvObj}
+                        collapseKey={this.state.collapseKey}
+                        changeClose={this.changeCollapseClose}
+                    />
               </Col>
             </Row>
             <Row type="flex" justify="space-around" className="row" align="middle">
@@ -1331,21 +1393,21 @@ class InterfaceColContent extends Component {
                 消息通知
                 <Tooltip title={'测试不通过时，会给项目组成员发送消息通知'}>
                   <Icon
-                    type="question-circle-o"
-                    style={{
-                      width: '10px'
-                    }}
-                  />
+                          type="question-circle-o"
+                          style={{
+                            width: '10px'
+                          }}
+                      />
                 </Tooltip>
-                &nbsp;：
+                    &nbsp;：
               </Col>
               <Col span={21}>
                 <Switch
-                  checked={this.state.email}
-                  checkedChildren="开"
-                  unCheckedChildren="关"
-                  onChange={this.emailChange}
-                />
+                        checked={this.state.email}
+                        checkedChildren="开"
+                        unCheckedChildren="关"
+                        onChange={this.emailChange}
+                    />
               </Col>
             </Row>
             <Row type="flex" justify="space-around" className="row" align="middle">
@@ -1353,29 +1415,29 @@ class InterfaceColContent extends Component {
                 下载数据
                 <Tooltip title={'开启后，测试数据将被下载到本地'}>
                   <Icon
-                    type="question-circle-o"
-                    style={{
-                      width: '10px'
-                    }}
-                  />
+                          type="question-circle-o"
+                          style={{
+                            width: '10px'
+                          }}
+                      />
                 </Tooltip>
-                &nbsp;：
+                    &nbsp;：
               </Col>
               <Col span={21}>
                 <Switch
-                  checked={this.state.download}
-                  checkedChildren="开"
-                  unCheckedChildren="关"
-                  onChange={this.downloadChange}
-                />
+                        checked={this.state.download}
+                        checkedChildren="开"
+                        unCheckedChildren="关"
+                        onChange={this.downloadChange}
+                    />
               </Col>
             </Row>
             <Row type="flex" justify="space-around" className="row" align="middle">
               <Col span={21} className="autoTestUrl">
                 <a
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  href={localUrl + autoTestsUrl} >
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        href={localUrl + autoTestsUrl} >
                   {autoTestsUrl}
                 </a>
               </Col>
@@ -1389,7 +1451,7 @@ class InterfaceColContent extends Component {
               注：访问该URL，可以测试所有用例，请确保YApi服务器可以访问到环境配置的 domain
             </div>
           </Modal>
-        )}
+          )}
       </div>
     );
   }
