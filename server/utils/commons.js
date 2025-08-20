@@ -18,6 +18,9 @@ const jsf = require('json-schema-faker');
 const { schemaValidator } = require('../../common/utils');
 const http = require('http');
 const { runTestScript } = require('./dbClient');
+const WsTestController = require("../controllers/wsTest");
+const vm = require('vm');
+const assert = require('assert');
 jsf.extend('mock', function () {
   return {
     mock: function (xx) {
@@ -303,26 +306,50 @@ async function runSqlAsserts(asserts = [], vars = {}) {
  */
 exports.sandbox = async (sandbox, script) => {
   try {
-    const vm = require('vm');
     sandbox = sandbox || {};
-    // ✅ 注入 console
+    // ✅ 注入默认变量
     sandbox.vars = sandbox.vars || {};
     sandbox.sqlassert = sandbox.sqlassert || [];
     sandbox.console = console;
-    script = new vm.Script(script);
-    const context = new vm.createContext(sandbox);
-    script.runInContext(context, {
-      timeout: 3000
-    });
-    console.log(sandbox.sqlAssert, typeof sandbox.sqlAssert)
-    // 执行断言
-    if (Array.isArray(sandbox.sqlAssert) && sandbox.sqlAssert.length > 0) {
-      await runSqlAsserts(sandbox.sqlAssert, sandbox.vars);
+    sandbox.wsLog = null; // 脚本里可以直接赋值
+    const regex = /readWS\s*\(\s*["']([^"']+)["']\s*\)/;
+    const match = script.match(regex);
+
+    // 注入 assert
+    sandbox.assert = assert;
+
+    const context = vm.createContext(sandbox);
+
+    if (match) {
+     //注入readws
+      const connectionId = context.body.connectionId;
+      sandbox.readWS = async () => {
+        const msg = await WsTestController.readws(connectionId);
+        return msg;
+      };
+
+    } else {
+      return '未找到 readWS 调用';
     }
-    return sandbox
+
+    // 支持 async/await 脚本
+    const wrappedScript = new vm.Script(`
+      (async () => {
+        ${script}
+      })()
+    `);
+
+    await wrappedScript.runInContext(context);
+
+    // 执行 sqlassert
+    if (Array.isArray(sandbox.sqlassert) && sandbox.sqlassert.length > 0) {
+      await runSqlAsserts(sandbox.sqlassert, sandbox.vars);
+    }
+
+    return sandbox;
   } catch (err) {
     err.__sandboxFailed = true;
-    throw err
+    throw err;
   }
 };
 
@@ -615,6 +642,8 @@ ${JSON.stringify(schema, null, 2)}`)
         result.vars = context.vars;
       }
     }
+
+
 
     let script = params.script;
     // script 是断言

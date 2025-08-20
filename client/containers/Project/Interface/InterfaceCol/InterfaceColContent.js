@@ -369,11 +369,37 @@ class InterfaceColContent extends Component {
       // data 格式示例:
       // { header: {}, body: "...", status: 101, statusText: 'WebSocket连接关闭', messages: [...] }
       result = result = {
+        ...options,
         header: data.header,
         body: data.body,
         status: 200,
         statusText: data.message
       };
+
+      let responseData = Object.assign(
+          {},
+          {
+            status: 200,
+            body: data.body,
+            header: data.header,
+            statusText: data.statusText
+          }
+      );
+
+      let validRes = [];
+
+      // 断言测试
+      await this.handleScriptTest(interfaceData, responseData, validRes, requestParams, scriptVars);
+      if ([0, 2].includes(validRes[0].message)) {
+        validRes[0].message = validRes[0].message === 0 ? "验证通过" : "无脚本";
+        result.code = 0;
+        result.validRes = validRes.slice(0, 1)
+      } else {
+        validRes[0].message = "验证失败";
+        result.code = 1;
+        validRes.splice(1, 1)
+        result.validRes = validRes
+      }
 
     } catch (e) {
       result = {
@@ -385,6 +411,7 @@ class InterfaceColContent extends Component {
         messages: []
       };
     }
+
     return result
   }
 
@@ -971,6 +998,12 @@ class InterfaceColContent extends Component {
         property: 'path',
         header: {
           label: '接口路径'
+        },
+        props: {
+          style: {
+            width: '350px',
+            textAlign: 'center'
+          }
         },
         cell: {
           formatters: [

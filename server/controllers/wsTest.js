@@ -169,6 +169,13 @@ class WsTestController extends baseController {
         }, 200, "OK", 0);
     }
 
+    static readws(connectionId) {
+        const conn = wsConnections.get(connectionId);
+        if (!conn) return null;
+        const messages = conn.messages || [];
+        return messages.length ? messages[messages.length - 1] : null;
+    }
+
     /**
      * 统一返回格式
      */
