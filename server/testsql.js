@@ -1,4 +1,4 @@
-const { execSql } = require('./utils/mysqlClient');
+const { execSql } = require('./grpc/dbClient');
 
 async function runAssert(context, body) {
     // 执行 SQL

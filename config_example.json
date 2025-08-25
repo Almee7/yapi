@@ -3,7 +3,7 @@
   "adminAccount": "admin@admin.com",
   "timeout": 120000,
   "scriptEnable": true,
-  "sqlServer": "http://192.168.8.126:3399",
+  "sqlServer": "192.168.6.218:3388",
   "db": {
     "servername": "127.0.0.1",
     "DATABASE": "yapi",

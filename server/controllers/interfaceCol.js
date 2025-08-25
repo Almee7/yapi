@@ -4,7 +4,7 @@ const interfaceModel = require('../models/interface.js');
 const projectModel = require('../models/project.js');
 const baseController = require('./base.js');
 const yapi = require('../yapi.js');
-const _ = require('underscore');
+const _ = require('underscore')
 
 class interfaceColController extends baseController {
   constructor(ctx) {

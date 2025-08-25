@@ -264,7 +264,6 @@ function sandboxByBrowser(context = {}, script ) {
     eval(beginScript + script);
     //替换变量
     context.requestBody = replaceWithEnv(context.requestBody, context.vars);
-    console.log("context.requestBody---------",context)
   } catch (err) {
     let message = `Script:
                    ----CodeBegin----:
@@ -407,9 +406,7 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
   }
 
   function handleParams(interfaceData, handleValue, requestParams) {
-    console.log('interfaceData =', interfaceData);
     let interfaceRunData = Object.assign({}, interfaceData);
-    console.log("处理前---------------interfaceRunData", interfaceRunData)
 
     function paramsToObjectWithEnable(arr) {
       const obj = {};
@@ -421,7 +418,6 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
           }
         }
       });
-      console.log("这是obj", obj)
       return obj;
     }
 
@@ -439,9 +435,7 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
     }
 
     // 从对象 interfaceRunData 中提取若干字段，赋值给对应的变量：
-    console.log('interfaceRunData 解构前值:', interfaceRunData);
     let {case_env, path, env, _id} = interfaceRunData;
-    console.log("处理后---------------interfaceRunData", interfaceRunData)
     let currDomain,
         requestBody,
         requestOptions;
@@ -501,7 +495,6 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
     } catch (e) {
       console.error('err', e);
     }
-    console.log("method--------", interfaceRunData.method)
     if (HTTP_METHOD[interfaceRunData.method].request_body) {
       if (interfaceRunData.req_body_type === 'form') {
         requestBody = paramsToObjectWithEnable(
@@ -511,7 +504,6 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
         );
       } else if (interfaceRunData.req_body_type === 'json') {
         let reqBody = isJson5(interfaceRunData.req_body_other);
-        console.log("解析后的 reqBody：", reqBody);
         if (reqBody === false) {
           requestBody = interfaceRunData.req_body_other;
         } else {
@@ -519,7 +511,6 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
             requestParams = Object.assign(requestParams, reqBody);
           }
           requestBody = handleJson(reqBody, val => handleValue(val, currDomain.global));
-          console.log("data---------",requestBody)
         }
       } else {
         requestBody = interfaceRunData.req_body_other;
@@ -535,7 +526,6 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
         requestOptions.file = 'single-file';
       }
     }
-    console.log("--------------requestOptions", requestOptions)
     return requestOptions;
   }
 
