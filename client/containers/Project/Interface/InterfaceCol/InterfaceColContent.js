@@ -268,7 +268,7 @@ class InterfaceColContent extends Component {
     // 开始测试前，清空之前的状态
     this.setState({
       loading: true,
-      rows: this.state.rows.map(row => ({ ...row, test_status: '' }))
+      rows: this.state.rows.map(row => ({ ...row, loading: '' }))
     });
 
     // 切换按钮状态
@@ -284,25 +284,32 @@ class InterfaceColContent extends Component {
       if (!this.state.loading) break;
 
       const curRow = this.state.rows[i];
-      const b = this.state.selectedIds;
-      if (!b.includes(curRow._id)) continue;
+      const checkRow = this.state.selectedIds;
+      if (!checkRow.includes(curRow._id)) continue;
 
       rows_w[curRow._id] = curRow;
       console.log('符合条件的行:', rows_w);
 
-      let envItem = _.find(this.props.envList, item => {
-        return item._id === curRow.project_id;
-      });
+      let envItem = _.find(this.props.envList, item => item._id === curRow.project_id);
 
       let curitem = {
-        ...curRow,
-        env: envItem.env,
-        pre_script: this.props.currProject.pre_script,
-        after_script: this.props.currProject.after_script,
-        test_status: 'loading'
-      };
+            ...curRow,
+            env: envItem.env,
+            pre_script: this.props.currProject.pre_script,
+            after_script: this.props.currProject.after_script,
+            test_status: 'loading'
+        };
 
-      let status = 'error';
+        // 更新行为 loading
+      this.setState(prev => {
+        const newRows = [...prev.rows];
+        newRows[i] = curitem;
+        return { rows: newRows };
+    });
+
+
+
+        let status = 'error';
       let result;
 
       try {
@@ -332,6 +339,7 @@ class InterfaceColContent extends Component {
       newRows[i] = { ...curitem, test_status: status };
       this.setState({ rows: newRows });
 
+      //用于测试终止测试
       await sleep(1000);
 
     }
@@ -907,8 +915,6 @@ class InterfaceColContent extends Component {
           formatters: [
             (value, { rowData }) => {
               let id = rowData._id;
-              let code1 = this.reports[id]
-              console.log("code", code1)
               let code = this.reports[id] ? this.reports[id].code : 0;
               if (rowData.test_status === 'loading') {
                 return (

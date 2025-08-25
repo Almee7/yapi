@@ -1,6 +1,6 @@
 import React, { PureComponent as Component } from 'react';
 import PropTypes from 'prop-types';
-import { Table, Select, Tooltip, Icon } from 'antd';
+import {Table, Select, Tooltip, Icon, Input} from 'antd';
 import variable from '../../../../constants/variable';
 import { connect } from 'react-redux';
 const Option = Select.Option;
@@ -20,13 +20,16 @@ import { fetchInterfaceListMenu } from '../../../../reducer/modules/interface.js
 export default class ImportInterface extends Component {
   constructor(props) {
     super(props);
+      this.state = {
+          selectedRowKeys: [],
+          categoryCount: {},
+          project: this.props.currProjectId,
+          filter: '',
+          list: props.list ? [...props.list] : [] // 初始显示全部数据
+      };
   }
 
-  state = {
-    selectedRowKeys: [],
-    categoryCount: {},
-    project: this.props.currProjectId
-  };
+
 
   static propTypes = {
     list: PropTypes.array,
@@ -36,9 +39,11 @@ export default class ImportInterface extends Component {
     fetchInterfaceListMenu: PropTypes.func
   };
 
+
   async componentDidMount() {
     // console.log(this.props.currProjectId)
     await this.props.fetchInterfaceListMenu(this.props.currProjectId);
+    this.setState({ list: [...this.props.list] });
   }
 
   // 切换项目
@@ -51,8 +56,29 @@ export default class ImportInterface extends Component {
     await this.props.fetchInterfaceListMenu(val);
   };
 
+    handleSearch = () => {
+        const { filter } = this.state;
+        const { list } = this.props; // 原始完整数据
+
+        // 筛选逻辑：保留菜单或接口符合关键词的数据
+        const filteredList = list
+            .map(item => {
+                const newItem = { ...item };
+                if (newItem.list) {
+                    newItem.list = newItem.list.filter(
+                        inter =>
+                            inter.title.includes(filter) || inter.path.includes(filter)
+                    );
+                }
+                return newItem;
+            })
+            .filter(item => item.name.includes(filter) || (item.list && item.list.length > 0));
+
+        this.setState({ list: filteredList });
+    };
+
   render() {
-    const { list, projectList } = this.props;
+      const { list, projectList} = this.props;
 
     // const { selectedRowKeys } = this.state;
     const data = list.map(item => {
@@ -218,24 +244,39 @@ export default class ImportInterface extends Component {
       }
     ];
 
-    return (
-      <div>
-        <div className="select-project">
-          <span>选择要导入的项目： </span>
-          <Select value={this.state.project} style={{ width: 200 }} onChange={this.onChange}>
-            {projectList.map(item => {
-              return item.projectname ? (
-                ''
-              ) : (
+  return (
+    <div>
+      <div className="select-project" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <span>选择要导入的项目：</span>
+        <Select value={this.state.project} style={{ width: 200 }} onChange={this.onChange}>
+          {projectList.map(item =>
+              item.projectname ? null : (
                 <Option value={`${item._id}`} key={item._id}>
                   {item.name}
                 </Option>
-              );
-            })}
-          </Select>
+                  )
+              )}
+        </Select>
+
+        {/* 把搜索框放到下拉框右边 */}
+        <div className="interface-filter">
+          <Input
+                  value={this.state.filter}
+                  placeholder="搜索接口"
+                  style={{ width: 200 }}
+                  onChange={e => this.setState({ filter: e.target.value })}
+                  onPressEnter={this.handleSearch} // 回车触发搜索
+              />
         </div>
-        <Table columns={columns} rowSelection={rowSelection} dataSource={data} pagination={false} />
       </div>
-    );
+
+      <Table
+            columns={columns}
+            rowSelection={rowSelection}
+            dataSource={data}
+            pagination={false}
+        />
+    </div>
+  );
   }
 }
