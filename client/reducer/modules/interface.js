@@ -120,6 +120,7 @@ export async function deleteInterfaceCatData(id) {
 // Action Creators
 export async function fetchInterfaceData(interfaceId) {
   let result = await axios.get('/api/interface/get?id=' + interfaceId);
+  initialState.curdata = result
   return {
     type: FETCH_INTERFACE_DATA,
     payload: result

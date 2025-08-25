@@ -1,30 +1,19 @@
 const axios = require('axios');
 const assert = require('assert');
-const yapi = require('../../server/yapi');
 
 const testScript = [
     {
-        dataSourceType: "NEO4J",
-        fields: ["count"],
-        query: 'MATCH (o:organize {id:"668525845e3aa161ce5fb244"}) RETURN o.count as count',
-        expect: 15
-    },
-    {
-        dataSourceType: "MARIADB",
-        dataSourceName: "default",
-        fields: ["orgName", "deptName"],
-        query: 'SELECT orgName, deptName FROM organize_user WHERE userId="444"',
-        expect: [
-            ["学员", "第十九期"],
-            ["狂派经理", "狂派事业部"]
-        ]
+        "dataSourceType": "POSTGRES",
+        "fields": [
+            "user_name"
+        ],
+        "dataSourceName": "xpa-postgres",
+        "query": "select user_name from \"user\" where user_id = '007'"
     }
 ];
 
 async function runTestScript() {
-    let baseUrl = yapi.WEBCONFIG.sqlServer
-    const url = baseUrl + '/internal/loadAssertData'; // 请替换成你的接口地址
-    console.log("url",url);
+    const url = 'http://196.168.1.143:3399/internal/loadAssertData';
     // 构造请求体，去掉 expect 字段
     const payload = testScript.map(item => ({
         dataSourceType: item.dataSourceType,
@@ -39,7 +28,7 @@ async function runTestScript() {
         });
 
         const resultData = res.data;
-
+        console.log("resultData",resultData);
         testScript.forEach((testItem, index) => {
             const actualRows = resultData[index];
             const expect = testItem.expect;

@@ -146,7 +146,7 @@
     "react-dnd-html5-backend": "^2.5.1",
     "react-dom": "^16.2.0",
     "react-redux": "^5.0.5",
-    "react-router-dom": "^4.1.1",
+    "react-router-dom": "5.3.4",
     "react-scripts": "1.0.10",
     "reactabular-dnd": "^8.9.0",
     "reactabular-table": "^8.9.0",

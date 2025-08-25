@@ -40,7 +40,6 @@ function simpleJsonPathParse(key, json) {
       break;
     }
   }
-  console.log('simpleJsonPathParsesimpleJsonPathParse',json)
   return json;
 }
 

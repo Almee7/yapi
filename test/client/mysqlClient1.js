@@ -1,27 +1,18 @@
 const assert = require('assert');
 const axios = require("axios");
 
-const testScript = [
+const testScript =  [
     {
-        dataSourceType: "NEO4J",
-        fields: ["count"],
-        query: 'MATCH (o:organize {id:"668525845e3aa161ce5fb244"}) RETURN o.count as count',
-        expect: 14
-    },
-    {
-        dataSourceType: "MARIADB",
-        dataSourceName: "default",
-        fields: ["orgName", "deptName"],
-        query: 'SELECT orgName, deptName FROM organize_user WHERE userId="444"',
-        expect: [
-            ["学员", "第十九期"],
-            ["狂派经理", "狂派事业部"]
-        ]
+        "dataSourceType": "POSTGRES",
+        "fields": [
+            "user_name"
+        ],
+        "dataSourceName": "xpa-postgres",
+        "query": "select user_name from \"user\" where user_id = '007'"
     }
-];
+]
 async function runTestScript() {
-    const url = 'http://192.168.6.218:3399/internal/loadAssertData'; // 请替换成你的接口地址
-
+    const url = 'http://196.168.1.143:3399/internal/loadAssertData'; // 请替换成你的接口地址
     // 构造请求体，去掉 expect 字段
     const payload = testScript.map(item => ({
         dataSourceType: item.dataSourceType,
@@ -29,14 +20,14 @@ async function runTestScript() {
         fields: item.fields,
         query: item.query
     }));
-
+    console.log("payload",payload)
     try {
         const res = await axios.post(url, payload, {
             headers: { 'Content-Type': 'application/json' }
         });
 
         const resultData = res.data;
-
+        console.log("resultData",resultData);
         for (let index = 0; index < testScript.length; index++) {
             const testItem = testScript[index];
             const actualRows = resultData[index];

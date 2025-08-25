@@ -11,7 +11,6 @@ class GrpcAgentClient {
      */
     constructor() {
         const address = yapi.WEBCONFIG.sqlServer
-        console.log(address)
         this.client = new GrpcAgentServiceClient(address, grpc.credentials.createInsecure());
     }
 
@@ -21,7 +20,7 @@ class GrpcAgentClient {
      * @returns {Promise<Object|string>} - 解析后的 JSON 对象或字符串结果
      */
     invoke(paramsObj) {
-        console.log(paramsObj)
+        console.log("paramsObj",paramsObj);
         return new Promise((resolve, reject) => {
             const request = new AgentRequest();
             // 去掉 expect 字段

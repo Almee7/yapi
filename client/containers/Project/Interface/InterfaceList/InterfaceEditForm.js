@@ -18,7 +18,6 @@ const ResBodySchema = jSchema({ lang: 'zh_CN', mock: MOCK_SOURCE });
 const ReqBodySchema = jSchema({ lang: 'zh_CN', mock: MOCK_SOURCE });
 const TabPane = Tabs.TabPane;
 
-
 require('common/tui-editor/dist/tui-editor.min.css'); // editor ui
 require('common/tui-editor/dist/tui-editor-contents.min.css'); // editor content
 require('./editor.css');
@@ -129,7 +128,8 @@ class InterfaceEditForm extends Component {
     cat: PropTypes.array,
     changeEditStatus: PropTypes.func,
     projectMsg: PropTypes.object,
-    onTagClick: PropTypes.func
+    onTagClick: PropTypes.func,
+    onVersionChange: PropTypes.func
   };
 
   initState(curdata) {
@@ -168,7 +168,9 @@ class InterfaceEditForm extends Component {
         path: '',
         status: 'undone',
         method: 'get',
-
+        versions: [],
+        version: '',
+        interfaceId: '',
         req_params: [],
 
         req_query: [
@@ -369,26 +371,92 @@ class InterfaceEditForm extends Component {
       this._changeRadioGroup(radio[0], radio[1]);
     });
   };
+  /** --- 多接口独立存储方法 --- **/
+  getLastSelection = (interfaceKey) => ({
+    interfaceId: localStorage.getItem(`${interfaceKey}_lastInterfaceId`),
+    version: localStorage.getItem(`${interfaceKey}_lastVersion`)
+  });
+
+  getVersionList = async () => {
+    if (this.state['versions'].length) {
+      return;
+    }
+    const res = await axios.post('/api/interface/getVersionList', {
+      interface_key: this.state['interface_key']
+    });
+    const data = JSON.parse(JSON.stringify(res.data.data));
+    if (data && data.length) {
+      // 如果 state 没有 interfaceId（说明没记住上次选择）
+      if (!this.state.interfaceId) {
+        this.setState({
+          versions: data,
+          interfaceId: data[0]._id,        // 默认最新
+          version: data[0].version || ''
+        });
+      } else {
+        // 已经有上次选中的版本，仍然要把 versions 填进去
+        this.setState({ versions: data });
+      }
+    }
+  };
+
+
+  onChangeVersion = async ({ version, interfaceId }) => {
+    console.log(version, this.state.version)
+    if(version === this.state.version) {
+      return
+    }
+    // 更新当前选择的版本
+    const interfaceKey = this.state.interface_key; // 当前页面接口唯一 key
+    this.setState({ version, interfaceId });
+    // 记住用户选择
+    localStorage.setItem(`${interfaceKey}_lastInterfaceId`, interfaceId);
+    localStorage.setItem(`${interfaceKey}_lastVersion`, version);
+    this.props.onVersionChange(this.state.project_id, interfaceId);
+    // 获取详情
+    // const res = await axios.get('/api/interface/get?id=' + interfaceId);
+    // try {
+    //   if (res && res.data) {
+    //     this.setState({ versionDetail: res.data });
+    //     // router.push(`/project/${this.state.project_id}/interface/api/${interfaceId}`)
+    //     // window.location.href = `/project/${this.state.project_id}/interface/api/${interfaceId}?tab=edit`;
+    //   }
+    // } catch (err) {
+    //   console.error('接口详情拉取失败', err);
+    // }
+  };
 
   componentDidMount() {
     EditFormContext = this;
     this._isMounted = true;
+    // 初始化请求类型
     this.setState({
       req_radio_type: HTTP_METHOD[this.state.method].request_body ? 'req-body' : 'req-query'
     });
-
+    // 初始化 mock 预览
     this.mockPreview = mockEditor({
       container: 'mock-preview',
       data: '',
       readOnly: true
     });
-
+    // 初始化 markdown 编辑器
     this.editor = new Editor({
       el: document.querySelector('#desc'),
       initialEditType: 'wysiwyg',
       height: '500px',
       initialValue: this.state.markdown || this.state.desc
     });
+    // 读取上次选择的版本
+    const interfaceKey = this.state.interface_key;
+    const { interfaceId, version } = this.getLastSelection(interfaceKey);
+
+    if (interfaceId) {
+      this.setState({ interfaceId, version: version || '' }, () => {
+        this.onChangeVersion({ interfaceId, version });
+      });
+    } else {
+      this.getVersionList(); // 默认最新版本
+    }
   }
 
   componentWillUnmount() {
@@ -926,6 +994,40 @@ class InterfaceEditForm extends Component {
                 </Col>
               </Row>
             </FormItem>
+            <FormItem
+                className="interface-version-item"
+                {...formItemLayout}
+                label={<span>接口版本</span>}
+            >
+              <InputGroup compact>
+                <Select
+                    value={{ key: this.state.interfaceId, label: this.state.version }} // 显示版本号
+                    labelInValue
+                    onFocus={() => this.getVersionList()}
+                    onChange={({ key, label }) => {
+                      this.onChangeVersion({
+                        version: label, // 显示文本
+                        interfaceId: key // 选中的版本 id
+                      });
+                    }}
+                    style={{ width: '20%' }}
+                >
+                  {(this.state.versions || []).map(v => (
+                    <Option key={v._id} value={v._id}>
+                      {v.version}
+                    </Option>
+                  ))}
+                </Select>
+              </InputGroup>
+
+              <Row className="interface-edit-item">
+                <Col span={24} offset={0}>
+                  {paramsList}
+                </Col>
+              </Row>
+            </FormItem>
+
+
             <FormItem className="interface-edit-item" {...formItemLayout} label="Tag">
               {getFieldDecorator('tag', { initialValue: this.state.tag })(
                 <Select placeholder="请选择 tag " mode="multiple">

@@ -551,6 +551,7 @@ class InterfaceColContent extends Component {
   };
   // val 请求体的每个值 替换值
   handleValue = (val, global) => {
+    console.log('11111111111111111111',val)
     let globalValue = ArrayToObject(global);
     let context = Object.assign({}, { global: globalValue }, this.records);
     return handleParamsValue(val, context);
