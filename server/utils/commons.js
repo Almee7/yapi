@@ -346,58 +346,48 @@ exports.sandbox = async (sandbox, script) => {
     sandbox.vars = sandbox.vars || {};
     sandbox.sqlassert = sandbox.sqlassert || [];
     sandbox.console = console;
+    //ws脚本
+    const regex = /readWS\s*\(\s*["']([^"']+)["']\s*\)/;
+    const match = script.match(regex);
     script = new vm.Script(script);
     const context = new vm.createContext(sandbox);
     script.runInContext(context, {
-      timeout: 3000
+      timeout: 1000
     });
-    console.log(sandbox.sqlAssert, typeof sandbox.sqlAssert)
     // 执行断言
     if (Array.isArray(sandbox.sqlAssert) && sandbox.sqlAssert.length > 0) {
-      const actualValue =  await executeQuery(sandbox.sqlAssert, sandbox.vars);
+      const actualValue = await executeQuery(sandbox.sqlAssert, sandbox.vars);
       assertResult(actualValue, sandbox.sqlAssert)
-    sandbox.wsLog = null; // 脚本里可以直接赋值
-    const regex = /readWS\s*\(\s*["']([^"']+)["']\s*\)/;
-    const match = script.match(regex);
+      sandbox.wsLog = null; // 脚本里可以直接赋值
+      // 注入 assert
+      sandbox.assert = assert;
+      const context = vm.createContext(sandbox);
+      if (match) {
+        //注入readws
+        const connectionId = context.body.connectionId;
+        sandbox.readWS = async () => {
+          const msg = await WsTestController.readws(connectionId);
+          return msg;
+        };
 
-    // 注入 assert
-    sandbox.assert = assert;
+      } else {
+        return '未找到 readWS 调用';
+      }
 
-    const context = vm.createContext(sandbox);
-
-    if (match) {
-     //注入readws
-      const connectionId = context.body.connectionId;
-      sandbox.readWS = async () => {
-        const msg = await WsTestController.readws(connectionId);
-        return msg;
-      };
-
-    } else {
-      return '未找到 readWS 调用';
+      // 支持 async/await 脚本
+      const wrappedScript = new vm.Script(`
+          (async () => {
+            ${script}
+          })()
+        `);
+      await wrappedScript.runInContext(context);
+      return sandbox;
     }
-
-    // 支持 async/await 脚本
-    const wrappedScript = new vm.Script(`
-      (async () => {
-        ${script}
-      })()
-    `);
-
-    await wrappedScript.runInContext(context);
-
-    // 执行 sqlassert
-    if (Array.isArray(sandbox.sqlAssert) && sandbox.sqlAssert.length > 0) {
-        const actualValue =  await executeQuery(sandbox.sqlAssert, sandbox.vars);
-        assertResult(actualValue, sandbox.sqlAssert)
-    }
-    return sandbox;
   } catch (err) {
     err.__sandboxFailed = true;
-    throw err
+    throw err;
   }
-};
-
+}
 
 function trim(str) {
   if (!str) {
@@ -469,7 +459,7 @@ exports.validateParams = (schema2, params) => {
     allErrors: true,
     coerceTypes: true,
     useDefaults: true,
-    removeAdditional: flag ? false : true
+    removeAdditional: !flag
   });
 
   var localize = require('ajv-i18n');
@@ -477,7 +467,7 @@ exports.validateParams = (schema2, params) => {
 
   const schema = ejs(schema2);
 
-  schema.additionalProperties = flag ? true : false;
+  schema.additionalProperties = flag;
   const validate = ajv.compile(schema);
   let valid = validate(params);
 

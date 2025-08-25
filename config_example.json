@@ -5,11 +5,11 @@
   "scriptEnable": true,
   "sqlServer": "192.168.6.218:3388",
   "db": {
-    "servername": "193.168.2.100",
+    "servername": "127.0.0.1",
     "DATABASE": "yapi",
-    "port": 30018,
+    "port": 27017,
     "user": "root",
-    "pass": "123456",
+    "pass": "root",
     "authSource": "admin"
   },
   "mail": {

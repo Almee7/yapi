@@ -94,7 +94,9 @@ class interfaceModel extends baseModel {
       field3: String,
       api_opened: { type: Boolean, default: false },
       index: { type: Number, default: 0 },
-      tag: Array
+      tag: Array,
+      interface_key: 'string',
+      version: 'string'
     };
   }
 
@@ -140,6 +142,17 @@ class interfaceModel extends baseModel {
       })
       .exec();
   }
+  getByInterfaceKey(project_id, interface_key, method, version = null, select) {
+    select =
+        select || '_id title uid interface_key version method project_id catid edit_uid status add_time up_time type ...';
+    const query = {
+      project_id,
+      interface_key,
+      method
+    };
+    if (version) query.version = version; // 可选，查询指定版本
+    return this.model.find(query).select(select).exec();
+  }
 
   getByPath(project_id, path, method, select) {
     select =
@@ -155,10 +168,11 @@ class interfaceModel extends baseModel {
       .exec();
   }
 
-  checkRepeat(id, path, method) {
+  checkRepeat(id, interface_key,version, method) {
     return this.model.countDocuments({
       project_id: id,
-      path: path,
+      interface_key: interface_key,
+      version: version,
       method: method
     });
   }
@@ -179,6 +193,132 @@ class interfaceModel extends baseModel {
       .select(select)
       .sort({ title: 1 })
       .exec();
+  }
+
+  listLatestByProject(project_id, option = {},page, limit, select) {
+    page = parseInt(page);
+    limit = parseInt(limit);
+    // 默认返回字段
+    select = select || '_id title uid path method project_id catid edit_uid status add_time up_time interface_key version tag';
+
+    // 构造匹配条件
+    let match = { project_id: Number(project_id) };
+
+    if (option.status) {
+      match.status = Array.isArray(option.status) ? { $in: option.status } : option.status;
+    }
+
+    if (option.tag) {
+      match.tag = { $in: Array.isArray(option.tag) ? option.tag : [option.tag] };
+    }
+
+    // 构造 project 对象
+    const projectFields = select.split(' ').reduce((acc, key) => {
+      acc[key] = 1;
+      return acc;
+    }, {});
+
+    return this.model.aggregate([
+      { $match: match },
+      { $addFields: { versionNum: { $toDouble: "$version" } } },
+      { $sort: { versionNum: -1, up_time: -1 } }, // 确保 group 拿到最新版本
+      {
+        $group: {
+          _id: { catid: "$catid", interface_key: "$interface_key" },
+          doc: { $first: "$$ROOT" }
+        }
+      },
+      { $replaceRoot: { newRoot: "$doc" } },
+      { $project: projectFields },
+      { $sort: { catid: 1, up_time: -1 } }, // 分类 + 更新时间
+      {
+        $facet: {
+          list: [
+            { $skip: ((page - 1) * limit) },
+            { $limit: limit }
+          ],
+          total: [
+            { $count: "count" }
+          ]
+        }
+      }
+    ]).exec().then(res => {
+      if (!res.length) {
+        return { list: [], total: 0 };
+      }
+      return {
+        list: res[0].list,
+        total: res[0].total.length ? res[0].total[0].count : 0
+      };
+    });
+  }
+
+  listLatestByCat(catid, option = {}, page = 1, limit = 20, select) {
+    page = parseInt(page, 10);
+    limit = parseInt(limit, 10);
+
+    // 默认返回字段
+    select = select || '_id title uid path method project_id catid edit_uid status add_time up_time interface_key version tag';
+
+    // 构造匹配条件
+    let match = { catid: Number(catid) };
+
+    if (option.status) {
+      match.status = Array.isArray(option.status) ? { $in: option.status } : option.status;
+    }
+
+    if (option.tag) {
+      match.tag = { $in: Array.isArray(option.tag) ? option.tag : [option.tag] };
+    }
+
+    // 构造投影字段
+    const projectFields = select.split(' ').reduce((acc, key) => {
+      acc[key] = 1;
+      return acc;
+    }, {});
+
+    return this.model.aggregate([
+      { $match: match },
+      { $addFields: { versionNum: { $toDouble: "$version" } } },
+      { $sort: { versionNum: -1, up_time: -1 } }, // 每个 interface_key 最新版本排前
+      {
+        $group: {
+          _id: "$interface_key",
+          doc: { $first: "$$ROOT" }  // 去重，每个 interface_key 只保留最新
+        }
+      },
+      { $replaceRoot: { newRoot: "$doc" } },
+      { $project: projectFields },
+      { $sort: { up_time: -1 } }, // 按更新时间排序
+      {
+        $facet: {
+          list: [
+            { $skip: (page - 1) * limit },
+            { $limit: limit }
+          ],
+          total: [
+            { $count: "count" }
+          ]
+        }
+      }
+    ]).exec().then(res => {
+      if (!res.length) return { list: [], total: 0 };
+      return {
+        list: res[0].list,
+        total: res[0].total.length ? res[0].total[0].count : 0
+      };
+    });
+  }
+
+
+  listVersionByInterfaceKey(interface_key) {
+    return this.model
+        .find(
+            { interface_key },
+            { _id: 1, version: 1, up_time: 1 }
+        )
+        .sort({ up_time: -1 })
+        .exec();
   }
 
   listWithPage(project_id, page, limit) {
@@ -222,6 +362,40 @@ class interfaceModel extends baseModel {
       .sort({ index: 1 })
       .exec();
   }
+
+  // Model.js
+  listLatestByCatIds(catIds, select) {
+    select =
+        select ||
+        '_id title uid path method project_id catid edit_uid status add_time up_time index tag version interface_key';
+
+    const projectFields = select.split(' ').reduce((acc, key) => {
+      acc[key] = 1;
+      return acc;
+    }, {});
+
+    return this.model
+        .aggregate([
+          { $match: { catid: { $in: catIds } } },
+          {
+            $addFields: {
+              versionNum: { $toDouble: { $ifNull: ['$version', 0] } }
+            }
+          },
+          { $sort: { interface_key: 1, versionNum: -1, up_time: -1 } },
+          {
+            $group: {
+              _id: { catid: '$catid', interface_key: '$interface_key' },
+              doc: { $first: '$$ROOT' }
+            }
+          },
+          { $replaceRoot: { newRoot: '$doc' } },
+          { $project: projectFields },
+          { $sort: { index: 1 } }
+        ])
+        .exec();
+  }
+
 
   listByCatidWithPage(catid, page, limit) {
     page = parseInt(page);
