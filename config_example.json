@@ -9,7 +9,7 @@
     "DATABASE": "yapi",
     "port": 30018,
     "user": "root",
-    "pass": "123456",
+    "pass": "one.2013",
     "authSource": "admin"
   },
   "mail": {
