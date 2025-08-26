@@ -71,7 +71,7 @@ function connect(callback) {
     }
   );
 
-  autoIncrement.initialize(db);
+  autoIncrement.initialize();
   return db;
 }
 

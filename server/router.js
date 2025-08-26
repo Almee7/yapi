@@ -392,6 +392,11 @@ let routerConfig = {
       action: 'schema2json',
       path: 'schema2json',
       method: 'post'
+    },
+    {
+      action: 'getVersionList',
+      path: 'getVersionList',
+      method: 'post'
     }
   ],
   log: [

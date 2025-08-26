@@ -245,16 +245,8 @@ class InterfaceColContent extends Component {
       if (currColEnvObj[item.project_id]) {
         item.case_env = currColEnvObj[item.project_id];
       }
-      console.log('item.req_headers：', item.req_headers);
-      console.log('item.case_env：', item.case_env);
       item.req_headers = that.handleReqHeader(item.project_id, item.req_headers, item.case_env);
-      console.log('处理后的 row：', item);
     })
-    // produce(rows || [], draftRows => {
-    //   draftRows.forEach(item => {
-    //
-    //   });
-    // });
     this.setState({ rows: newRows });
   };
 
@@ -419,7 +411,6 @@ class InterfaceColContent extends Component {
     let requestParams = {};
     let options = handleParams(interfaceData, this.handleValue, requestParams);
     options.vars = scriptVars
-    console.log("scriptVars----------",scriptVars)
     let result = {
       code: 400,
       msg: '数据异常',
@@ -432,7 +423,6 @@ class InterfaceColContent extends Component {
       projectId: interfaceData.project_id,
       interfaceId: interfaceData.interface_id
     }));
-    console.log('options----------',options)
     try {
       let data = await crossRequest(options, interfaceData.pre_script, interfaceData.after_script,interfaceData.pre_request_script, createContext(
         this.props.curUid,
@@ -541,6 +531,7 @@ class InterfaceColContent extends Component {
   };
   // val 请求体的每个值 替换值
   handleValue = (val, global) => {
+    console.log('11111111111111111111',val)
     let globalValue = ArrayToObject(global);
     let context = Object.assign({}, { global: globalValue }, this.records);
     return handleParamsValue(val, context);
@@ -785,7 +776,6 @@ class InterfaceColContent extends Component {
     const allSelected = this.isAllSelected();
     const selectedIds = allSelected ? [] : rows.map(row => row._id);
     this.setState({ selectedIds });
-    console.log("当前选中的 ID：", selectedIds);
   };
 
   // 处理单个选择事件
@@ -804,7 +794,6 @@ class InterfaceColContent extends Component {
         item._id === id ? {...item, enable_async: checked} : item
     );
     this.setState({rows: newRows});
-    console.log("rows----------------","rows");
   };
 
   render() {
