@@ -394,6 +394,7 @@ export default class Run extends Component {
             options,
             options.pre_script || this.state.pre_script,
             options.after_script || this.state.after_script,
+            options.pre_request_script || this.state.pre_request_script,
             createContext(this.props.curUid, this.props.projectId, this.props.interfaceId)
         );
         await plugin.emitHook("after_request", result, {

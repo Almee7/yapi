@@ -25,7 +25,9 @@ export default class ImportInterface extends Component {
           categoryCount: {},
           project: this.props.currProjectId,
           filter: '',
-          list: props.list ? [...props.list] : [] // 初始显示全部数据
+          searchList: [],
+          list: props.list ? [...props.list] : [], // 初始显示全部数据
+          expandedRowKeys: []  //自动展开有匹配接口的分类
       };
   }
 
@@ -36,7 +38,8 @@ export default class ImportInterface extends Component {
     selectInterface: PropTypes.func,
     projectList: PropTypes.array,
     currProjectId: PropTypes.string,
-    fetchInterfaceListMenu: PropTypes.func
+    fetchInterfaceListMenu: PropTypes.func,
+      searchList: PropTypes.array
   };
 
 
@@ -56,32 +59,47 @@ export default class ImportInterface extends Component {
     await this.props.fetchInterfaceListMenu(val);
   };
 
-    handleSearch = () => {
-        const { filter } = this.state;
-        const { list } = this.props; // 原始完整数据
+    handleSearch = (filter) => {
+        const { list } = this.props;
+        const expandedRowKeys = [];
 
-        // 筛选逻辑：保留菜单或接口符合关键词的数据
         const filteredList = list
             .map(item => {
-                const newItem = { ...item };
-                if (newItem.list) {
-                    newItem.list = newItem.list.filter(
-                        inter =>
-                            inter.title.includes(filter) || inter.path.includes(filter)
-                    );
-                }
-                return newItem;
-            })
-            .filter(item => item.name.includes(filter) || (item.list && item.list.length > 0));
+                const newItem = {
+                    ...item,
+                    list: item.list
+                        ? item.list.filter(
+                            inter =>
+                                inter.title.toLowerCase().includes(filter.toLowerCase()) ||
+                                inter.path.toLowerCase().includes(filter.toLowerCase())
+                        )
+                        : []
+                };
 
-        this.setState({ list: filteredList });
+                // 匹配分类名或子项时自动展开
+                if (
+                    item.name.toLowerCase().includes(filter.toLowerCase()) ||
+                    (newItem.list && newItem.list.length > 0)
+                ) {
+                    expandedRowKeys.push('category_' + item._id);
+                    return newItem;
+                }
+                return null;
+            })
+            .filter(Boolean);
+
+        this.setState({ searchList: filteredList, expandedRowKeys, filter });
     };
 
-  render() {
-      const { list, projectList} = this.props;
 
-    // const { selectedRowKeys } = this.state;
-    const data = list.map(item => {
+    render() {
+      const { projectList} = this.props;
+      const { searchList, list } = this.state;
+      const displayList = searchList.length > 0 || this.state.filter.trim() ? searchList : list;
+
+
+      // const { selectedRowKeys } = this.state;
+    const data = displayList.map(item => {
       return {
         key: 'category_' + item._id,
         title: item.name,
@@ -260,21 +278,25 @@ export default class ImportInterface extends Component {
 
         {/* 把搜索框放到下拉框右边 */}
         <div className="interface-filter">
-          <Input
-                  value={this.state.filter}
-                  placeholder="搜索接口"
-                  style={{ width: 200 }}
-                  onChange={e => this.setState({ filter: e.target.value })}
-                  onPressEnter={this.handleSearch} // 回车触发搜索
-              />
+            <Input
+                value={this.state.filter}
+                placeholder="搜索接口"
+                style={{ width: 200 }}
+                onChange={e => this.handleSearch(e.target.value)} // ⭐️ 输入实时触发搜索
+            />
+
         </div>
       </div>
-
-      <Table
+        <Table
             columns={columns}
             rowSelection={rowSelection}
             dataSource={data}
             pagination={false}
+            expandable={{
+                expandedRowKeys: this.state.expandedRowKeys,
+                onExpandedRowsChange: expandedRowKeys =>
+                    this.setState({ expandedRowKeys })
+            }}
         />
     </div>
   );
