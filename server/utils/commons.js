@@ -515,6 +515,7 @@ exports.createAction = (router, baseurl, routerController, action, path, method,
   router[method](baseurl + path, async ctx => {
     let inst = new routerController(ctx);
     try {
+
       await inst.init(ctx);
       ctx.params = Object.assign({}, ctx.request.query, ctx.request.body, ctx.params);
       if (inst.schemaMap && typeof inst.schemaMap === 'object' && inst.schemaMap[action]) {
