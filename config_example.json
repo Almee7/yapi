@@ -3,13 +3,13 @@
   "adminAccount": "admin@admin.com",
   "timeout": 120000,
   "scriptEnable": true,
-  "sqlServer": "192.168.6.218:3388",
+  "sqlServer": "http://192.168.6.218:3399",
   "db": {
-    "servername": "127.0.0.1",
+    "servername": "193.168.2.100",
     "DATABASE": "yapi",
-    "port": 27017,
+    "port": 30018,
     "user": "root",
-    "pass": "root",
+    "pass": "one.2013",
     "authSource": "admin"
   },
   "mail": {
