@@ -54,9 +54,7 @@ class InterfaceEdit extends Component {
       curdata: {},
       status: 0,
       visible: false
-      // tag: []
     };
-    console.log('-----------inerface edit', this.props)
   }
 
   onSubmit = async params => {

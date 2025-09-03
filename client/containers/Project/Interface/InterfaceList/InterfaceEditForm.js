@@ -374,56 +374,59 @@ class InterfaceEditForm extends Component {
   /** --- 多接口独立存储方法 --- **/
   getLastSelection = (interfaceKey) => ({
     interfaceId: localStorage.getItem(`${interfaceKey}_lastInterfaceId`),
-    version: localStorage.getItem(`${interfaceKey}_lastVersion`)
+    version: parseInt(localStorage.getItem(`${interfaceKey}_lastVersion`), 10) || 0
   });
-
-  getVersionList = async () => {
+  // onlyLoadList = true 表示只加载列表，不触发默认选中
+  getVersionList = async (onlyLoadList = false) => {
     if (this.state['versions'].length) {
       return;
     }
     const res = await axios.post('/api/interface/getVersionList', {
       interface_key: this.state['interface_key']
     });
-    const data = JSON.parse(JSON.stringify(res.data.data));
-    if (data && data.length) {
-      // 如果 state 没有 interfaceId（说明没记住上次选择）
-      if (!this.state.interfaceId) {
-        this.setState({
-          versions: data,
-          interfaceId: data[0]._id,        // 默认最新
-          version: data[0].version || ''
-        });
-      } else {
-        // 已经有上次选中的版本，仍然要把 versions 填进去
-        this.setState({ versions: data });
-      }
+    const data = JSON.parse(JSON.stringify(res.data.data || []));
+    this.setState({ versions: data });
+    if (onlyLoadList) return; // 仅加载，不修改状态或缓存
+
+    if (data.length) {
+      // 取本地记录的上次选择
+      const lastSelection = this.getLastSelection(this.state['interface_key']);
+
+      // 优先选本地记录，否则选最新（数组第 0 个）
+      let selected = data.find(v => v._id === lastSelection.interfaceId) || data[0];
+      // 统一将 version 转整数
+      const version = parseInt(selected.version, 10);
+      this.setState({
+        versions: data,
+        interfaceId: selected._id,
+        version
+      }, () => {
+        // 更新缓存
+        const interfaceKey = this.state.interface_key;
+        localStorage.setItem(`${interfaceKey}_lastInterfaceId`, selected._id);
+        localStorage.setItem(`${interfaceKey}_lastVersion`, version);
+
+        // 通知父组件
+        this.props.onVersionChange(this.state.project_id, selected._id);
+      });
     }
   };
 
 
+
   onChangeVersion = async ({ version, interfaceId }) => {
-    console.log(version, this.state.version)
-    if(version === this.state.version) {
-      return
-    }
-    // 更新当前选择的版本
     const interfaceKey = this.state.interface_key; // 当前页面接口唯一 key
-    this.setState({ version, interfaceId });
-    // 记住用户选择
-    localStorage.setItem(`${interfaceKey}_lastInterfaceId`, interfaceId);
-    localStorage.setItem(`${interfaceKey}_lastVersion`, version);
-    this.props.onVersionChange(this.state.project_id, interfaceId);
-    // 获取详情
-    // const res = await axios.get('/api/interface/get?id=' + interfaceId);
-    // try {
-    //   if (res && res.data) {
-    //     this.setState({ versionDetail: res.data });
-    //     // router.push(`/project/${this.state.project_id}/interface/api/${interfaceId}`)
-    //     // window.location.href = `/project/${this.state.project_id}/interface/api/${interfaceId}?tab=edit`;
-    //   }
-    // } catch (err) {
-    //   console.error('接口详情拉取失败', err);
-    // }
+    // 统一类型为整数
+    version = parseInt(version, 10);
+    // 判断是否需要更新
+    if (version === this.state.version) return;
+
+    this.setState({ version, interfaceId }, () => {
+      // ✅ 状态更新后再执行
+      localStorage.setItem(`${interfaceKey}_lastInterfaceId`, interfaceId);
+      localStorage.setItem(`${interfaceKey}_lastVersion`, version);
+      this.props.onVersionChange(this.state.project_id, interfaceId);
+    });
   };
 
   componentDidMount() {
@@ -451,8 +454,8 @@ class InterfaceEditForm extends Component {
     const { interfaceId, version } = this.getLastSelection(interfaceKey);
 
     if (interfaceId) {
-      this.setState({ interfaceId, version: version || '' }, () => {
-        this.onChangeVersion({ interfaceId, version });
+      this.setState({ interfaceId, version }, () => {
+        this.props.onVersionChange(this.state.project_id, interfaceId);
       });
     } else {
       this.getVersionList(); // 默认最新版本
@@ -1001,23 +1004,33 @@ class InterfaceEditForm extends Component {
             >
               <InputGroup compact>
                 <Select
-                    value={{ key: this.state.interfaceId, label: this.state.version }} // 显示版本号
+                    value={{
+                      key: this.state.interfaceId,
+                      label: this.state.version === 0 ? '初始版本' : `v${this.state.version}`
+                    }}
                     labelInValue
-                    onFocus={() => this.getVersionList()}
+                    onFocus={() => {
+                      // 仅加载版本列表，不修改缓存
+                      if (!this.state.versions.length) {
+                        this.getVersionList(true);
+                      }
+                    }}
                     onChange={({ key, label }) => {
-                      this.onChangeVersion({
-                        version: label, // 显示文本
-                        interfaceId: key // 选中的版本 id
-                      });
+                      const ver = label === '初始版本' ? 0 : Number(label.replace(/^v/, ''));
+                      this.onChangeVersion({ interfaceId: key, version: ver });
                     }}
                     style={{ width: '20%' }}
                 >
-                  {(this.state.versions || []).map(v => (
-                    <Option key={v._id} value={v._id}>
-                      {v.version}
-                    </Option>
-                  ))}
+                  {(this.state.versions || []).map(v => {
+                    const label = v.version === 0 ? '初始版本' : `v${v.version}`;
+                    return (
+                      <Option key={v._id} value={v._id}>
+                        {label}
+                      </Option>
+                    );
+                  })}
                 </Select>
+
               </InputGroup>
 
               <Row className="interface-edit-item">

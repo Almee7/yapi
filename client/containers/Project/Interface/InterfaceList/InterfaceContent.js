@@ -64,7 +64,7 @@ class Content extends Component {
     const params = nextProps.match.params;
     const search = new URLSearchParams(nextProps.location.search);
     const tab = search.get('tab'); // 从 ?tab=edit 提取值
-   await this.props.fetchInterfaceData(params.actionId)
+    await this.props.fetchInterfaceData(params.actionId)
 
     this.setState({
       curtab: tab || 'view' // 有 tab 就用它，否则默认 'view'
@@ -147,8 +147,11 @@ class Content extends Component {
     let tabContent = null;
     if (this.state.curtab) {
       let C = InterfaceTabs[this.state.curtab].component;
-      tabContent = <C switchToView={this.switchToView} onVersionChange={(project_id, interfaceId) => {
-        this.props.history.push(`/project/${project_id}/interface/api/${interfaceId}?tab=edit`)
+      tabContent = <C
+          key={`${this.state.curtab}-${this.actionId}`}
+          switchToView={this.switchToView}
+          onVersionChange={(project_id, interfaceId) => {
+            this.props.history.push(`/project/${project_id}/interface/api/${interfaceId}?tab=edit`)
       }} />;
     }
 

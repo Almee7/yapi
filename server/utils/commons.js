@@ -352,15 +352,13 @@ exports.sandbox = async (sandbox, script) => {
     script = new vm.Script(script);
     const context = new vm.createContext(sandbox);
     script.runInContext(context, {
-      timeout: 1000
+      timeout: 3000
     });
     // 执行断言
     if (Array.isArray(sandbox.sqlAssert) && sandbox.sqlAssert.length > 0) {
       const actualValue = await executeQuery(sandbox.sqlAssert, sandbox.vars);
       assertResult(actualValue, sandbox.sqlAssert)
       sandbox.wsLog = null; // 脚本里可以直接赋值
-      // 注入 assert
-      sandbox.assert = assert;
       const context = vm.createContext(sandbox);
       if (match) {
         //注入readws
@@ -383,6 +381,7 @@ exports.sandbox = async (sandbox, script) => {
       await wrappedScript.runInContext(context);
       return sandbox;
     }
+    return sandbox
   } catch (err) {
     err.__sandboxFailed = true;
     throw err;
@@ -674,7 +673,7 @@ ${JSON.stringify(schema, null, 2)}`)
       if (globalScript) {
         logs.push('执行脚本：' + globalScript)
         result = await yapi.commons.sandbox(context, globalScript);
-        result.vars = context.vars;
+        result.vars = context.vars || {};
       }
     }
 
@@ -683,7 +682,7 @@ ${JSON.stringify(schema, null, 2)}`)
     if (script) {
       logs.push('执行脚本:' + script)
       result = await yapi.commons.sandbox(context, script);
-      result.vars = context.vars;
+      result.vars = context.vars || {};
     }
     result.logs = logs;
     return yapi.commons.resReturn(result);

@@ -96,7 +96,7 @@ class interfaceModel extends baseModel {
       index: { type: Number, default: 0 },
       tag: Array,
       interface_key: 'string',
-      version: 'string'
+      version: Number
     };
   }
 

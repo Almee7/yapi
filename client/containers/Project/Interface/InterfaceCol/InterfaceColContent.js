@@ -309,7 +309,7 @@ class InterfaceColContent extends Component {
 
         let status = 'error';
       let result;
-
+      console.log("excuteTests===================",curitem)
       try {
         if (curitem.method === 'WS'){
           result = await this.handleWSTest(curitem);
@@ -430,6 +430,8 @@ class InterfaceColContent extends Component {
 
   handleTest = async interfaceData => {
     let requestParams = {};
+    console.log("interfaceData=======================",interfaceData);
+    console.log("requestParams=======================",requestParams);
     let options = handleParams(interfaceData, this.handleValue, requestParams);
     options.vars = scriptVars
     let result = {
@@ -551,9 +553,10 @@ class InterfaceColContent extends Component {
   };
   // val 请求体的每个值 替换值
   handleValue = (val, global) => {
-    console.log('11111111111111111111',val)
+    console.log("[DEBUG handleValue] 原始 val:", JSON.stringify(val));
     let globalValue = ArrayToObject(global);
     let context = Object.assign({}, { global: globalValue }, this.records);
+    console.log("[DEBUG handleValue] context:", context);
     return handleParamsValue(val, context);
   };
 
