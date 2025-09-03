@@ -1,3 +1,4 @@
 {
-    "watch": ["server/", "common/", "plugins", "exts/"]
+    "watch": ["server/", "common/", "plugins", "exts/"],
+    "delay": "1000"
 }

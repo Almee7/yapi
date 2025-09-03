@@ -617,14 +617,19 @@ export default class InterfaceColMenu extends Component {
         />
 
         <Modal
-          title="导入接口到集合"
-          visible={importInterVisible}
-          onOk={this.handleImportOk}
-          onCancel={this.handleImportCancel}
-          className="import-case-modal"
-          width={800}
-        >
-          <ImportInterface currProjectId={currProjectId} selectInterface={this.selectInterface} />
+              title="导入接口到集合"
+              visible={importInterVisible}
+              onOk={this.handleImportOk}
+              onCancel={this.handleImportCancel}
+              className="import-case-modal"
+              width={800}
+              destroyOnClose={true} // ✅ 关闭时卸载组件，保证下一次重新挂载
+          >
+          <ImportInterface
+                  key={this.state.importColId} // ✅ 给组件加 key，colId 变化时强制刷新
+                  currProjectId={currProjectId}
+                  selectInterface={this.selectInterface}
+              />
         </Modal>
       </div>
     );

@@ -245,26 +245,31 @@ class InterfaceColContent extends Component {
       if (currColEnvObj[item.project_id]) {
         item.case_env = currColEnvObj[item.project_id];
       }
-      console.log('item.req_headers：', item.req_headers);
-      console.log('item.case_env：', item.case_env);
       item.req_headers = that.handleReqHeader(item.project_id, item.req_headers, item.case_env);
-      console.log('处理后的 row：', item);
     })
-    // produce(rows || [], draftRows => {
-    //   draftRows.forEach(item => {
-    //
-    //   });
-    // });
     this.setState({ rows: newRows });
   };
 
-//开始测试入口
+///开始测试入口
   executeTests = async () => {
     // 如果正在运行，点击就是取消
     if (this.state.loading) {
       this.setState({ loading: false });
       return;
     }
+      const selectedIds = this.state.selectedIds;
+      if (!selectedIds.length) {
+          message.warning("请先选择用例");
+          return;
+      }
+    // 开始测试前，清空之前的状态
+    this.setState({
+      loading: true,
+      rows: this.state.rows.map(row => ({ ...row, loading: '' }))
+    });
+
+      // 清空 reports 要单独写
+      this.reports = {};
 
     // 切换按钮状态
     this.setState({ loading: true });
@@ -279,24 +284,30 @@ class InterfaceColContent extends Component {
       if (!this.state.loading) break;
 
       const curRow = this.state.rows[i];
-      const b = this.state.selectedIds;
-      if (!b.includes(curRow._id)) continue;
+      const checkRow = this.state.selectedIds;
+      if (!checkRow.includes(curRow._id)) continue;
 
       rows_w[curRow._id] = curRow;
+      console.log('符合条件的行:', rows_w);
 
-      let envItem = _.find(this.props.envList, item => {
-        return item._id === curRow.project_id;
-      });
+      let envItem = _.find(this.props.envList, item => item._id === curRow.project_id);
 
       let curitem = {
-        ...curRow,
-        env: envItem.env,
-        pre_script: this.props.currProject.pre_script,
-        after_script: this.props.currProject.after_script,
-        test_status: 'loading'
-      };
+            ...curRow,
+            env: envItem.env,
+            pre_script: this.props.currProject.pre_script,
+            after_script: this.props.currProject.after_script,
+            test_status: 'loading'
+        };
 
-      let status = 'error';
+        // 更新行为 loading
+      this.setState(prev => {
+        const newRows = [...prev.rows];
+        newRows[i] = curitem;
+        return { rows: newRows };
+    });
+
+        let status = 'error';
       let result;
 
       try {
@@ -326,7 +337,9 @@ class InterfaceColContent extends Component {
       newRows[i] = { ...curitem, test_status: status };
       this.setState({ rows: newRows });
 
-      await sleep(2000);
+      //用于测试终止测试
+      await sleep(1000);
+
     }
 
     if (this.state.loading) {
@@ -419,7 +432,6 @@ class InterfaceColContent extends Component {
     let requestParams = {};
     let options = handleParams(interfaceData, this.handleValue, requestParams);
     options.vars = scriptVars
-    console.log("scriptVars----------",scriptVars)
     let result = {
       code: 400,
       msg: '数据异常',
@@ -432,13 +444,11 @@ class InterfaceColContent extends Component {
       projectId: interfaceData.project_id,
       interfaceId: interfaceData.interface_id
     }));
-    console.log('options----------',options)
     try {
       let data = await crossRequest(options, interfaceData.pre_script, interfaceData.after_script,interfaceData.pre_request_script, createContext(
         this.props.curUid,
         this.props.match.params.id,
         interfaceData.interface_id
-
       ));
       options.taskId = this.props.curUid;
       let res = (data.res.body = json_parse(data.res.body));
@@ -785,7 +795,6 @@ class InterfaceColContent extends Component {
     const allSelected = this.isAllSelected();
     const selectedIds = allSelected ? [] : rows.map(row => row._id);
     this.setState({ selectedIds });
-    console.log("当前选中的 ID：", selectedIds);
   };
 
   // 处理单个选择事件
@@ -804,7 +813,6 @@ class InterfaceColContent extends Component {
         item._id === id ? {...item, enable_async: checked} : item
     );
     this.setState({rows: newRows});
-    console.log("rows----------------","rows");
   };
 
   render() {
@@ -866,7 +874,6 @@ class InterfaceColContent extends Component {
                   {record.casename && record.casename.length > 23
                     ? record.casename.substr(0, 20) + '...'
                     : record.casename}
-
                 </Link>
               );
             }
@@ -929,7 +936,8 @@ class InterfaceColContent extends Component {
           formatters: [
             (value, { rowData }) => {
               let id = rowData._id;
-              let code = this.reports[id] ? this.reports[id].code : 0;
+                console.log("re---------",this.reports)
+              let code = this.reports[id] ? this.reports[id].code : undefined;
               if (rowData.test_status === 'loading') {
                 return (
                   <div>
@@ -937,8 +945,11 @@ class InterfaceColContent extends Component {
                   </div>
                 );
               }
+                if (code === undefined || code === null) {
+                    return <div style={{ minHeight: 16 }} />;
+                }
 
-              switch (code) {
+                switch (code) {
                 case 0:
                   return (
                     <div>
@@ -1204,7 +1215,6 @@ class InterfaceColContent extends Component {
                     }}
                 />
               </Col>
-
               <Col span="6">
                 <div className="insert-code">
                   {InsertCodeMap.map(item => {
@@ -1290,7 +1300,6 @@ class InterfaceColContent extends Component {
                 >
                   {/*根据 loading 状态切换*/}
                   {loading ? '取消' : '开始测试'}
-
                 </Button>
               </div>
               ) : (

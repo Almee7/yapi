@@ -1038,6 +1038,7 @@ class InterfaceEditForm extends Component {
                       <Radio value="json">json</Radio>
                       <Radio value="file">file</Radio>
                       <Radio value="raw">raw</Radio>
+                      <Radio value="xml">xml</Radio>
                     </RadioGroup>
                   )}
                 </FormItem>
@@ -1160,6 +1161,21 @@ class InterfaceEditForm extends Component {
                   {getFieldDecorator('req_body_other', {
                     initialValue: this.state.req_body_other
                   })(<TextArea placeholder="" autosize={{ minRows: 8 }} />)}
+                </Col>
+              </Row>
+            ) : null}
+            {this.props.form.getFieldValue('req_body_type') === 'xml' &&
+            this.state.hideTabs.req.body !== 'hide' ? (
+              <Row>
+                <Col>
+                  {getFieldDecorator('req_body_other', {
+                      initialValue: this.state.req_body_other
+                    })(
+                      <TextArea
+                            placeholder=""
+                            autosize={{ minRows: 8 }}
+                        />
+                    )}
                 </Col>
               </Row>
             ) : null}
