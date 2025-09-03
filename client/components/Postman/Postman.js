@@ -191,6 +191,15 @@ export default class Run extends Component {
       req_headers: headers
     });
   };
+  getCacheKeys = (id) => {
+      const key = id || 'default';
+      return {
+          cacheKey: `req_body_cache_${key}`,
+          headerCacheKey: `res_header_cache_${key}`,
+          bodyCacheKey: `res_body_cache_${key}`,
+          preRequestKey: `pre_request_script_${key}`
+      };
+  };
 
   async initState(data) {
     if (!this.checkInterfaceData(data)) {

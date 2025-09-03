@@ -257,11 +257,19 @@ class InterfaceColContent extends Component {
       this.setState({ loading: false });
       return;
     }
+      const selectedIds = this.state.selectedIds;
+      if (!selectedIds.length) {
+          message.warning("请先选择用例");
+          return;
+      }
     // 开始测试前，清空之前的状态
     this.setState({
       loading: true,
       rows: this.state.rows.map(row => ({ ...row, loading: '' }))
     });
+
+      // 清空 reports 要单独写
+      this.reports = {};
 
     // 切换按钮状态
     this.setState({ loading: true });
@@ -298,8 +306,6 @@ class InterfaceColContent extends Component {
         newRows[i] = curitem;
         return { rows: newRows };
     });
-
-
 
         let status = 'error';
       let result;
@@ -545,7 +551,6 @@ class InterfaceColContent extends Component {
   };
   // val 请求体的每个值 替换值
   handleValue = (val, global) => {
-    console.log('11111111111111111111',val)
     let globalValue = ArrayToObject(global);
     let context = Object.assign({}, { global: globalValue }, this.records);
     return handleParamsValue(val, context);
@@ -931,7 +936,8 @@ class InterfaceColContent extends Component {
           formatters: [
             (value, { rowData }) => {
               let id = rowData._id;
-              let code = this.reports[id] ? this.reports[id].code : 0;
+                console.log("re---------",this.reports)
+              let code = this.reports[id] ? this.reports[id].code : undefined;
               if (rowData.test_status === 'loading') {
                 return (
                   <div>
@@ -939,8 +945,11 @@ class InterfaceColContent extends Component {
                   </div>
                 );
               }
+                if (code === undefined || code === null) {
+                    return <div style={{ minHeight: 16 }} />;
+                }
 
-              switch (code) {
+                switch (code) {
                 case 0:
                   return (
                     <div>

@@ -44,10 +44,6 @@ export default class ImportInterface extends Component {
     async componentDidMount() {
         await this.props.fetchInterfaceListMenu(this.props.currProjectId);
         this.setState({
-            filter: '',
-            searchList: [],
-            expandedRowKeys: [],
-            tableFilters: {},
             list: [...this.props.list]
         });
     }
