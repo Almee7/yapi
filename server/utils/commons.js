@@ -344,7 +344,7 @@ exports.sandbox = async (sandbox, script) => {
     sandbox = sandbox || {};
     // ✅ 注入默认变量
     sandbox.vars = sandbox.vars || {};
-    sandbox.sqlassert = sandbox.sqlassert || [];
+    sandbox.sqlAssert = sandbox.sqlAssert || [];
     sandbox.console = console;
     //ws脚本
     const regex = /readWS\s*\(\s*["']([^"']+)["']\s*\)/;
@@ -352,7 +352,7 @@ exports.sandbox = async (sandbox, script) => {
     script = new vm.Script(script);
     const context = new vm.createContext(sandbox);
     script.runInContext(context, {
-      timeout: 3000
+      timeout: 1000
     });
     // 执行断言
     if (Array.isArray(sandbox.sqlAssert) && sandbox.sqlAssert.length > 0) {
@@ -381,10 +381,9 @@ exports.sandbox = async (sandbox, script) => {
       await wrappedScript.runInContext(context);
       return sandbox;
     }
-    return sandbox
+    return sandbox;
   } catch (err) {
-    err.__sandboxFailed = true;
-    throw err;
+    throw err.message;
   }
 }
 
@@ -392,9 +391,7 @@ function trim(str) {
   if (!str) {
     return str;
   }
-
   str = str + '';
-
   return str.replace(/(^\s*)|(\s*$)/g, '');
 }
 
@@ -630,7 +627,7 @@ exports.runCaseScript = async function runCaseScript(params, colId, interfaceId)
     header: params.response.header,
     records: params.records,
     params: params.params,
-    vars: params.vars || {},
+    vars: { ...(params.vars || {}), ...(params.scriptVars || {}) },
     sqlAssert: [],
     log: msg => {
       logs.push('log: ' + convertString(msg));
@@ -661,28 +658,26 @@ exports.runCaseScript = async function runCaseScript(params, colId, interfaceId)
         let result = schemaValidator(schema, context.body)
         if (!result.valid) {
           throw (`返回Json 不符合 response 定义的数据结构,原因: ${result.message}
-数据结构如下：
-${JSON.stringify(schema, null, 2)}`)
+          数据结构如下：
+          ${JSON.stringify(schema, null, 2)}`)
         }
       }
     }
 
     if (colData.checkScript.enable) {
       let globalScript = colData.checkScript.content;
-      // script 是断言
       if (globalScript) {
         logs.push('执行脚本：' + globalScript)
         result = await yapi.commons.sandbox(context, globalScript);
-        result.vars = context.vars || {};
+        result.vars = context.vars;
       }
     }
 
     let script = params.script;
-    // script 是断言
     if (script) {
       logs.push('执行脚本:' + script)
       result = await yapi.commons.sandbox(context, script);
-      result.vars = context.vars || {};
+      result.vars = context.vars;
     }
     result.logs = logs;
     return yapi.commons.resReturn(result);

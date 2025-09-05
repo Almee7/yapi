@@ -288,7 +288,6 @@ class InterfaceColContent extends Component {
       if (!checkRow.includes(curRow._id)) continue;
 
       rows_w[curRow._id] = curRow;
-      console.log('符合条件的行:', rows_w);
 
       let envItem = _.find(this.props.envList, item => item._id === curRow.project_id);
 
@@ -309,7 +308,7 @@ class InterfaceColContent extends Component {
 
         let status = 'error';
       let result;
-      console.log("excuteTests===================",curitem)
+
       try {
         if (curitem.method === 'WS'){
           result = await this.handleWSTest(curitem);
@@ -430,8 +429,6 @@ class InterfaceColContent extends Component {
 
   handleTest = async interfaceData => {
     let requestParams = {};
-    console.log("interfaceData=======================",interfaceData);
-    console.log("requestParams=======================",requestParams);
     let options = handleParams(interfaceData, this.handleValue, requestParams);
     options.vars = scriptVars
     let result = {
@@ -537,7 +534,8 @@ class InterfaceColContent extends Component {
         script: interfaceData.test_script,
         params: requestParams,
         col_id: this.props.currColId,
-        interface_id: interfaceData.interface_id
+        interface_id: interfaceData.interface_id,
+        vars: scriptVars
       });
       validRes.push({message : test.data.errcode})
       test.data.data.logs.forEach(item => {
@@ -553,10 +551,8 @@ class InterfaceColContent extends Component {
   };
   // val 请求体的每个值 替换值
   handleValue = (val, global) => {
-    console.log("[DEBUG handleValue] 原始 val:", JSON.stringify(val));
     let globalValue = ArrayToObject(global);
     let context = Object.assign({}, { global: globalValue }, this.records);
-    console.log("[DEBUG handleValue] context:", context);
     return handleParamsValue(val, context);
   };
 
@@ -940,7 +936,6 @@ class InterfaceColContent extends Component {
           formatters: [
             (value, { rowData }) => {
               let id = rowData._id;
-                console.log("re---------",this.reports)
               let code = this.reports[id] ? this.reports[id].code : undefined;
               if (rowData.test_status === 'loading') {
                 return (

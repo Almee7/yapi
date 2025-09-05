@@ -20,14 +20,12 @@ async function runTestScript() {
         fields: item.fields,
         query: item.query
     }));
-    console.log("payload",payload)
     try {
         const res = await axios.post(url, payload, {
             headers: { 'Content-Type': 'application/json' }
         });
 
         const resultData = res.data;
-        console.log("resultData",resultData);
         for (let index = 0; index < testScript.length; index++) {
             const testItem = testScript[index];
             const actualRows = resultData[index];

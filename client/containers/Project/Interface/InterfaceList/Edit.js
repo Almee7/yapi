@@ -54,6 +54,7 @@ class InterfaceEdit extends Component {
       curdata: {},
       status: 0,
       visible: false
+      // tag: []
     };
   }
 

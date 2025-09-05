@@ -66,7 +66,7 @@ const CaseReport = function(props) {
         </TabPane>
         <TabPane className="case-report-pane" tab="Response" key="response">
           <Row  className="case-report">
-·            <Col className="case-report-title" span="6">
+            <Col className="case-report-title" span="6">
               HttpCode
             </Col>
             <Col span="18">
