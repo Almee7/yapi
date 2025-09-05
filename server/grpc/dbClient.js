@@ -11,7 +11,6 @@ class GrpcAgentClient {
      */
     constructor() {
         const address = yapi.WEBCONFIG.sqlServer
-        console.log(address)
         this.client = new GrpcAgentServiceClient(address, grpc.credentials.createInsecure());
     }
 

@@ -452,7 +452,6 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
 
     // 处理 URL 拼接与查询参数的注入
     const urlObj = URL.parse(joinPath(currDomain.domain, path), true);
-    console.log("interfaceRunData-------------------", interfaceRunData)
     const url = URL.format({
       protocol: urlObj.protocol || 'http',
       host: urlObj.host,

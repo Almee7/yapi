@@ -201,36 +201,49 @@ export default class Run extends Component {
       };
   };
 
+  getCacheKeys = (id) => {
+    const key = id || 'default';
+    return {
+      cacheKey: `req_body_cache_${key}`,
+      headerCacheKey: `res_header_cache_${key}`,
+      bodyCacheKey: `res_body_cache_${key}`,
+      preRequestKey: `pre_request_script_${key}`
+    };
+  };
+
   async initState(data) {
     if (!this.checkInterfaceData(data)) {
       return null;
     }
+    const { cacheKey, headerCacheKey, bodyCacheKey,preRequestKey} = this.getCacheKeys(data._id);
+    const cached = localStorage.getItem(cacheKey);
+    const cachedHeader = localStorage.getItem(headerCacheKey);
+    const cachedResBody = localStorage.getItem(bodyCacheKey);
+    const cachedPreScript = localStorage.getItem(preRequestKey);
 
     const { req_body_other, req_body_type, req_body_is_json_schema } = data;
     let body = req_body_other;
-    // 运行时才会进行转换
+    // JSON schema 转换逻辑
     if (
-      this.props.type === 'inter' &&
-      req_body_type === 'json' &&
-      req_body_other &&
-      req_body_is_json_schema
+        this.props.type === 'inter' &&
+        req_body_type === 'json' &&
+        req_body_other &&
+        req_body_is_json_schema
     ) {
-      let schema = {};
       try {
-        schema = json5.parse(req_body_other);
-        // 强制禁止额外属性，避免多余字段
+        const schema = json5.parse(req_body_other);
         schema.additionalProperties = false;
+        const result = await axios.post('/api/interface/schema2json', {
+          schema,
+          required: true
+        });
+        body = JSON.stringify(result.data);
       } catch (e) {
-        console.log('e', e);
-        return;
+        console.log('schema parse error', e);
+        body = req_body_other || '';
       }
-      let result = await axios.post('/api/interface/schema2json', {
-        schema: schema,
-        required: true
-      });
-      body = JSON.stringify(result.data);
     }
-
+    // example 值初始化
     let example = {}
     if(this.props.type === 'inter'){
       example = ['req_headers', 'req_query', 'req_body_form'].reduce(
@@ -254,11 +267,12 @@ export default class Run extends Component {
     this.setState(
       {
         ...this.state,
-        test_res_header: null,
-        test_res_body: null,
+        test_res_header: cachedHeader ? JSON.parse(cachedHeader) : null,
+        test_res_body: cachedResBody || null,
+        pre_request_script: cachedPreScript || '',
         ...data,
         ...example,
-        req_body_other: body,
+        req_body_other: cached || body,
         resStatusCode: null,
         test_valid_msg: null,
         resStatusText: null
@@ -287,6 +301,16 @@ export default class Run extends Component {
   }
 
   componentWillMount() {
+    const {cacheKey} = this.getCacheKeys(this.props.data._id);
+    const cachedBody  = localStorage.getItem(cacheKey);
+    // 如果有缓存，则赋值到 state
+    if (cachedBody) {
+      this.setState({
+        req_body_other: cachedBody
+      });
+    }
+  }
+  componentDidMount() {
     this._crossRequestInterval = initCrossRequest(hasPlugin => {
       this.setState({
         hasPlugin: hasPlugin
@@ -294,14 +318,26 @@ export default class Run extends Component {
     });
     this.initState(this.props.data);
   }
-
   componentWillUnmount() {
     clearInterval(this._crossRequestInterval);
+    // 保存参数到 localStorage
+    const { cacheKey, headerCacheKey, bodyCacheKey ,preRequestKey} = this.getCacheKeys(this.props.data._id);
+    localStorage.setItem(headerCacheKey, JSON.stringify(this.state.test_res_header || {}));
+    localStorage.setItem(bodyCacheKey, this.state.test_res_body || '');
+    localStorage.setItem(cacheKey, this.state.req_body_other || '');
+    localStorage.setItem(preRequestKey, this.state.pre_request_script || '');
   }
 
   componentWillReceiveProps(nextProps) {
     if (this.checkInterfaceData(nextProps.data) && this.checkInterfaceData(this.props.data)) {
       if (nextProps.data._id !== this.props.data._id) {
+        // 切换接口前先保存当前缓存
+        const { cacheKey: oldCacheKey, preRequestKey: oldPreKey } = this.getCacheKeys(
+            this.props.data._id
+        );
+        localStorage.setItem(oldCacheKey, this.state.req_body_other || '');
+        localStorage.setItem(oldPreKey, this.state.pre_request_script || '');
+        // 加载新接口缓存或默认值
         this.initState(nextProps.data);
       } else if (nextProps.data.interface_up_time !== this.props.data.interface_up_time) {
         this.initState(nextProps.data);
@@ -335,15 +371,16 @@ export default class Run extends Component {
     });
   };
 
-
   reqRealInterface = async () => {
-    console.log("this.state", this.state);
-
     if (this.state.loading === true) {
-      this.setState({ loading: false });
+      this.setState({
+        loading: false
+      });
       return null;
     }
-    this.setState({ loading: true });
+    this.setState({
+      loading: true
+    });
 
     let options = handleParams(this.state, this.handleValue),
         result;
@@ -446,22 +483,25 @@ export default class Run extends Component {
       this.setState({ res_body_type: "json" });
     }
 
+    // 对 返回值数据结构 和定义的 返回数据结构 进行 格式校验
     let validResult = this.resBodyValidator(this.props.data, result.body);
     if (!validResult.valid) {
       this.setState({ test_valid_msg: `返回参数 ${validResult.message}` });
     } else {
-      this.setState({ test_valid_msg: "" });
+      this.setState({ test_valid_msg: '' });
     }
-
+    // ✅ 定义缓存 key
+    const { headerCacheKey, bodyCacheKey } = this.getCacheKeys(this.props.data._id);
     this.setState({
       resStatusCode: result.status,
       resStatusText: result.statusText,
       test_res_header: result.header,
       test_res_body: result.body
-    });
+    },() => {
+      localStorage.setItem(headerCacheKey, JSON.stringify(this.state.test_res_header || {}));
+      localStorage.setItem(bodyCacheKey, this.state.test_res_body || '');
+    })
   };
-
-
 
   // 返回数据与定义数据的比较判断
   resBodyValidator = (interfaceData, test_res_body) => {

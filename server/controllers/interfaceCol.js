@@ -853,7 +853,6 @@ class interfaceColController extends baseController {
 
   async runCaseScript(ctx) {
     let params = ctx.request.body;
-    console.log()
     ctx.body = await yapi.commons.runCaseScript(params, params.col_id, params.interface_id, this.getUid());
   }
 

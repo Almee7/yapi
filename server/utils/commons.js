@@ -354,7 +354,7 @@ exports.sandbox = async (sandbox, script) => {
         const regex = /readWS\s*\(\s*["']([^"']+)["']\s*\)/;
         const match = script.match(regex);
         if (match) {
-            const connectionId = context.body?.connectionId;
+            const connectionId = context.body && context.body.connectionId;
             sandbox.readWS = async () => {
                 const msg = await WsTestController.readws(connectionId);
                 sandbox.wsLog = msg;     // 👈 把结果挂到 sandbox

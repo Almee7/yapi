@@ -37,7 +37,8 @@ class InterfaceEdit extends Component {
     fetchInterfaceData: PropTypes.func,
     match: PropTypes.object,
     switchToView: PropTypes.func,
-    getProject: PropTypes.func
+    getProject: PropTypes.func,
+    onVersionChange: PropTypes.func
   };
 
   constructor(props) {
@@ -191,6 +192,7 @@ class InterfaceEdit extends Component {
         {this.state.status === 1 ? (
           <InterfaceEditForm
             cat={cat}
+            onVersionChange={this.props.onVersionChange}
             mockUrl={this.state.mockUrl}
             basepath={basepath}
             noticed={switch_notice}

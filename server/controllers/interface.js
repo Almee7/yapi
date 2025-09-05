@@ -24,7 +24,7 @@ function parseInterfaceKeyAndVersion(project_id, url) {
   if (!url.startsWith('/')) url = '/' + url;
 
   const segments = url.split('/').filter(Boolean); // 去掉空字符串
-  let version = '1.0';
+  let version = '1';
   let pathSegments = [...segments];
 
   // 检查开头是否有版本号
