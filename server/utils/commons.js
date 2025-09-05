@@ -346,49 +346,44 @@ exports.sandbox = async (sandbox, script) => {
         sandbox.vars = sandbox.vars || {};
         sandbox.sqlassert = sandbox.sqlassert || [];
         sandbox.console = console;
-        //ws脚本
+        sandbox.assert = assert;
+
+        const context = vm.createContext(sandbox);
+
+        // 检查是否有 readWS 调用
         const regex = /readWS\s*\(\s*["']([^"']+)["']\s*\)/;
         const match = script.match(regex);
-        script = new vm.Script(script);
-        const context = new vm.createContext(sandbox);
-        script.runInContext(context, {
-            timeout: 1000
-        });
-        // 执行断言
+        if (match) {
+            const connectionId = context.body?.connectionId;
+            sandbox.readWS = async () => {
+                const msg = await WsTestController.readws(connectionId);
+                sandbox.wsLog = msg;     // 👈 把结果挂到 sandbox
+                return msg;              // 👈 同时返回，脚本里也能接收
+            };
+        }
+
+        // 如果有 sqlAssert，执行断言
         if (Array.isArray(sandbox.sqlAssert) && sandbox.sqlAssert.length > 0) {
             const actualValue = await executeQuery(sandbox.sqlAssert, sandbox.vars);
-            assertResult(actualValue, sandbox.sqlAssert)
-            sandbox.wsLog = null; // 脚本里可以直接赋值
-            // 注入 assert
-            sandbox.assert = assert;
-            const context = vm.createContext(sandbox);
-            if (match) {
-                //注入readws
-                const connectionId = context.body.connectionId;
-                sandbox.readWS = async () => {
-                    const msg = await WsTestController.readws(connectionId);
-                    return msg;
-                };
-
-            } else {
-                return '未找到 readWS 调用';
-            }
-
-            // 支持 async/await 脚本
-            const wrappedScript = new vm.Script(`
-          (async () => {
-            ${script}
-          })()
-        `);
-            await wrappedScript.runInContext(context);
-            return sandbox;
+            assertResult(actualValue, sandbox.sqlAssert);
+            sandbox.wsLog = null; // 保证有 wsLog 字段
         }
-    return sandbox;
+
+        // ✅ 统一执行脚本，支持 async/await
+        const wrappedScript = new vm.Script(`
+      (async () => {
+        ${script}
+      })()
+    `);
+
+        await wrappedScript.runInContext(context);
+
+        return sandbox; // 👈 统一一个 return
     } catch (err) {
         err.__sandboxFailed = true;
         throw err;
     }
-}
+};
 
 function trim(str) {
     if (!str) {

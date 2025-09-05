@@ -169,11 +169,12 @@ class WsTestController extends baseController {
         }, 200, "OK", 0);
     }
 
-    static readws(connectionId) {
+    static async readws(connectionId) {
         const conn = wsConnections.get(connectionId);
         if (!conn) return null;
         const messages = conn.messages || [];
-        return messages.length ? messages[messages.length - 1] : null;
+        // 包装成 Promise，保证 async/await 逻辑能跑
+        return Promise.resolve(messages.length ? messages[messages.length - 1] : null);
     }
 
     /**
