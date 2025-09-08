@@ -267,6 +267,7 @@ class InterfaceMenu extends Component {
     // let data = JSON.parse(JSON.stringify(interfaceData.payload.data.data));
     // data.title = data.title + '_copy';
     // data.path = data.path + '_' + Date.now();
+    console.log("1111111111")
     let data = interfaceData.payload.data.data;
     let newData = produce(data, draftData => {
       draftData.title = draftData.title + '_copy';
