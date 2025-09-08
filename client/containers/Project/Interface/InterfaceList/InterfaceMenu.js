@@ -18,7 +18,6 @@ import axios from 'axios';
 import { Link, withRouter } from 'react-router-dom';
 import produce from 'immer';
 import { arrayChangeIndex } from '../../../../common.js';
-
 import './interfaceMenu.scss';
 
 const confirm = Modal.confirm;
@@ -264,14 +263,11 @@ class InterfaceMenu extends Component {
 
   copyInterface = async id => {
     let interfaceData = await this.props.fetchInterfaceData(id);
-    // let data = JSON.parse(JSON.stringify(interfaceData.payload.data.data));
-    // data.title = data.title + '_copy';
-    // data.path = data.path + '_' + Date.now();
-    console.log("1111111111")
     let data = interfaceData.payload.data.data;
     let newData = produce(data, draftData => {
-      draftData.title = draftData.title + '_copy';
-      draftData.path = draftData.path + '_' + Date.now();
+      draftData.title = draftData.title + '_' + Date.now();
+      draftData.isCopy = true;
+      delete draftData._id; // ✅ 去掉原始 id
     });
 
     axios.post('/api/interface/add', newData).then(async res => {

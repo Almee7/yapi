@@ -96,7 +96,8 @@ class interfaceModel extends baseModel {
       index: { type: Number, default: 0 },
       tag: Array,
       interface_key: 'string',
-      version: Number
+      version: Number,
+      isCopy: false
     };
   }
 
@@ -211,7 +212,9 @@ class interfaceModel extends baseModel {
     if (option.tag) {
       match.tag = { $in: Array.isArray(option.tag) ? option.tag : [option.tag] };
     }
-
+    if (option.isCopy !== undefined) {
+      match.isCopy = option.isCopy;
+    }
     // 构造 project 对象
     const projectFields = select.split(' ').reduce((acc, key) => {
       acc[key] = 1;
@@ -224,7 +227,7 @@ class interfaceModel extends baseModel {
       { $sort: { versionNum: -1, up_time: -1 } }, // 确保 group 拿到最新版本
       {
         $group: {
-          _id: { catid: "$catid", interface_key: "$interface_key" },
+          _id: { interface_key: { $cond: [ { $eq: ["$isCopy", true] }, "$_id", "$interface_key" ] } },
           doc: { $first: "$$ROOT" }
         }
       },
@@ -256,21 +259,19 @@ class interfaceModel extends baseModel {
   listLatestByCat(catid, option = {}, page = 1, limit = 20, select) {
     page = parseInt(page, 10);
     limit = parseInt(limit, 10);
-
     // 默认返回字段
-    select = select || '_id title uid path method project_id catid edit_uid status add_time up_time interface_key version tag';
-
+    select = select || '_id title uid path method project_id catid edit_uid status add_time up_time interface_key version tag isCopy';
     // 构造匹配条件
     let match = { catid: Number(catid) };
-
     if (option.status) {
       match.status = Array.isArray(option.status) ? { $in: option.status } : option.status;
     }
-
     if (option.tag) {
       match.tag = { $in: Array.isArray(option.tag) ? option.tag : [option.tag] };
     }
-
+    if (option.isCopy !== undefined) {
+      match.isCopy = option.isCopy;
+    }
     // 构造投影字段
     const projectFields = select.split(' ').reduce((acc, key) => {
       acc[key] = 1;
@@ -280,13 +281,11 @@ class interfaceModel extends baseModel {
     return this.model.aggregate([
       { $match: match },
       { $addFields: { versionNum: { $toDouble: "$version" } } },
-      { $sort: { versionNum: -1, up_time: -1 } }, // 每个 interface_key 最新版本排前
-      {
-        $group: {
-          _id: "$interface_key",
-          doc: { $first: "$$ROOT" }  // 去重，每个 interface_key 只保留最新
-        }
-      },
+      { $sort: { versionNum: -1, up_time: -1 } },
+      { $group: {
+          _id: { interface_key: { $cond: [ { $eq: ["$isCopy", true] }, "$_id", "$interface_key" ] } },
+          doc: { $first: "$$ROOT" }
+        }},
       { $replaceRoot: { newRoot: "$doc" } },
       { $project: projectFields },
       { $sort: { up_time: -1 } }, // 按更新时间排序

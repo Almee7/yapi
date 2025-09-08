@@ -161,7 +161,8 @@ class interfaceController extends baseController {
       markdown: 'string',
       tag: 'array',
       interface_key: 'string', // 新增 interface_key
-      version: 'string'        // 新增 version
+      version: 'string',        // 新增 version
+      isCopy:  false
     };
 
     this.schemaMap = {
@@ -173,7 +174,8 @@ class interfaceController extends baseController {
           '*method': minLengthStringField,
           '*catid': 'number',
           interface_key: 'string',
-          version: 'string'
+          version: 'string',
+          isCopy:  false
         },
         addAndUpCommonField
       ),
@@ -201,7 +203,8 @@ class interfaceController extends baseController {
           switch_notice: 'boolean',
           dataSync: 'string',
           interface_key: 'string',
-          version: 'string'
+          version: 'string',
+          isCopy:  false
         },
         addAndUpCommonField
       )
@@ -238,7 +241,6 @@ class interfaceController extends baseController {
    */
   async add(ctx) {
     let params = ctx.params;
-
     if (!this.$tokenAuth) {
       let auth = await this.checkAuth(params.project_id, 'project', 'edit');
 
@@ -268,10 +270,13 @@ class interfaceController extends baseController {
     });
     // 先解析 interface_key + version
     const { interface_key, version } = parseInterfaceKeyAndVersion(params.project_id, params.path);
+    const isCopy = params.isCopy === true;
     //检查同版本接口是否存在
-    let checkRepeat = await this.Model.checkRepeat(params.project_id, interface_key, version, params.method);
-    if (checkRepeat > 0) {
-      return (ctx.body = yapi.commons.resReturn(null, 40022, '已存在的接口:' + params.path + '[' + params.method + ']'));
+    if (!isCopy){
+      let checkRepeat = await this.Model.checkRepeat(params.project_id, interface_key, version, params.method);
+      if (checkRepeat > 0) {
+        return (ctx.body = yapi.commons.resReturn(null, 40022, '已存在的接口:' + params.path + '[' + params.method + ']'));
+      }
     }
     let  data = {
       ...params,
@@ -279,7 +284,8 @@ class interfaceController extends baseController {
       add_time: yapi.commons.time(),
       up_time: yapi.commons.time(),
       interface_key: interface_key,
-      version: String(version)
+      version: String(version),
+      isCopy: isCopy
     }
     yapi.commons.handleVarPath(params.path, params.req_params);
     data.type = params.req_params.length > 0 ? 'var' : 'static';
@@ -633,14 +639,12 @@ class interfaceController extends baseController {
           option.tag = tag;
         }
       }
-
-      // let result = await this.Model.listByOptionWithPage(option, page, limit);
-      //
-      // let count = await this.Model.listCount(option);
       let allResultObj = await this.Model.listLatestByCat(catid, option, page, limit);
+      console.log("listLatestByCat===allResultObj", allResultObj)
       let count = allResultObj.total;
       // 拿到数组
       let result = allResultObj.list;
+      console.log("listLatestByCat===result", result)
 
       ctx.body = yapi.commons.resReturn({
         count: count,
