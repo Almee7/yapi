@@ -7,13 +7,32 @@ const yapi = require('../yapi.js');
 
 class GrpcAgentClient {
     /**
-     * 构造函数，初始化客户端
+     * @param {string} serverName - 前端传入的 serverName，例如 'okr' 或 'xpa'
      */
-    constructor() {
-        const address = yapi.WEBCONFIG.sqlServer
-        this.client = new GrpcAgentServiceClient(address, grpc.credentials.createInsecure());
+    constructor(serverName) {
+        console.log('GrpcAgentClient', serverName);
+        this.serverName = serverName;
+        if (!serverName) {
+            throw new Error('serverName 必须传入');
+        }
+        // 根据 serverName 选择不同配置
+        let address;
+        if (serverName.includes('okr')) {
+            address = yapi.WEBCONFIG.okrServer;
+        } else if (serverName.includes('xpa')) {
+            address = yapi.WEBCONFIG.xpaServer;
+        } else {
+            throw new Error(`未知 serverName: ${serverName}`);
+        }
+        if (!address) {
+            throw new Error(`未配置对应的 gRPC 地址: ${serverName}`);
+        }
+        this.address = address;
+        this.client = new GrpcAgentServiceClient(
+            this.address,
+            grpc.credentials.createInsecure()
+        );
     }
-
     /**
      * 发送请求调用 invoke 方法
      * @param {Object|Array} paramsObj - 要传递的参数对象或数组，内部自动序列化为 JSON 字符串并转 Buffer

@@ -278,8 +278,8 @@ function replaceVars(template, vars) {
 
 
 //执行sql
-async function executeQuery(params = [], vars = {}) {
-    const client = new GrpcAgentClient();
+async function executeQuery(params = [], vars = {},serverName) {
+    const client = new GrpcAgentClient(serverName);
     // 替换变量，构造新数组，避免修改原始 asserts
     const replacedAsserts = params.map(item => {
         const replacedQuery = replaceVars(item.query, vars);
@@ -678,8 +678,6 @@ ${JSON.stringify(schema, null, 2)}`)
         // script 是断言
         if (script) {
             logs.push('执行脚本:' + script)
-            console.log("context11111111",context)
-            console.log("script111111111",script)
             result = await yapi.commons.sandbox(context, script);
             result.vars = context.vars;
         }

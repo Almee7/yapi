@@ -201,10 +201,26 @@ class InterfaceMenu extends Component {
     });
   };
 
+  clearInterfaceCache = (interfaceKey, id) => {
+    if (!interfaceKey || !id) return;
+    try {
+      localStorage.removeItem(`${interfaceKey}_lastInterfaceId`);
+      localStorage.removeItem(`${interfaceKey}_lastVersion`);
+      localStorage.removeItem(`req_body_cache_${id}`);
+      localStorage.removeItem(`res_header_cache_${id}`);
+      localStorage.removeItem(`res_body_cache_${id}`);
+      localStorage.removeItem(`pre_request_script_${id}`);
+      console.log(`接口 ${interfaceKey} 缓存已清理`);
+    } catch (err) {
+      console.error('清理接口缓存失败', err);
+    }
+  };
+
   showConfirm = data => {
     let that = this;
     let id = data._id;
     let catid = data.catid;
+    let interfaceKey = data.interface_key;
     const ref = confirm({
       title: '您确认删除此接口????',
       content: '温馨提示：接口删除后，无法恢复',
@@ -212,6 +228,8 @@ class InterfaceMenu extends Component {
       cancelText: '取消',
       async onOk() {
         await that.props.deleteInterfaceData(id, that.props.projectId);
+        // 清理缓存
+        that.clearInterfaceCache(interfaceKey, id);
         await that.getList();
         await that.props.fetchInterfaceCatList({ catid });
         ref.destroy();
