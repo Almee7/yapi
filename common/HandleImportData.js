@@ -64,12 +64,10 @@ async function handle(
     }
     
     const res = info.apis;
-    console.log("res==============",res);
     let len = res.length;
     let count = 0;
     let successNum = len;
     let existNum = 0;
-
     if (len === 0) {
       messageError(`解析数据为空`);
       callback({ showLoading: false });
@@ -118,14 +116,11 @@ async function handle(
         }
         data.dataSync = dataSync;
         let result = await axios.post(apipath, data);
-        console.log("result.data.data===normal",result.data.data);
         if (result.data.errcode) {
-          console.log(1)
           successNum--;
           callback({ showLoading: false });
           messageError(result.data.errmsg);
         } else {
-          console.log(2)
           existNum = existNum + result.data.data.length;
         }
       } else {
@@ -136,7 +131,6 @@ async function handle(
           apipath = 'http://127.0.0.1:' + port + apipath;
         }
         let result = await axios.post(apipath, data);
-        console.log("result.data===other",result.data);
         if (result.data.errcode) {
           successNum--;
           if (result.data.errcode == 40022) {

@@ -19,39 +19,6 @@ const path = require('path');
 // const annotatedCss = require("jsondiffpatch/public/formatters-styles/annotated.css");
 // const htmlCss = require("jsondiffpatch/public/formatters-styles/html.css");
 
-function parseInterfaceKeyAndVersion(project_id, url) {
-  url = url.trim();
-  if (!url.startsWith('/')) url = '/' + url;
-
-  const segments = url.split('/').filter(Boolean); // 去掉空字符串
-  let version = 0;
-  let pathSegments = [...segments];
-
-  // 检查开头是否有版本号
-  const first = segments[0];
-  if (first.startsWith('v')) {
-    const v = first.slice(1);
-    if (/^\d+(\.\d+)?$/.test(v)) {
-      version = v;
-      pathSegments.shift();
-    }
-  }
-
-  // 检查结尾是否有版本号（如果开头没匹配到）
-  if (pathSegments.length > 0) {
-    const last = pathSegments[pathSegments.length - 1];
-    if (last.startsWith('v')) {
-      const v = last.slice(1);
-      if (/^\d+(\.\d+)?$/.test(v)) {
-        version = v;
-        pathSegments.pop();
-      }
-    }
-  }
-  // 拼接 interface_key，不包含版本号
-  const interface_key = project_id + '/' + (pathSegments.length > 0 ? pathSegments.join('/') : '');
-  return { interface_key, version };
-}
 
 function handleHeaders(values){
   let isfile = false,
@@ -159,10 +126,7 @@ class interfaceController extends baseController {
       req_body_is_json_schema: 'string',
       res_body_is_json_schema: 'string',
       markdown: 'string',
-      tag: 'array',
-      interface_key: 'string', // 新增 interface_key
-      version: 'string',        // 新增 version
-      isCopy:  false
+      tag: 'array'
     };
 
     this.schemaMap = {
@@ -172,10 +136,7 @@ class interfaceController extends baseController {
           '*path': minLengthStringField,
           '*title': minLengthStringField,
           '*method': minLengthStringField,
-          '*catid': 'number',
-          interface_key: 'string',
-          version: 'string',
-          isCopy:  false
+          '*catid': 'number'
         },
         addAndUpCommonField
       ),
@@ -201,10 +162,7 @@ class interfaceController extends baseController {
           method: minLengthStringField,
           message: minLengthStringField,
           switch_notice: 'boolean',
-          dataSync: 'string',
-          interface_key: 'string',
-          version: 'string',
-          isCopy:  false
+          dataSync: 'string'
         },
         addAndUpCommonField
       )
@@ -241,6 +199,7 @@ class interfaceController extends baseController {
    */
   async add(ctx) {
     let params = ctx.params;
+
     if (!this.$tokenAuth) {
       let auth = await this.checkAuth(params.project_id, 'project', 'edit');
 
@@ -248,47 +207,62 @@ class interfaceController extends baseController {
         return (ctx.body = yapi.commons.resReturn(null, 40033, '没有权限'));
       }
     }
-    params.method = (params.method || 'GET').toUpperCase();
+    params.method = params.method || 'GET';
+    params.res_body_is_json_schema = _.isUndefined(params.res_body_is_json_schema)
+      ? false
+      : params.res_body_is_json_schema;
+    params.req_body_is_json_schema = _.isUndefined(params.req_body_is_json_schema)
+      ? false
+      : params.req_body_is_json_schema;
+    params.method = params.method.toUpperCase();
     params.req_params = params.req_params || [];
     params.res_body_type = params.res_body_type ? params.res_body_type.toLowerCase() : 'json';
-    params.req_body_is_json_schema = _.isUndefined(params.req_body_is_json_schema) ? false : params.req_body_is_json_schema;
-    params.res_body_is_json_schema = _.isUndefined(params.res_body_is_json_schema) ? false : params.res_body_is_json_schema;
-    let http_path = url.parse(params.path, true)
+    let http_path = url.parse(params.path, true);
 
     if (!yapi.commons.verifyPath(http_path.pathname)) {
       return (ctx.body = yapi.commons.resReturn(
-          null,
-          400,
-          'path第一位必需为 /, 只允许由 字母数字-/_:.! 组成'
+        null,
+        400,
+        'path第一位必需为 /, 只允许由 字母数字-/_:.! 组成'
       ));
     }
-    handleHeaders(params);
 
-    params.query_path = { path: http_path.pathname, params: [] };
+    handleHeaders(params)
+
+    params.query_path = {};
+    params.query_path.path = http_path.pathname;
+    params.query_path.params = [];
     Object.keys(http_path.query).forEach(item => {
-      params.query_path.params.push({ name: item, value: http_path.query[item] });
+      params.query_path.params.push({
+        name: item,
+        value: http_path.query[item]
+      });
     });
-    // 先解析 interface_key + version
-    const { interface_key, version } = parseInterfaceKeyAndVersion(params.project_id, params.path);
-    const isCopy = params.isCopy === true;
-    //检查同版本接口是否存在
-    if (!isCopy){
-      let checkRepeat = await this.Model.checkRepeat(params.project_id, interface_key, version, params.method);
-      if (checkRepeat > 0) {
-        return (ctx.body = yapi.commons.resReturn(null, 40022, '已存在的接口:' + params.path + '[' + params.method + ']'));
-      }
+
+    let checkRepeat = await this.Model.checkRepeat(params.project_id, params.path, params.method);
+
+    if (checkRepeat > 0) {
+      return (ctx.body = yapi.commons.resReturn(
+        null,
+        40022,
+        '已存在的接口:' + params.path + '[' + params.method + ']'
+      ));
     }
-    let  data = {
-      ...params,
+
+    let data = Object.assign(params, {
       uid: this.getUid(),
       add_time: yapi.commons.time(),
-      up_time: yapi.commons.time(),
-      interface_key: interface_key,
-      version: String(version),
-      isCopy: isCopy
-    }
+      up_time: yapi.commons.time()
+    });
+
     yapi.commons.handleVarPath(params.path, params.req_params);
-    data.type = params.req_params.length > 0 ? 'var' : 'static';
+
+    if (params.req_params.length > 0) {
+      data.type = 'var';
+      data.req_params = params.req_params;
+    } else {
+      data.type = 'static';
+    }
 
     // 新建接口的人成为项目dev  如果不存在的话
     // 命令行导入时无法获知导入接口人的信息，其uid 为 999999
@@ -308,10 +282,10 @@ class interfaceController extends baseController {
     this.catModel.get(params.catid).then(cate => {
       let username = this.getUsername();
       let title = `<a href="/user/profile/${this.getUid()}">${username}</a> 为分类 <a href="/project/${
-          params.project_id
+        params.project_id
       }/interface/api/cat_${params.catid}">${cate.name}</a> 添加了接口 <a href="/project/${
-          params.project_id
-      }/interface/api/${result._id}">${data.title}</a>`;
+        params.project_id
+      }/interface/api/${result._id}">${data.title}</a> `;
 
       yapi.commons.saveLog({
         content: title,
@@ -320,7 +294,6 @@ class interfaceController extends baseController {
         username: username,
         typeid: params.project_id
       });
-
       this.projectModel.up(params.project_id, { up_time: new Date().getTime() }).then();
     });
 
@@ -358,91 +331,63 @@ class interfaceController extends baseController {
    */
   async save(ctx) {
     let params = ctx.params;
-
+    console.log('params:', params);
     if (!this.$tokenAuth) {
       let auth = await this.checkAuth(params.project_id, 'project', 'edit');
       if (!auth) {
         return (ctx.body = yapi.commons.resReturn(null, 40033, '没有权限'));
       }
     }
-
     params.method = params.method || 'GET';
     params.method = params.method.toUpperCase();
-    params.req_params = params.req_params || [];
-    params.res_body_type = params.res_body_type ? params.res_body_type.toLowerCase() : 'json';
-    params.req_body_is_json_schema = _.isUndefined(params.req_body_is_json_schema) ? false : params.req_body_is_json_schema;
-    params.res_body_is_json_schema = _.isUndefined(params.res_body_is_json_schema) ? false : params.res_body_is_json_schema;
+
     let http_path = url.parse(params.path, true);
+
     if (!yapi.commons.verifyPath(http_path.pathname)) {
       return (ctx.body = yapi.commons.resReturn(
-          null,
-          400,
-          'path第一位必需为 /, 只允许由 字母数字-/_:.! 组成'
+        null,
+        400,
+        'path第一位必需为 /, 只允许由 字母数字-/_:.! 组成'
       ));
     }
-    // 解析 interface_key 和 version
-    const { interface_key, version } = parseInterfaceKeyAndVersion(params.project_id, params.path);
-    // 根据 interface_key + version 查询
-    let result = await this.Model.getByInterfaceKey(params.project_id, interface_key, params.method, version, '_id res_body req_body_other interface_key version');
-    // URL query 参数处理
-    params.query_path = { path: http_path.pathname, params: [] };
-    Object.keys(http_path.query).forEach(item => {
-      params.query_path.params.push({ name: item, value: http_path.query[item] });
-    });
-    yapi.commons.handleVarPath(params.path, params.req_params);
-    params.type = params.req_params.length > 0 ? 'var' : 'static';
 
+    let result = await this.Model.getByPath(params.project_id, params.path, params.method, '_id res_body');
     if (result.length > 0) {
-      // 已存在接口 → 更新
-      for (const item of result) {
+      result.forEach(async item => {
         params.id = item._id;
-        let validParams = Object.assign({}, params);
+        // console.log(this.schemaMap['up'])
+        let validParams = Object.assign({}, params)
         let validResult = yapi.commons.validateParams(this.schemaMap['up'], validParams);
-        if (!validResult.valid) {
+        if (validResult.valid) {
+          let data = Object.assign({}, ctx);
+          data.params = validParams;
+
+          if(params.res_body_is_json_schema && params.dataSync === 'good'){
+            try{
+              let new_res_body = yapi.commons.json_parse(params.res_body)
+              let old_res_body = yapi.commons.json_parse(item.res_body)
+              data.params.res_body = JSON.stringify(mergeJsonSchema(old_res_body, new_res_body),null,2);
+            }catch(err){}
+          }
+          await this.up(data);
+        } else {
           return (ctx.body = yapi.commons.resReturn(null, 400, validResult.message));
         }
-        let data = Object.assign({}, ctx);
-        data.params = validParams;
-
-        // 合并 JSON schema
-        if (params.res_body_is_json_schema && params.dataSync === 'good') {
-          try {
-            let new_res_body = yapi.commons.json_parse(params.res_body);
-            let old_res_body = yapi.commons.json_parse(item.res_body || '{}');
-            data.params.res_body = JSON.stringify(mergeJsonSchema(old_res_body, new_res_body), null, 2);
-          } catch (err) {}
-        }
-        if (params.req_body_is_json_schema && params.dataSync === 'good') {
-          try {
-            let new_req_body = yapi.commons.json_parse(params.req_body_other);
-            let old_req_body = yapi.commons.json_parse(item.req_body_other || '{}');
-            data.params.req_body_other = JSON.stringify(mergeJsonSchema(old_req_body, new_req_body), null, 2);
-          } catch (err) {
-            console.error('req_body_other merge error', err);
-          }
-        }
-
-        // 保持原 interface_key 和 version
-        data.params.interface_key = item.interface_key;
-        data.params.version = item.version;
-        await this.up(data);
-      }
+      });
     } else {
-      // 新接口 → 添加
       let validResult = yapi.commons.validateParams(this.schemaMap['add'], params);
-      if (!validResult.valid) {
+      if (validResult.valid) {
+        let data = {};
+        data.params = params;
+        await this.add(data);
+      } else {
         return (ctx.body = yapi.commons.resReturn(null, 400, validResult.message));
       }
-      let data = { params: Object.assign({}, params) };
-      data.params.interface_key = interface_key;
-      data.params.version = version;
-      data.params.uid = this.getUid();
-      data.params.add_time = yapi.commons.time();
-      data.params.up_time = yapi.commons.time();
-      await this.add(data);
     }
     ctx.body = yapi.commons.resReturn(result);
+    // return ctx.body = yapi.commons.resReturn(null, 400, 'path第一位必需为 /, 只允许由 字母数字-/_:.! 组成');
   }
+
   async autoAddTag(params) {
     //检查是否提交了目前不存在的tag
     let tags = params.tag;
@@ -542,56 +487,60 @@ class interfaceController extends baseController {
    */
   async list(ctx) {
     let project_id = ctx.params.project_id;
-    let page = parseInt(ctx.request.query.page) || 1;
-    let limit = parseInt(ctx.request.query.limit) || 10;
-    let status = ctx.request.query.status;
-    let tag = ctx.request.query.tag;
-
+    let page = ctx.request.query.page || 1,
+      limit = ctx.request.query.limit || 10;
+    let status = ctx.request.query.status,
+      tag = ctx.request.query.tag;
     let project = await this.projectModel.getBaseInfo(project_id);
     if (!project) {
-      return ctx.body = yapi.commons.resReturn(null, 407, '不存在的项目');
+      return (ctx.body = yapi.commons.resReturn(null, 407, '不存在的项目'));
     }
     if (project.project_type === 'private') {
       if ((await this.checkAuth(project._id, 'project', 'view')) !== true) {
-        return ctx.body = yapi.commons.resReturn(null, 406, '没有权限');
+        return (ctx.body = yapi.commons.resReturn(null, 406, '没有权限'));
       }
     }
     if (!project_id) {
-      return ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空');
+      return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
     }
 
     try {
-      // 构造 option
-      let option = {};
-      if (status) {
-        option.status = Array.isArray(status) ? status : [status];
-      }
-      if (tag) {
-        option.tag = Array.isArray(tag) ? tag : [tag];
+      let result, count;
+      if (limit === 'all') {
+        result = await this.Model.list(project_id);
+        count = await this.Model.listCount({project_id});
+      } else {
+        let option = {project_id};
+        if (status) {
+          if (Array.isArray(status)) {
+            option.status = {"$in": status};
+          } else {
+            option.status = status;
+          }
+        }
+        if (tag) {
+          if (Array.isArray(tag)) {
+            option.tag = {"$in": tag};
+          } else {
+            option.tag = tag;
+          }
+        }
+
+        result = await this.Model.listByOptionWithPage(option, page, limit);
+        count = await this.Model.listCount(option);
       }
 
-      // 聚合获取最新版本接口
-      let allResultObj = await this.Model.listLatestByProject(project_id, option, page, limit);
-      let count = allResultObj.total;
-      //转数组
-      let allResult = allResultObj.list; // 拿到数组
-      // 分页
-      let list = (limit === 'all')
-          ? allResult
-          : allResult.slice((page - 1) * limit, page * limit);
 
       ctx.body = yapi.commons.resReturn({
         count: count,
-        total: (limit === 'all') ? 1 : Math.ceil(count / limit),
-        list: list
+        total: Math.ceil(count / limit),
+        list: result
       });
-
-      yapi.emitHook('interface_list', list).then();
+      yapi.emitHook('interface_list', result).then();
     } catch (err) {
       ctx.body = yapi.commons.resReturn(null, 402, err.message);
     }
   }
-
 
   async downloadCrx(ctx) {
     let filename = 'crossRequest.zip';
@@ -624,7 +573,7 @@ class interfaceController extends baseController {
       }
 
 
-      let option = {}
+      let option = {catid}
       if (status) {
         if (Array.isArray(status)) {
           option.status = {"$in": status};
@@ -639,10 +588,10 @@ class interfaceController extends baseController {
           option.tag = tag;
         }
       }
-      let allResultObj = await this.Model.listLatestByCat(catid, option, page, limit);
-      let count = allResultObj.total;
-      // 拿到数组
-      let result = allResultObj.list;
+
+      let result = await this.Model.listByOptionWithPage(option, page, limit);
+
+      let count = await this.Model.listCount(option);
 
       ctx.body = yapi.commons.resReturn({
         count: count,
@@ -655,12 +604,12 @@ class interfaceController extends baseController {
   }
 
   async listByMenu(ctx) {
-    const project_id = ctx.params.project_id;
+    let project_id = ctx.params.project_id;
     if (!project_id) {
       return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
     }
 
-    const project = await this.projectModel.getBaseInfo(project_id);
+    let project = await this.projectModel.getBaseInfo(project_id);
     if (!project) {
       return (ctx.body = yapi.commons.resReturn(null, 406, '不存在的项目'));
     }
@@ -671,31 +620,23 @@ class interfaceController extends baseController {
     }
 
     try {
-      // 获取分类
-      const cats = await this.catModel.list(project_id);
-      const catIds = cats.map(c => c._id);
-
-      // 一次查出所有分类的最新接口
-      const interfaces = await this.Model.listLatestByCatIds(catIds);
-
-      // 按 catid 组织
-      const catMap = cats.reduce((acc, c) => {
-        acc[c._id] = { ...c.toObject(), list: [] };
-        return acc;
-      }, {});
-
-      for (const iface of interfaces) {
-        if (catMap[iface.catid]) {
-          catMap[iface.catid].list.push(iface);
+      let result = await this.catModel.list(project_id),
+        newResult = [];
+      for (let i = 0, item, list; i < result.length; i++) {
+        item = result[i].toObject();
+        list = await this.Model.listByCatid(item._id);
+        for (let j = 0; j < list.length; j++) {
+          list[j] = list[j].toObject();
         }
-      }
 
-      ctx.body = yapi.commons.resReturn(Object.values(catMap));
+        item.list = list;
+        newResult[i] = item;
+      }
+      ctx.body = yapi.commons.resReturn(newResult);
     } catch (err) {
       ctx.body = yapi.commons.resReturn(null, 402, err.message);
     }
   }
-
 
   /**
    * 编辑接口
@@ -725,23 +666,24 @@ class interfaceController extends baseController {
    */
   async up(ctx) {
     let params = ctx.params;
+
     if (!_.isUndefined(params.method)) {
-      params.method = (params.method || 'GET').toUpperCase();
+      params.method = params.method || 'GET';
+      params.method = params.method.toUpperCase();
     }
 
     let id = params.id;
     params.message = params.message || '';
     params.message = params.message.replace(/\n/g, '<br>');
+    // params.res_body_is_json_schema = _.isUndefined (params.res_body_is_json_schema) ? true : params.res_body_is_json_schema;
+    // params.req_body_is_json_schema = _.isUndefined(params.req_body_is_json_schema) ?  true : params.req_body_is_json_schema;
 
-    handleHeaders(params);
+    handleHeaders(params)
 
     let interfaceData = await this.Model.get(id);
     if (!interfaceData) {
       return (ctx.body = yapi.commons.resReturn(null, 400, '不存在的接口'));
     }
-    // 保证 path 和 method 有值
-    params.path = params.path || interfaceData.path;
-    params.method = (params.method || interfaceData.method || 'GET').toUpperCase();
     if (!this.$tokenAuth) {
       let auth = await this.checkAuth(interfaceData.project_id, 'project', 'edit');
       if (!auth) {
@@ -749,40 +691,54 @@ class interfaceController extends baseController {
       }
     }
 
-    let data = Object.assign({ up_time: yapi.commons.time() }, params);
+    let data = Object.assign(
+      {
+        up_time: yapi.commons.time()
+      },
+      params
+    );
 
     if (params.path) {
-      let http_path = url.parse(params.path, true);
+      let http_path;
+      http_path = url.parse(params.path, true);
+
       if (!yapi.commons.verifyPath(http_path.pathname)) {
-        return (ctx.body = yapi.commons.resReturn(null, 400, 'path第一位必需为 /, 只允许由 字母数字-/_:.! 组成'));
+        return (ctx.body = yapi.commons.resReturn(
+          null,
+          400,
+          'path第一位必需为 /, 只允许由 字母数字-/_:.! 组成'
+        ));
       }
-      params.query_path = { path: http_path.pathname, params: [] };
+      params.query_path = {};
+      params.query_path.path = http_path.pathname;
+      params.query_path.params = [];
       Object.keys(http_path.query).forEach(item => {
-        params.query_path.params.push({ name: item, value: http_path.query[item] });
+        params.query_path.params.push({
+          name: item,
+          value: http_path.query[item]
+        });
       });
       data.query_path = params.query_path;
     }
 
-    // 保持 interface_key 和 version
-    const { interface_key, version } = parseInterfaceKeyAndVersion(params.project_id, params.path);
-    // 检查路径+方法是否重复
-    if (params.path && (params.path !== interfaceData.path || params.method !== interfaceData.method)) {
+    if (
+      params.path &&
+      (params.path !== interfaceData.path || params.method !== interfaceData.method)
+    ) {
       let checkRepeat = await this.Model.checkRepeat(
-          interfaceData.project_id,
-          interface_key,
-          version,
-          params.method
+        interfaceData.project_id,
+        params.path,
+        params.method
       );
       if (checkRepeat > 0) {
         return (ctx.body = yapi.commons.resReturn(
-            null,
-            401,
-            '已存在的接口:' + params.path + '[' + params.method + ']'
+          null,
+          401,
+          '已存在的接口:' + params.path + '[' + params.method + ']'
         ));
       }
     }
 
-    // 判断 req_params 类型
     if (!_.isUndefined(data.req_params)) {
       if (Array.isArray(data.req_params) && data.req_params.length > 0) {
         data.type = 'var';
@@ -791,70 +747,82 @@ class interfaceController extends baseController {
         data.req_params = [];
       }
     }
-
     let result = await this.Model.up(id, data);
-    // 后续日志、通知保持原逻辑
     let username = this.getUsername();
     let CurrentInterfaceData = await this.Model.get(id);
-    let logData = { interface_id: id, cat_id: data.catid, current: CurrentInterfaceData.toObject(), old: interfaceData.toObject() };
+    let logData = {
+      interface_id: id,
+      cat_id: data.catid,
+      current: CurrentInterfaceData.toObject(),
+      old: interfaceData.toObject()
+    };
 
     this.catModel.get(interfaceData.catid).then(cate => {
       let diffView2 = showDiffMsg(jsondiffpatch, formattersHtml, logData);
-      if (diffView2.length <= 0) return;
+      if (diffView2.length <= 0) {
+          return; // 没有变化时，不写日志
+      }
       yapi.commons.saveLog({
-        content: `<a href="/user/profile/${this.getUid()}">${username}</a> 更新了分类 <a href="/project/${cate.project_id}/interface/api/cat_${data.catid}">${cate.name}</a> 下的接口 <a href="/project/${cate.project_id}/interface/api/${id}">${interfaceData.title}</a><p>${params.message}</p>`,
+        content: `<a href="/user/profile/${this.getUid()}">${username}</a> 
+                    更新了分类 <a href="/project/${cate.project_id}/interface/api/cat_${
+          data.catid
+        }">${cate.name}</a> 
+                    下的接口 <a href="/project/${cate.project_id}/interface/api/${id}">${
+          interfaceData.title
+        }</a><p>${params.message}</p>`,
         type: 'project',
         uid: this.getUid(),
-        username,
+        username: username,
         typeid: cate.project_id,
         data: logData
       });
     });
 
-    // 1. 更新项目更新时间
     this.projectModel.up(interfaceData.project_id, { up_time: new Date().getTime() }).then();
-
-    // 2. 如果开启通知，发送更新通知
     if (params.switch_notice === true) {
       let diffView = showDiffMsg(jsondiffpatch, formattersHtml, logData);
       let annotatedCss = fs.readFileSync(
-          path.resolve(yapi.WEBROOT, 'node_modules/jsondiffpatch/dist/formatters-styles/annotated.css'),
-          'utf8'
+        path.resolve(
+          yapi.WEBROOT,
+          'node_modules/jsondiffpatch/dist/formatters-styles/annotated.css'
+        ),
+        'utf8'
       );
       let htmlCss = fs.readFileSync(
-          path.resolve(yapi.WEBROOT, 'node_modules/jsondiffpatch/dist/formatters-styles/html.css'),
-          'utf8'
+        path.resolve(yapi.WEBROOT, 'node_modules/jsondiffpatch/dist/formatters-styles/html.css'),
+        'utf8'
       );
 
       let project = await this.projectModel.getBaseInfo(interfaceData.project_id);
-      let interfaceUrl = `${ctx.request.origin}/project/${interfaceData.project_id}/interface/api/${id}`;
+
+      let interfaceUrl = `${ctx.request.origin}/project/${
+        interfaceData.project_id
+      }/interface/api/${id}`;
 
       yapi.commons.sendNotice(interfaceData.project_id, {
         title: `${username} 更新了接口`,
         content: `<html>
-      <head>
-      <style>
-      ${annotatedCss}
-      ${htmlCss}
-      </style>
-      </head>
-      <body>
-      <div><h3>${username}更新了接口(${data.title})</h3>
-      <p>项目名：${project.name} </p>
-      <p>修改用户: ${username}</p>
-      <p>接口名: <a href="${interfaceUrl}">${data.title}</a></p>
-      <p>接口路径: [${data.method}]${data.path}</p>
-      <p>详细改动日志: ${this.diffHTML(diffView)}</p></div>
-      </body>
-      </html>`
+        <head>
+        <style>
+        ${annotatedCss}
+        ${htmlCss}
+        </style>
+        </head>
+        <body>
+        <div><h3>${username}更新了接口(${data.title})</h3>
+        <p>项目名：${project.name} </p>
+        <p>修改用户: ${username}</p>
+        <p>接口名: <a href="${interfaceUrl}">${data.title}</a></p>
+        <p>接口路径: [${data.method}]${data.path}</p>
+        <p>详细改动日志: ${this.diffHTML(diffView)}</p></div>
+        </body>
+        </html>`
       });
     }
 
-    // 3. 触发接口更新钩子 & 自动加标签
     yapi.emitHook('interface_update', id).then();
     await this.autoAddTag(params);
 
-    // 4. 返回结果
     ctx.body = yapi.commons.resReturn(result);
     return 1;
   }
@@ -1295,21 +1263,6 @@ class interfaceController extends baseController {
       ctx.body = yapi.commons.resReturn(null, 402, err.message);
     }
   }
-
-  //获取接口的不同版本
-  async getVersionList(ctx) {
-    let interface_key = ctx.params.interface_key;
-    if (!interface_key) {
-      return (ctx.body = yapi.commons.resReturn(null, 400, 'interface_key不能为空'));
-    }
-    try {
-      const VersionList = await this.Model.listVersionByInterfaceKey(interface_key);
-      ctx.body = yapi.commons.resReturn(VersionList);
-    }catch (err) {
-      ctx.body = yapi.commons.resReturn(null, 402, err.message + '1');
-    }
-  }
-
 }
 
 module.exports = interfaceController;
