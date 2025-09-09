@@ -372,7 +372,6 @@ class interfaceController extends baseController {
     params.res_body_type = params.res_body_type ? params.res_body_type.toLowerCase() : 'json';
     params.req_body_is_json_schema = _.isUndefined(params.req_body_is_json_schema) ? false : params.req_body_is_json_schema;
     params.res_body_is_json_schema = _.isUndefined(params.res_body_is_json_schema) ? false : params.res_body_is_json_schema;
-
     let http_path = url.parse(params.path, true);
     if (!yapi.commons.verifyPath(http_path.pathname)) {
       return (ctx.body = yapi.commons.resReturn(
@@ -384,27 +383,24 @@ class interfaceController extends baseController {
     // 解析 interface_key 和 version
     const { interface_key, version } = parseInterfaceKeyAndVersion(params.project_id, params.path);
     // 根据 interface_key + version 查询
-    let existing = await this.Model.getByInterfaceKey(params.project_id, interface_key, version, params.method);
+    let result = await this.Model.getByInterfaceKey(params.project_id, interface_key, params.method, version, '_id res_body req_body_other interface_key version');
     // URL query 参数处理
     params.query_path = { path: http_path.pathname, params: [] };
     Object.keys(http_path.query).forEach(item => {
       params.query_path.params.push({ name: item, value: http_path.query[item] });
     });
-
     yapi.commons.handleVarPath(params.path, params.req_params);
     params.type = params.req_params.length > 0 ? 'var' : 'static';
 
-    if (existing.length > 0) {
+    if (result.length > 0) {
       // 已存在接口 → 更新
-      for (const item of existing) {
+      for (const item of result) {
         params.id = item._id;
-
         let validParams = Object.assign({}, params);
         let validResult = yapi.commons.validateParams(this.schemaMap['up'], validParams);
         if (!validResult.valid) {
           return (ctx.body = yapi.commons.resReturn(null, 400, validResult.message));
         }
-
         let data = Object.assign({}, ctx);
         data.params = validParams;
 
@@ -416,11 +412,19 @@ class interfaceController extends baseController {
             data.params.res_body = JSON.stringify(mergeJsonSchema(old_res_body, new_res_body), null, 2);
           } catch (err) {}
         }
+        if (params.req_body_is_json_schema && params.dataSync === 'good') {
+          try {
+            let new_req_body = yapi.commons.json_parse(params.req_body_other);
+            let old_req_body = yapi.commons.json_parse(item.req_body_other || '{}');
+            data.params.req_body_other = JSON.stringify(mergeJsonSchema(old_req_body, new_req_body), null, 2);
+          } catch (err) {
+            console.error('req_body_other merge error', err);
+          }
+        }
 
         // 保持原 interface_key 和 version
         data.params.interface_key = item.interface_key;
-        data.params.version = params.item.version;
-
+        data.params.version = item.version;
         await this.up(data);
       }
     } else {
@@ -429,20 +433,16 @@ class interfaceController extends baseController {
       if (!validResult.valid) {
         return (ctx.body = yapi.commons.resReturn(null, 400, validResult.message));
       }
-
       let data = { params: Object.assign({}, params) };
       data.params.interface_key = interface_key;
       data.params.version = version;
       data.params.uid = this.getUid();
       data.params.add_time = yapi.commons.time();
       data.params.up_time = yapi.commons.time();
-
       await this.add(data);
     }
-
-    ctx.body = yapi.commons.resReturn({ interface_key, version });
+    ctx.body = yapi.commons.resReturn(result);
   }
-
   async autoAddTag(params) {
     //检查是否提交了目前不存在的tag
     let tags = params.tag;
@@ -640,11 +640,9 @@ class interfaceController extends baseController {
         }
       }
       let allResultObj = await this.Model.listLatestByCat(catid, option, page, limit);
-      console.log("listLatestByCat===allResultObj", allResultObj)
       let count = allResultObj.total;
       // 拿到数组
       let result = allResultObj.list;
-      console.log("listLatestByCat===result", result)
 
       ctx.body = yapi.commons.resReturn({
         count: count,
