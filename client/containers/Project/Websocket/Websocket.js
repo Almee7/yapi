@@ -21,15 +21,32 @@ export default function WebsocketManager() {
         const fetchList = async () => {
             try {
                 const res = await axios.get('/api/ws-test/list');
-                let list = (res && res.data && res.data.body && res.data.body.list) || [];
+                let list = [];
+                if (res && res.data && res.data.body && res.data.body.list) {
+                    list = res.data.body.list;
+                }
 
-                // 去重（按 url）
                 const uniqueList = [];
                 const seenUrls = new Set();
                 for (let item of list) {
                     if (!seenUrls.has(item.url)) {
                         seenUrls.add(item.url);
-                        item.messages = [];
+
+                        // 过滤掉 messages 中的 pong
+                        const originalMessages = item.messages || [];
+                        const filteredMessages = [];
+                        for (let msg of originalMessages) {
+                            try {
+                                const text = JSON.parse(msg).data.text;
+                                if (text !== 'pong') {
+                                    filteredMessages.push(msg);
+                                }
+                            } catch(err) {
+                                filteredMessages.push(msg);
+                            }
+                        }
+                        item.messages = filteredMessages;
+
                         uniqueList.push(item);
                     }
                 }
@@ -37,6 +54,7 @@ export default function WebsocketManager() {
                 setTabs(uniqueList);
                 if (uniqueList.length > 0) {
                     setActiveTab(uniqueList[0].connectionId);
+                    setTimeout(scrollToBottom, 0); // 初始滚动到底部
                 }
             } catch (err) {
                 console.error('获取连接列表失败', err);
@@ -47,7 +65,6 @@ export default function WebsocketManager() {
 
         fetchList();
 
-        // 连接 Node.js 代理 WS
         const ws = new WebSocket('ws://localhost:3000/api/ws-test/frontend');
 
         ws.onopen = () => console.log('已连接到 Node.js 代理 WS');
@@ -61,7 +78,8 @@ export default function WebsocketManager() {
                         if (tab.connectionId === connectionId) {
                             if (!tab.messages) tab.messages = [];
                             if (data.type === 'message') {
-                                if (JSON.parse(data.message).data.text !== 'pong') {
+                                const parsed = JSON.parse(data.message);
+                                if (parsed.data.text !== 'pong') {
                                     tab.messages.push(data.message);
                                 }
                             }
@@ -81,10 +99,7 @@ export default function WebsocketManager() {
 
         wsRef.current = ws;
 
-        // 卸载时关闭 WS
-        return () => {
-            ws.close();
-        };
+        return () => ws.close();
     }, []);
 
     useEffect(() => {
