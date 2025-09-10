@@ -506,6 +506,7 @@ class interfaceController extends baseController {
           return;
         }
       }
+      // console.log('result', result);
       if (!result) {
         return (ctx.body = yapi.commons.resReturn(null, 490, '不存在的'));
       }
@@ -639,9 +640,11 @@ class interfaceController extends baseController {
         }
       }
       let allResultObj = await this.Model.listLatestByCat(catid, option, page, limit);
+      console.log("listLatestByCat===allResultObj", allResultObj)
       let count = allResultObj.total;
       // 拿到数组
       let result = allResultObj.list;
+      console.log("listLatestByCat===result", result)
 
       ctx.body = yapi.commons.resReturn({
         count: count,
@@ -654,12 +657,12 @@ class interfaceController extends baseController {
   }
 
   async listByMenu(ctx) {
-    const project_id = ctx.params.project_id;
+    let project_id = ctx.params.project_id;
     if (!project_id) {
       return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
     }
 
-    const project = await this.projectModel.getBaseInfo(project_id);
+    let project = await this.projectModel.getBaseInfo(project_id);
     if (!project) {
       return (ctx.body = yapi.commons.resReturn(null, 406, '不存在的项目'));
     }
@@ -670,26 +673,19 @@ class interfaceController extends baseController {
     }
 
     try {
-      // 获取分类
-      const cats = await this.catModel.list(project_id);
-      const catIds = cats.map(c => c._id);
-
-      // 一次查出所有分类的最新接口
-      const interfaces = await this.Model.listLatestByCatIds(catIds);
-
-      // 按 catid 组织
-      const catMap = cats.reduce((acc, c) => {
-        acc[c._id] = { ...c.toObject(), list: [] };
-        return acc;
-      }, {});
-
-      for (const iface of interfaces) {
-        if (catMap[iface.catid]) {
-          catMap[iface.catid].list.push(iface);
+      let result = await this.catModel.list(project_id),
+        newResult = [];
+      for (let i = 0, item, list; i < result.length; i++) {
+        item = result[i].toObject();
+        list = await this.Model.listByCatid(item._id);
+        for (let j = 0; j < list.length; j++) {
+          list[j] = list[j].toObject();
         }
-      }
 
-      ctx.body = yapi.commons.resReturn(Object.values(catMap));
+        item.list = list;
+        newResult[i] = item;
+      }
+      ctx.body = yapi.commons.resReturn(newResult);
     } catch (err) {
       ctx.body = yapi.commons.resReturn(null, 402, err.message);
     }
@@ -741,7 +737,6 @@ class interfaceController extends baseController {
     // 保证 path 和 method 有值
     params.path = params.path || interfaceData.path;
     params.method = (params.method || interfaceData.method || 'GET').toUpperCase();
-
     if (!this.$tokenAuth) {
       let auth = await this.checkAuth(interfaceData.project_id, 'project', 'edit');
       if (!auth) {
@@ -1198,7 +1193,6 @@ class interfaceController extends baseController {
       params.forEach(item => {
         if (item.id) {
           this.Model.upIndex(item.id, item.index).then(
-              // eslint-disable-next-line no-unused-vars
             res => {},
             err => {
               yapi.commons.log(err.message, 'error');
@@ -1232,7 +1226,6 @@ class interfaceController extends baseController {
       params.forEach(item => {
         if (item.id) {
           this.catModel.upCatIndex(item.id, item.index).then(
-              // eslint-disable-next-line no-unused-vars
             res => {},
             err => {
               yapi.commons.log(err.message, 'error');
