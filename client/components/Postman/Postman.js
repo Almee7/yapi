@@ -70,6 +70,11 @@ export const InsertCodeMap = [
   {
     code: 'assert.notDeepEqual(body, {"code": 0})',
     title: '断言对象 body 不等于 {"code": 0}'
+  },
+  {
+    code: 'wsLog = await readWS("ws://api-im-pre.jinqidongli.com");\n' +
+        'assert.equal(wsLog,xxxx);',
+    title: '读取ws日志执行断言'
   }
 ];
 

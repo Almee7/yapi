@@ -108,17 +108,18 @@
     padding-bottom: 24px;
     border: none;
     .group-item {
-      // height: 48px;
-      // line-height: 48px;
-      // padding: 0 24px;
+       //height: 48px;
+       //line-height: 48px;
+       //padding: 0 24px;
       font-size: 14px;
     }
     .group-item:hover {
-      // background: #34495E;
-      // color: mixin.$color-white;
+    //   background: #34495E;
+    //   color: mixin.$color-white;
     }
+
     .group-item.selected {
-      // background: #34495E;
+       //background: #34495E;
     }
     .group-name {
       float: left;
@@ -127,6 +128,9 @@
       float: right;
       font-size: 18px;
     }
+    //.ant-menu-item-active{
+    //  color: mixin.$color-white;
+    //}
   }
 }
 .add-group-modal {
@@ -144,4 +148,8 @@
       color: #ccc;
     }
   }
+}
+.ant-menu-inline .ant-menu-item,
+.ant-menu-inline .ant-menu-submenu-title {
+  width: 100% !important;
 }
