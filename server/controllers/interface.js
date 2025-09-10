@@ -506,7 +506,6 @@ class interfaceController extends baseController {
           return;
         }
       }
-      // console.log('result', result);
       if (!result) {
         return (ctx.body = yapi.commons.resReturn(null, 490, '不存在的'));
       }
@@ -1196,6 +1195,7 @@ class interfaceController extends baseController {
       params.forEach(item => {
         if (item.id) {
           this.Model.upIndex(item.id, item.index).then(
+              // eslint-disable-next-line no-unused-vars
             res => {},
             err => {
               yapi.commons.log(err.message, 'error');
@@ -1229,6 +1229,7 @@ class interfaceController extends baseController {
       params.forEach(item => {
         if (item.id) {
           this.catModel.upCatIndex(item.id, item.index).then(
+              // eslint-disable-next-line no-unused-vars
             res => {},
             err => {
               yapi.commons.log(err.message, 'error');
