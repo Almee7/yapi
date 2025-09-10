@@ -145,7 +145,7 @@ class interfaceModel extends baseModel {
   }
   getByInterfaceKey(project_id, interface_key, method, version = null, select) {
     select =
-        select || '_id title uid path method project_id catid edit_uid status add_time up_time interface_key version tag isCopy';
+        select || '_id title uid interface_key version method project_id catid edit_uid status add_time up_time type ...';
     const query = {
       project_id,
       interface_key,
