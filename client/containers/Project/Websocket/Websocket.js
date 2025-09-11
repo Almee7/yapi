@@ -18,10 +18,26 @@ export default function WebsocketManager() {
 
     // 初始化加载连接列表 & 建立前端 WS 代理连接
     useEffect(() => {
+        // 获取列表并初始化 tabs
         const fetchList = async () => {
             try {
                 const res = await axios.get('/api/ws-test/list');
-                const list = (res && res.data && res.data.body && res.data.body.list) ? res.data.body.list : [];
+                let list = (res && res.data && res.data.body && res.data.body.list)
+                    ? res.data.body.list
+                    : [];
+
+                // 初始化时过滤 messages 中的 pong
+                list = list.map(tab => {
+                    const filteredMessages = (tab.messages || []).filter(msg => {
+                        try {
+                            const parsed = JSON.parse(msg);
+                            return !(parsed.data && parsed.data.text === 'pong');
+                        } catch (err) {
+                            return true; // 解析失败也保留
+                        }
+                    });
+                    return { ...tab, messages: filteredMessages };
+                });
 
                 setTabs(list);
 
@@ -51,9 +67,20 @@ export default function WebsocketManager() {
                     prev.map(tab => {
                         if (tab.connectionId === connectionId) {
                             if (!tab.messages) tab.messages = [];
+
+                            // 实时消息过滤 pong
                             if (data.type === 'message') {
-                                tab.messages.push(data.message);
+                                let parsed;
+                                try {
+                                    parsed = JSON.parse(data.message);
+                                } catch (err) {
+                                    parsed = null;
+                                }
+                                if (!parsed || !(parsed.data && parsed.data.text === 'pong')) {
+                                    tab.messages.push(data.message);
+                                }
                             }
+
                             if (data.type === 'status') {
                                 tab.status = data.status;
                             }
@@ -72,7 +99,6 @@ export default function WebsocketManager() {
 
         return () => ws.close();
     }, []);
-
 
 
     useEffect(() => {
