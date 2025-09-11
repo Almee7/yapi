@@ -139,14 +139,24 @@ class WsTestController extends baseController {
      * GET /api/ws-test/list
      */
     async list(ctx) {
-        const list = Array.from(wsConnections.entries()).map(([id, conn]) => ({
-            connectionId: id,
-            url: conn.url,
-            headers: conn.headers,
-            query: conn.query,
-            status: conn.status,
-            messages: conn.messages
-        }));
+        const seenUrls = new Set();
+        const list = [];
+
+        for (const [id, conn] of wsConnections.entries()) {
+            if (!seenUrls.has(conn.url)) {
+                seenUrls.add(conn.url);
+
+                list.push({
+                    connectionId: id,
+                    url: conn.url,
+                    headers: conn.headers,
+                    query: conn.query,
+                    status: conn.status,
+                    messages: conn.messages
+                });
+            }
+        }
+
         ctx.body = this._response(true, {}, { list, tips: "当前连接列表" }, 200, "OK", 0);
     }
 
@@ -170,6 +180,9 @@ class WsTestController extends baseController {
     }
 
     static async readws(connectionId) {
+        const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
+        // 先等待 1 秒
+        await wait(2000);
         const conn = wsConnections.get(connectionId);
         if (!conn) return null;
         const messages = conn.messages || [];
