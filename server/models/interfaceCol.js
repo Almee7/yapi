@@ -11,6 +11,7 @@ class interfaceCol extends baseModel {
       name: { type: String, required: true },
       uid: { type: Number, required: true },
       project_id: { type: Number, required: true },
+      parent_id: { type: Number, default: 0 },
       desc: String,
       add_time: Number,
       up_time: Number,
@@ -71,12 +72,46 @@ class interfaceCol extends baseModel {
     });
   }
 
+  async getParentId(col_id) {
+    // 查询整个表
+    const allData = await this.model.find({}).lean().exec();
+
+    // 构建 parent_id -> 子节点 Map
+    const map = new Map();
+    for (const item of allData) {
+      const pid = item.parent_id?.toString() || null;
+      if (!map.has(pid)) map.set(pid, []);
+      map.get(pid).push(item);
+    }
+
+    // 非递归获取所有子级 col_id（不包含自己）
+    const stack = [...(map.get(col_id?.toString()) || [])]; // 初始栈放直接子节点
+    const resultIds = [];
+
+    while (stack.length > 0) {
+      const node = stack.pop();
+      resultIds.push(node._id); // 只保存 col_id
+
+      const children = map.get(node._id?.toString()) || [];
+      for (const child of children) {
+        stack.push(child);
+      }
+    }
+
+    // 如果找不到子级，返回原来的 col_id
+    if (resultIds.length === 0) {
+      return [col_id];
+    }
+
+    return resultIds; // 返回 col_id 数组
+  }
+
   list(project_id) {
     return this.model
       .find({
         project_id: project_id
       })
-      .select('name uid project_id desc add_time up_time, index')
+      .select('name uid project_id desc add_time up_time, index, parent_id')
       .exec();
   }
 

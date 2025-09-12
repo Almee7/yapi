@@ -738,6 +738,9 @@ class interfaceController extends baseController {
     if (!interfaceData) {
       return (ctx.body = yapi.commons.resReturn(null, 400, '不存在的接口'));
     }
+    // 保证 path 和 method 有值
+    params.path = params.path || interfaceData.path;
+    params.method = (params.method || interfaceData.method || 'GET').toUpperCase();
 
     if (!this.$tokenAuth) {
       let auth = await this.checkAuth(interfaceData.project_id, 'project', 'edit');

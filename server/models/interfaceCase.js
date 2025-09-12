@@ -16,6 +16,7 @@ class interfaceCase extends baseModel {
       index: { type: Number, default: 0 },
       project_id: { type: Number, required: true },
       interface_id: { type: Number, required: true },
+      parent_id: [],
       add_time: Number,
       up_time: Number,
       case_env: { type: String },
@@ -77,20 +78,22 @@ class interfaceCase extends baseModel {
 
   list(col_id, select) {
     select = select || 'casename uid col_id _id index interface_id project_id';
+
+    // 判断 col_id 是否是数组，如果是数组则使用 $in 查询
+    const query = Array.isArray(col_id)
+        ? { col_id: { $in: col_id } }
+        : { col_id: col_id };
     if (select === 'all') {
       return this.model
-        .find({
-          col_id: col_id
-        })
-        .exec();
+          .find(query)
+          .exec();
     }
     return this.model
-      .find({
-        col_id: col_id
-      })
-      .select(select)
-      .exec();
+        .find(query)
+        .select(select)
+        .exec();
   }
+
 
   del(id) {
     return this.model.remove({

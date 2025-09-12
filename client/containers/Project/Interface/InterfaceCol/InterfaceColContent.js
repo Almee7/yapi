@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { withRouter } from 'react-router';
 import { Link } from 'react-router-dom';
 //import constants from '../../../../constants/variable.js'
-import { Tooltip, Icon,Input, Button, Row, Col, Spin, Modal, message, Select, Switch } from 'antd';
+import { Tooltip, Icon,Input, Button, Row, Col, Spin, Modal, message, Select, Switch, Tree  } from 'antd';
 import {
   fetchInterfaceColList,
   fetchCaseList,
@@ -134,6 +134,7 @@ class InterfaceColContent extends Component {
       currColEnvObj: {},
       collapseKey: '1',
       commonSettingModalVisible: false,
+      expandedRows: [], // 存储已展开的行ID
       commonSetting: {
         checkHttpCodeIs200: false,
         checkResponseField: {
@@ -216,6 +217,7 @@ class InterfaceColContent extends Component {
 
   // 整合header信息
   handleReqHeader = (project_id, req_header, case_env) => {
+    console.log("props---",this.props)
     let envItem = _.find(this.props.envList, item => {
       return item._id === project_id;
     });
@@ -239,6 +241,7 @@ class InterfaceColContent extends Component {
     let that = this;
     let newRows =  rows || []
     newRows.forEach(item => {
+      console.log('before:', item);
       item.id = item._id;
       item._test_status = item.test_status;
 
@@ -246,8 +249,10 @@ class InterfaceColContent extends Component {
         item.case_env = currColEnvObj[item.project_id];
       }
       item.req_headers = that.handleReqHeader(item.project_id, item.req_headers, item.case_env);
+      console.log('after:', item);
     })
     this.setState({ rows: newRows });
+    console.log("newRows--------------", newRows);
   };
 
 ///开始测试入口
@@ -815,6 +820,7 @@ class InterfaceColContent extends Component {
     this.setState({rows: newRows});
   };
 
+
   render() {
     const {
       loading,
@@ -1338,7 +1344,7 @@ class InterfaceColContent extends Component {
           <Table.Body
                 className="interface-col-table-body"
                 rows={resolvedRows}
-                rowKey="id"
+                rowKey="_id"
                 onRow={this.onRow}
             />
         </Table.Provider>
