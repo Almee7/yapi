@@ -78,14 +78,11 @@ class interfaceColController extends baseController {
   async addCol(ctx) {
     try {
       let params = ctx.request.body;
-      console.log("params-----------------", params);
       params = yapi.commons.handleParams(params, {
         name: 'string',
         project_id: 'number',
-        desc: 'string',
-        parent_id: 'number'
+        desc: 'string'
       });
-      console.log("params11111-----------------", params);
 
       if (!params.project_id) {
         return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
@@ -99,47 +96,25 @@ class interfaceColController extends baseController {
         return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));
       }
 
-      // 保存接口集
-      let colData = {
+      let result = await this.colModel.save({
         name: params.name,
-        parent_id: Number(
-            params.parent_id && params.parent_id.id
-                ? params.parent_id.id
-                : params.parent_id
-        ) || 0,
         project_id: params.project_id,
         desc: params.desc,
         uid: this.getUid(),
         add_time: yapi.commons.time(),
         up_time: yapi.commons.time()
-      };
-
-      // 如果 parent_id 存在，说明是子级接口集
-      if (params.parent_id) {
-        colData.parent_id = params.parent_id;
-      }
-      console.log("colData-----",colData);
-      let result = await this.colModel.save(colData);
-
+      });
       let username = this.getUsername();
-      let logContent = `<a href="/user/profile/${this.getUid()}">${username}</a> 添加了接口集 `;
-
-      if (params.parent_id) {
-        logContent += `<a href="/project/${params.project_id}/interface/col/${params.parent_id}">父级接口集</a> 的子集 <a href="/project/${
-            params.project_id
-        }/interface/col/${result._id}">${params.name}</a>`;
-      } else {
-        logContent += `<a href="/project/${params.project_id}/interface/col/${result._id}">${params.name}</a>`;
-      }
-
       yapi.commons.saveLog({
-        content: logContent,
+        content: `<a href="/user/profile/${this.getUid()}">${username}</a> 添加了接口集 <a href="/project/${
+          params.project_id
+        }/interface/col/${result._id}">${params.name}</a>`,
         type: 'project',
         uid: this.getUid(),
         username: username,
         typeid: params.project_id
       });
-
+      // this.projectModel.up(params.project_id,{up_time: new Date().getTime()}).then();
       ctx.body = yapi.commons.resReturn(result);
     } catch (e) {
       ctx.body = yapi.commons.resReturn(null, 402, e.message);
@@ -188,11 +163,8 @@ class interfaceColController extends baseController {
    * @example
    */
   async getCaseEnvList(ctx) {
-    // console.log("ctx----", ctx)
     try {
       let id = ctx.query.col_id;
-      // console.log("ctx----",ctx.query())
-      // console.log("id----", id)
       if (!id || id === 0) {
         return (ctx.body = yapi.commons.resReturn(null, 407, 'col_id不能为空'));
       }
@@ -204,17 +176,12 @@ class interfaceColController extends baseController {
           return (ctx.body = yapi.commons.resReturn(null, 406, '没有权限'));
         }
       }
-
       // 通过col_id 找到 caseList
-      let projectList = await this.caseModel.list(id, 'project_id');
-      if (!projectList || projectList.length === 0) {
-        let col_id = await  this.colModel.getParentId(id)
-        projectList = await this.caseModel.list(col_id, 'project_id');
-
-      }
+      let caseList = await this.caseModel.list(id, 'project_id');
+      console.log("通过col_id 找到 caseList", caseList);
       // 对projectList 进行去重处理
-      projectList = this.unique(projectList, 'project_id');
-
+      let projectList = this.unique(caseList, 'project_id');
+      console.log("对projectList 进行去重处理", projectList);
 
       // 遍历projectList 找到项目和env
       let projectEnvList = [];
@@ -396,7 +363,6 @@ class interfaceColController extends baseController {
   async addCaseList(ctx) {
     try {
       let params = ctx.request.body;
-      console.log("params1231------", params);
       params = yapi.commons.handleParams(params, {
         project_id: 'number',
         col_id: 'number'
@@ -425,7 +391,6 @@ class interfaceColController extends baseController {
         up_time: yapi.commons.time(),
         project_id: params.project_id,
         col_id: params.col_id
-        // parent_id: parent_idArr
       };
 
       for (let i = 0; i < params.interface_list.length; i++) {

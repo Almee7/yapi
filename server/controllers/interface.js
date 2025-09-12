@@ -365,82 +365,54 @@ class interfaceController extends baseController {
         return (ctx.body = yapi.commons.resReturn(null, 40033, '没有权限'));
       }
     }
-
     params.method = params.method || 'GET';
     params.method = params.method.toUpperCase();
-    params.req_params = params.req_params || [];
-    params.res_body_type = params.res_body_type ? params.res_body_type.toLowerCase() : 'json';
-    params.req_body_is_json_schema = _.isUndefined(params.req_body_is_json_schema) ? false : params.req_body_is_json_schema;
-    params.res_body_is_json_schema = _.isUndefined(params.res_body_is_json_schema) ? false : params.res_body_is_json_schema;
 
     let http_path = url.parse(params.path, true);
+
     if (!yapi.commons.verifyPath(http_path.pathname)) {
       return (ctx.body = yapi.commons.resReturn(
-          null,
-          400,
-          'path第一位必需为 /, 只允许由 字母数字-/_:.! 组成'
+        null,
+        400,
+        'path第一位必需为 /, 只允许由 字母数字-/_:.! 组成'
       ));
     }
-    // 解析 interface_key 和 version
-    const { interface_key, version } = parseInterfaceKeyAndVersion(params.project_id, params.path);
-    // 根据 interface_key + version 查询
-    let existing = await this.Model.getByInterfaceKey(params.project_id, interface_key, version, params.method);
-    // URL query 参数处理
-    params.query_path = { path: http_path.pathname, params: [] };
-    Object.keys(http_path.query).forEach(item => {
-      params.query_path.params.push({ name: item, value: http_path.query[item] });
-    });
 
-    yapi.commons.handleVarPath(params.path, params.req_params);
-    params.type = params.req_params.length > 0 ? 'var' : 'static';
-
-    if (existing.length > 0) {
-      // 已存在接口 → 更新
-      for (const item of existing) {
+    let result = await this.Model.getByPath(params.project_id, params.path, params.method, '_id res_body');
+    if (result.length > 0) {
+      result.forEach(async item => {
         params.id = item._id;
-
-        let validParams = Object.assign({}, params);
+        // console.log(this.schemaMap['up'])
+        let validParams = Object.assign({}, params)
         let validResult = yapi.commons.validateParams(this.schemaMap['up'], validParams);
-        if (!validResult.valid) {
+        if (validResult.valid) {
+          let data = Object.assign({}, ctx);
+          data.params = validParams;
+
+          if(params.res_body_is_json_schema && params.dataSync === 'good'){
+            try{
+              let new_res_body = yapi.commons.json_parse(params.res_body)
+              let old_res_body = yapi.commons.json_parse(item.res_body)
+              data.params.res_body = JSON.stringify(mergeJsonSchema(old_res_body, new_res_body),null,2);
+            }catch(err){}
+          }
+          await this.up(data);
+        } else {
           return (ctx.body = yapi.commons.resReturn(null, 400, validResult.message));
         }
-
-        let data = Object.assign({}, ctx);
-        data.params = validParams;
-
-        // 合并 JSON schema
-        if (params.res_body_is_json_schema && params.dataSync === 'good') {
-          try {
-            let new_res_body = yapi.commons.json_parse(params.res_body);
-            let old_res_body = yapi.commons.json_parse(item.res_body || '{}');
-            data.params.res_body = JSON.stringify(mergeJsonSchema(old_res_body, new_res_body), null, 2);
-          } catch (err) {}
-        }
-
-        // 保持原 interface_key 和 version
-        data.params.interface_key = item.interface_key;
-        data.params.version = params.item.version;
-
-        await this.up(data);
-      }
+      });
     } else {
-      // 新接口 → 添加
       let validResult = yapi.commons.validateParams(this.schemaMap['add'], params);
-      if (!validResult.valid) {
+      if (validResult.valid) {
+        let data = {};
+        data.params = params;
+        await this.add(data);
+      } else {
         return (ctx.body = yapi.commons.resReturn(null, 400, validResult.message));
       }
-
-      let data = { params: Object.assign({}, params) };
-      data.params.interface_key = interface_key;
-      data.params.version = version;
-      data.params.uid = this.getUid();
-      data.params.add_time = yapi.commons.time();
-      data.params.up_time = yapi.commons.time();
-
-      await this.add(data);
     }
-
-    ctx.body = yapi.commons.resReturn({ interface_key, version });
+    ctx.body = yapi.commons.resReturn(result);
+    // return ctx.body = yapi.commons.resReturn(null, 400, 'path第一位必需为 /, 只允许由 字母数字-/_:.! 组成');
   }
 
   async autoAddTag(params) {
@@ -549,49 +521,54 @@ class interfaceController extends baseController {
 
     let project = await this.projectModel.getBaseInfo(project_id);
     if (!project) {
-      return ctx.body = yapi.commons.resReturn(null, 407, '不存在的项目');
+      return (ctx.body = yapi.commons.resReturn(null, 407, '不存在的项目'));
     }
     if (project.project_type === 'private') {
       if ((await this.checkAuth(project._id, 'project', 'view')) !== true) {
-        return ctx.body = yapi.commons.resReturn(null, 406, '没有权限');
+        return (ctx.body = yapi.commons.resReturn(null, 406, '没有权限'));
       }
     }
     if (!project_id) {
-      return ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空');
+      return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
     }
 
     try {
-      // 构造 option
-      let option = {};
-      if (status) {
-        option.status = Array.isArray(status) ? status : [status];
-      }
-      if (tag) {
-        option.tag = Array.isArray(tag) ? tag : [tag];
+      let result, count;
+      if (limit === 'all') {
+        result = await this.Model.list(project_id);
+        count = await this.Model.listCount({project_id});
+      } else {
+        let option = {project_id};
+        if (status) {
+          if (Array.isArray(status)) {
+            option.status = {"$in": status};
+          } else {
+            option.status = status;
+          }
+        }
+        if (tag) {
+          if (Array.isArray(tag)) {
+            option.tag = {"$in": tag};
+          } else {
+            option.tag = tag;
+          }
+        }
+
+        result = await this.Model.listByOptionWithPage(option, page, limit);
+        count = await this.Model.listCount(option);
       }
 
-      // 聚合获取最新版本接口
-      let allResultObj = await this.Model.listLatestByProject(project_id, option, page, limit);
-      let count = allResultObj.total;
-      //转数组
-      let allResult = allResultObj.list; // 拿到数组
-      // 分页
-      let list = (limit === 'all')
-          ? allResult
-          : allResult.slice((page - 1) * limit, page * limit);
 
       ctx.body = yapi.commons.resReturn({
         count: count,
-        total: (limit === 'all') ? 1 : Math.ceil(count / limit),
-        list: list
+        total: Math.ceil(count / limit),
+        list: result
       });
-
-      yapi.emitHook('interface_list', list).then();
+      yapi.emitHook('interface_list', result).then();
     } catch (err) {
       ctx.body = yapi.commons.resReturn(null, 402, err.message);
     }
   }
-
 
   async downloadCrx(ctx) {
     let filename = 'crossRequest.zip';
@@ -624,7 +601,7 @@ class interfaceController extends baseController {
       }
 
 
-      let option = {}
+      let option = {catid}
       if (status) {
         if (Array.isArray(status)) {
           option.status = {"$in": status};
@@ -639,12 +616,10 @@ class interfaceController extends baseController {
           option.tag = tag;
         }
       }
-      let allResultObj = await this.Model.listLatestByCat(catid, option, page, limit);
-      console.log("listLatestByCat===allResultObj", allResultObj)
-      let count = allResultObj.total;
-      // 拿到数组
-      let result = allResultObj.list;
-      console.log("listLatestByCat===result", result)
+
+      let result = await this.Model.listByOptionWithPage(option, page, limit);
+
+      let count = await this.Model.listCount(option);
 
       ctx.body = yapi.commons.resReturn({
         count: count,
@@ -691,7 +666,6 @@ class interfaceController extends baseController {
     }
   }
 
-
   /**
    * 编辑接口
    * @interface /interface/up
@@ -720,6 +694,7 @@ class interfaceController extends baseController {
    */
   async up(ctx) {
     let params = ctx.params;
+
     if (!_.isUndefined(params.method)) {
       params.method = (params.method || 'GET').toUpperCase();
     }
