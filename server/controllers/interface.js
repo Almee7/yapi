@@ -365,16 +365,20 @@ class interfaceController extends baseController {
         return (ctx.body = yapi.commons.resReturn(null, 40033, '没有权限'));
       }
     }
+
     params.method = params.method || 'GET';
     params.method = params.method.toUpperCase();
+    params.req_params = params.req_params || [];
+    params.res_body_type = params.res_body_type ? params.res_body_type.toLowerCase() : 'json';
+    params.req_body_is_json_schema = _.isUndefined(params.req_body_is_json_schema) ? false : params.req_body_is_json_schema;
+    params.res_body_is_json_schema = _.isUndefined(params.res_body_is_json_schema) ? false : params.res_body_is_json_schema;
 
     let http_path = url.parse(params.path, true);
-
     if (!yapi.commons.verifyPath(http_path.pathname)) {
       return (ctx.body = yapi.commons.resReturn(
-        null,
-        400,
-        'path第一位必需为 /, 只允许由 字母数字-/_:.! 组成'
+          null,
+          400,
+          'path第一位必需为 /, 只允许由 字母数字-/_:.! 组成'
       ));
     }
 
@@ -478,7 +482,6 @@ class interfaceController extends baseController {
           return;
         }
       }
-      // console.log('result', result);
       if (!result) {
         return (ctx.body = yapi.commons.resReturn(null, 490, '不存在的'));
       }
@@ -521,54 +524,49 @@ class interfaceController extends baseController {
 
     let project = await this.projectModel.getBaseInfo(project_id);
     if (!project) {
-      return (ctx.body = yapi.commons.resReturn(null, 407, '不存在的项目'));
+      return ctx.body = yapi.commons.resReturn(null, 407, '不存在的项目');
     }
     if (project.project_type === 'private') {
       if ((await this.checkAuth(project._id, 'project', 'view')) !== true) {
-        return (ctx.body = yapi.commons.resReturn(null, 406, '没有权限'));
+        return ctx.body = yapi.commons.resReturn(null, 406, '没有权限');
       }
     }
     if (!project_id) {
-      return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
+      return ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空');
     }
 
     try {
-      let result, count;
-      if (limit === 'all') {
-        result = await this.Model.list(project_id);
-        count = await this.Model.listCount({project_id});
-      } else {
-        let option = {project_id};
-        if (status) {
-          if (Array.isArray(status)) {
-            option.status = {"$in": status};
-          } else {
-            option.status = status;
-          }
-        }
-        if (tag) {
-          if (Array.isArray(tag)) {
-            option.tag = {"$in": tag};
-          } else {
-            option.tag = tag;
-          }
-        }
-
-        result = await this.Model.listByOptionWithPage(option, page, limit);
-        count = await this.Model.listCount(option);
+      // 构造 option
+      let option = {};
+      if (status) {
+        option.status = Array.isArray(status) ? status : [status];
+      }
+      if (tag) {
+        option.tag = Array.isArray(tag) ? tag : [tag];
       }
 
+      // 聚合获取最新版本接口
+      let allResultObj = await this.Model.listLatestByProject(project_id, option, page, limit);
+      let count = allResultObj.total;
+      //转数组
+      let allResult = allResultObj.list; // 拿到数组
+      // 分页
+      let list = (limit === 'all')
+          ? allResult
+          : allResult.slice((page - 1) * limit, page * limit);
 
       ctx.body = yapi.commons.resReturn({
         count: count,
-        total: Math.ceil(count / limit),
-        list: result
+        total: (limit === 'all') ? 1 : Math.ceil(count / limit),
+        list: list
       });
-      yapi.emitHook('interface_list', result).then();
+
+      yapi.emitHook('interface_list', list).then();
     } catch (err) {
       ctx.body = yapi.commons.resReturn(null, 402, err.message);
     }
   }
+
 
   async downloadCrx(ctx) {
     let filename = 'crossRequest.zip';
@@ -601,7 +599,7 @@ class interfaceController extends baseController {
       }
 
 
-      let option = {catid}
+      let option = {}
       if (status) {
         if (Array.isArray(status)) {
           option.status = {"$in": status};
@@ -616,10 +614,10 @@ class interfaceController extends baseController {
           option.tag = tag;
         }
       }
-
-      let result = await this.Model.listByOptionWithPage(option, page, limit);
-
-      let count = await this.Model.listCount(option);
+      let allResultObj = await this.Model.listLatestByCat(catid, option, page, limit);
+      let count = allResultObj.total;
+      // 拿到数组
+      let result = allResultObj.list;
 
       ctx.body = yapi.commons.resReturn({
         count: count,
@@ -694,7 +692,6 @@ class interfaceController extends baseController {
    */
   async up(ctx) {
     let params = ctx.params;
-
     if (!_.isUndefined(params.method)) {
       params.method = (params.method || 'GET').toUpperCase();
     }
@@ -712,6 +709,7 @@ class interfaceController extends baseController {
     // 保证 path 和 method 有值
     params.path = params.path || interfaceData.path;
     params.method = (params.method || interfaceData.method || 'GET').toUpperCase();
+
     if (!this.$tokenAuth) {
       let auth = await this.checkAuth(interfaceData.project_id, 'project', 'edit');
       if (!auth) {
@@ -1168,6 +1166,7 @@ class interfaceController extends baseController {
       params.forEach(item => {
         if (item.id) {
           this.Model.upIndex(item.id, item.index).then(
+              // eslint-disable-next-line no-unused-vars
             res => {},
             err => {
               yapi.commons.log(err.message, 'error');
@@ -1201,6 +1200,7 @@ class interfaceController extends baseController {
       params.forEach(item => {
         if (item.id) {
           this.catModel.upCatIndex(item.id, item.index).then(
+              // eslint-disable-next-line no-unused-vars
             res => {},
             err => {
               yapi.commons.log(err.message, 'error');

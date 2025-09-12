@@ -13,6 +13,8 @@ import { fetchProjectList } from '../../../../reducer/modules/project';
 import axios from 'axios';
 import ImportInterface from './ImportInterface';
 import { Input, Icon, Button, Modal, message, Tooltip, Tree, Form } from 'antd';
+// eslint-disable-next-line no-unused-vars
+import { arrayChangeIndex } from '../../../../common.js';
 import _ from 'underscore'
 
 const TreeNode = Tree.TreeNode;
