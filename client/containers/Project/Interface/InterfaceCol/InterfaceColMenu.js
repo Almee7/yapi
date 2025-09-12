@@ -13,7 +13,6 @@ import { fetchProjectList } from '../../../../reducer/modules/project';
 import axios from 'axios';
 import ImportInterface from './ImportInterface';
 import { Input, Icon, Button, Modal, message, Tooltip, Tree, Form } from 'antd';
-import { arrayChangeIndex } from '../../../../common.js';
 import _ from 'underscore'
 
 const TreeNode = Tree.TreeNode;
@@ -27,18 +26,18 @@ const ColModalForm = Form.create()(props => {
   const { visible, onCancel, onCreate, form, title, isSubDir } = props;
   const { getFieldDecorator } = form;
   return (
-      <Modal visible={visible} title={title} onCancel={onCancel} onOk={onCreate}>
-        <Form layout="vertical">
-          <FormItem label={isSubDir ? "子目录名" : "集合名"}>
-            {getFieldDecorator('colName', {
+    <Modal visible={visible} title={title} onCancel={onCancel} onOk={onCreate}>
+      <Form layout="vertical">
+        <FormItem label={isSubDir ? "子目录名" : "集合名"}>
+          {getFieldDecorator('colName', {
               rules: [{ required: true, message: isSubDir ? '请输入子目录命名！' : '请输入集合命名！' }]
             })(<Input />)}
-          </FormItem>
-          {!isSubDir && (
-              <FormItem label="简介">{getFieldDecorator('colDesc')(<Input type="textarea" />)}</FormItem>
+        </FormItem>
+        {!isSubDir && (
+          <FormItem label="简介">{getFieldDecorator('colDesc')(<Input type="textarea" />)}</FormItem>
           )}
-        </Form>
-      </Modal>
+      </Form>
+    </Modal>
   );
 });
 
@@ -453,18 +452,18 @@ export default class InterfaceColMenu extends Component {
           const children = this.buildTreeNodes(data, col._id);
 
           return (
-              <TreeNode
+            <TreeNode
                   key={'col_' + col._id}
                   title={
                     <div className="menu-title">
-                <span>
-                  <Icon type="folder-open" style={{ marginRight: 5 }} />
-                  <span>{col.name}</span>
-                  {/* 显示接口数量（包含子级） */}
-                  <span style={{ marginLeft: 8, color: '#999', fontSize: '12px' }}>
-                    ({this.getAllCasesFromColAndChildren(col._id, data).length})
-                  </span>
-                </span>
+                      <span>
+                        <Icon type="folder-open" style={{ marginRight: 5 }} />
+                        <span>{col.name}</span>
+                        {/* 显示接口数量（包含子级） */}
+                        <span style={{ marginLeft: 8, color: '#999', fontSize: '12px' }}>
+                          ({this.getAllCasesFromColAndChildren(col._id, data).length})
+                        </span>
+                      </span>
                       <div className="btns">
                         <Tooltip title="删除集合">
                           <Icon
@@ -519,16 +518,16 @@ export default class InterfaceColMenu extends Component {
                     </div>
                   }
               >
-                {children}
-                {col.caseList && col.caseList.map(this.itemInterfaceColCreate)}
-              </TreeNode>
+              {children}
+              {col.caseList && col.caseList.map(this.itemInterfaceColCreate)}
+            </TreeNode>
           );
         });
   };
 
   itemInterfaceColCreate = interfaceCase => {
     return (
-        <TreeNode
+      <TreeNode
             style={{ width: '100%' }}
             key={'case_' + interfaceCase._id}
             title={
@@ -627,22 +626,22 @@ export default class InterfaceColMenu extends Component {
     }
 
     return (
-        <div>
-          <div className="interface-filter">
-            <Input placeholder="搜索测试集合" onChange={this.filterCol} />
-            <Tooltip placement="bottom" title="添加集合">
-              <Button
+      <div>
+        <div className="interface-filter">
+          <Input placeholder="搜索测试集合" onChange={this.filterCol} />
+          <Tooltip placement="bottom" title="添加集合">
+            <Button
                   type="primary"
                   style={{ marginLeft: '16px' }}
                   onClick={() => this.showColModal('add')}
                   className="btn-filter"
               >
-                添加集合
-              </Button>
-            </Tooltip>
-          </div>
-          <div className="tree-wrapper" style={{ maxHeight: parseInt(document.body.clientHeight) - headHeight + 'px'}}>
-            <Tree
+              添加集合
+            </Button>
+          </Tooltip>
+        </div>
+        <div className="tree-wrapper" style={{ maxHeight: parseInt(document.body.clientHeight) - headHeight + 'px'}}>
+          <Tree
                 className="col-list-tree"
                 defaultExpandedKeys={currentKes.expands}
                 defaultSelectedKeys={currentKes.selects}
@@ -654,10 +653,10 @@ export default class InterfaceColMenu extends Component {
                 onExpand={this.onExpand}
                 // onDrop={this.onDrop}
             >
-              {this.buildTreeNodes(list)}
-            </Tree>
-          </div>
-          <ColModalForm
+            {this.buildTreeNodes(list)}
+          </Tree>
+        </div>
+        <ColModalForm
               ref={this.saveFormRef}
               type={colModalType}
               visible={colModalVisible}
@@ -672,7 +671,7 @@ export default class InterfaceColMenu extends Component {
               onCreate={this.addorEditCol}
           />
 
-          <Modal
+        <Modal
               title="导入接口到集合"
               visible={importInterVisible}
               onOk={this.handleImportOk}
@@ -681,13 +680,13 @@ export default class InterfaceColMenu extends Component {
               width={800}
               destroyOnClose={true}
           >
-            <ImportInterface
+          <ImportInterface
                 key={this.state.importColId}
                 currProjectId={currProjectId}
                 selectInterface={this.selectInterface}
             />
-          </Modal>
-        </div>
+        </Modal>
+      </div>
     );
   }
 }
