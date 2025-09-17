@@ -66,8 +66,8 @@ class Interface extends Component {
     location: PropTypes.object,
     isShowCol: PropTypes.bool,
     getProject: PropTypes.func,
-    setColData: PropTypes.func
-    // fetchInterfaceColList: PropTypes.func
+    setColData: PropTypes.func,
+    fetchInterfaceColList: PropTypes.func
   };
 
   constructor(props) {

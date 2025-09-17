@@ -152,6 +152,7 @@ export default class InterfaceCaseContent extends Component {
     const res = await axios.post('/api/col/up_case', params);
     if (this.props.currCase.casename !== casename) {
       this.props.fetchInterfaceColList(this.props.match.params.id);
+      console.log('✅ 已执行 fetchInterfaceColList');
     }
     if (res.data.errcode) {
       message.error(res.data.errmsg);

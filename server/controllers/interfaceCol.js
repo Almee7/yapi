@@ -26,6 +26,7 @@ class interfaceColController extends baseController {
    * @example
    */
   async list(ctx) {
+    console.log("12333333",ctx.query.project_id)
     try {
       let id = ctx.query.project_id;
       let project = await this.projectModel.getBaseInfo(id);
@@ -35,6 +36,7 @@ class interfaceColController extends baseController {
         }
       }
       let result = await this.colModel.list(id);
+      // console.log("body",result);
       result = result.sort((a, b) => {
         return a.index - b.index;
       });
@@ -583,6 +585,7 @@ class interfaceColController extends baseController {
    */
 
   async upCase(ctx) {
+    // console.log("12333333",ctx.request.body)
     try {
       let params = ctx.request.body;
       params = yapi.commons.handleParams(params, {
@@ -740,6 +743,7 @@ class interfaceColController extends baseController {
   async upCaseIndex(ctx) {
     try {
       let params = ctx.request.body;
+      console.log("aaa----------------",ctx.query.body);
       if (!params || !Array.isArray(params)) {
         ctx.body = yapi.commons.resReturn(null, 400, '请求参数必须是数组');
       }

@@ -60,6 +60,10 @@ export default class ImportInterface extends Component {
             tableFilters: {}
         });
         await this.props.fetchInterfaceListMenu(val);
+        const newList = this.props.list || [];
+        this.setState({
+            list: [...newList]
+        });
     };
 
     handleSearch = (filter) => {
@@ -78,30 +82,27 @@ export default class ImportInterface extends Component {
 
         const expandedRowKeys = [];
 
-        const filteredList = list
-            .map(item => {
-                // 搜索分类名称
-                const isCategoryMatch = item.name.toLowerCase().includes(filter.toLowerCase());
+        const filteredList = list.map(item => {
+            const matchedChildren = item.list
+                ? item.list.filter(
+                    inter =>
+                        inter.title.toLowerCase().includes(filter.toLowerCase()) ||
+                        inter.path.toLowerCase().includes(filter.toLowerCase())
+                )
+                : [];
 
-                // 搜索子节点
-                const matchedChildren = item.list
-                    ? item.list.filter(
-                        inter =>
-                            inter.title.toLowerCase().includes(filter.toLowerCase()) ||
-                            inter.path.toLowerCase().includes(filter.toLowerCase())
-                    )
-                    : [];
+            if (item.name.toLowerCase().includes(filter.toLowerCase()) || matchedChildren.length > 0) {
+                expandedRowKeys.push('category_' + item._id);
+                return {
+                    ...item,
+                    list: item.name.toLowerCase().includes(filter.toLowerCase())
+                        ? item.list // 分类匹配，显示全部子节点
+                        : matchedChildren // 子节点匹配，只显示匹配的子节点
+                };
+            }
 
-                if (isCategoryMatch || matchedChildren.length > 0) {
-                    expandedRowKeys.push('category_' + item._id);
-                    return {
-                        ...item,
-                        list: isCategoryMatch ? item.list : matchedChildren
-                    };
-                }
-                return null;
-            })
-            .filter(Boolean);
+            return null;
+        }).filter(Boolean);
 
         this.setState({
             searchList: filteredList,

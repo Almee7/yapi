@@ -397,46 +397,85 @@ export default class InterfaceColMenu extends Component {
     });
   };
 
-  // onDrop = async e => {
-  //   // const { interfaceColList } = this.props;
-  //   const dropKey = e.node.props.eventKey;
-  //   const dragKey = e.dragNode.props.eventKey;
-  //   const dropPos = e.node.props.pos.split('-');
-  //   const dropPosition = e.dropPosition - Number(dropPos[dropPos.length - 1]);
-  //
-  //   // 处理集合拖拽
-  //   if (dragKey.indexOf('col_') === 0) {
-  //     const dragColId = dragKey.split('_')[1];
-  //     let parentId = 0;
-  //
-  //     // 判断放置位置
-  //     if (dropKey.indexOf('col_') === 0 && dropPosition === 0) {
-  //       // 拖放到集合内部（作为子集合）
-  //       parentId = dropKey.split('_')[1];
-  //     }
-  //
-  //     // 更新集合的parent_id
-  //     const res = await axios.post('/api/col/up_col', {
-  //       col_id: dragColId,
-  //       parent_id: parentId
-  //     });
-  //
-  //     if (!res.data.errcode) {
-  //       message.success('移动成功');
-  //       this.getList();
-  //     } else {
-  //       message.error(res.data.errmsg);
-  //     }
-  //   } else {
-  //     // 处理用例拖拽（原有逻辑）
-  //     const dropColId = dropKey.split('_')[1];
-  //     const caseId = dragKey.split('_')[1];
-  //
-  //     await axios.post('/api/col/up_case', { id: caseId, col_id: dropColId });
-  //     this.getList();
-  //     this.props.setColData({ isRander: true });
-  //   }
-  // };
+  onDrop = async e => {
+    const { interfaceColList } = this.props;
+    const dragKey = e.dragNode.props.eventKey;
+    const dropKey = e.node.props.eventKey;
+
+    // 集合拖拽
+    if (dragKey.startsWith('col_')) {
+      const dragColId = dragKey.split('_')[1];
+      let parentId = 0;
+      if (dropKey.startsWith('col_') && e.dropPosition - Number(e.node.props.pos.split('-').pop()) === 0) {
+        parentId = dropKey.split('_')[1];
+      }
+
+      try {
+        const res = await axios.post('/api/col/up_col', { col_id: dragColId, parent_id: parentId });
+        if (!res.data.errcode) {
+          message.success('集合移动成功');
+          this.getList();
+        } else {
+          message.error(res.data.errmsg);
+        }
+      } catch (err) {
+        console.error('集合拖拽更新失败:', err);
+        message.error('集合移动失败');
+      }
+      return;
+    }
+
+    // 用例拖拽
+    const dragNodeData = e.dragNode.props.dataRef || {};
+    const caseId = dragKey.split('_')[1];
+    const dragColId = dragNodeData.col_id || dragNodeData._id;
+
+    try {
+      let dropColId = dragColId;
+      let targetCaseList = [];
+
+      if (dropKey.startsWith('case_')) {
+        // 拖到另一个用例上
+        const dropCaseId = dropKey.split('_')[1];
+        const dropCol = interfaceColList.find(col =>
+            col.caseList && col.caseList.some(c => String(c._id) === String(dropCaseId))
+        );
+        dropColId = dropCol ? dropCol._id : dragColId;
+        targetCaseList = dropCol ? dropCol.caseList : [];
+
+        if (dragColId !== dropColId) {
+          // 跨集合，更新 col_id
+          await axios.post('/api/col/up_case', { id: caseId, col_id: dropColId });
+        }
+      } else if (dropKey.startsWith('col_')) {
+        // 拖到集合节点，放到最后
+        dropColId = (e.node.props.dataRef && e.node.props.dataRef._id) || dropKey.split('_')[1];
+        const dropCol = interfaceColList.find(col => col._id === dropColId);
+        targetCaseList = dropCol ? dropCol.caseList : [];
+        await axios.post('/api/col/up_case', { id: caseId, col_id: dropColId });
+      }
+
+      // 计算拖拽的 index
+      const dragPos = e.dragNode.props.pos.split('-');
+      const dragIndex = Number(dragPos[dragPos.length - 1]);
+      const dropPos = e.node.props.pos.split('-');
+      const dropIndex = Number(dropPos[dropPos.length - 1]);
+
+      // 更新顺序
+      if (targetCaseList.length) {
+        const changes = arrayChangeIndex(targetCaseList, dragIndex, dropIndex);
+        if (changes.length) {
+          await axios.post('/api/col/up_case_index', changes);
+        }
+      }
+      this.getList();
+      this.props.setColData({ isRander: true });
+    } catch (err) {
+      console.error('用例拖拽更新失败:', err);
+      message.error('用例移动失败');
+    }
+  };
+
 
   enterItem = id => {
     this.setState({ delIcon: id });
@@ -532,6 +571,7 @@ export default class InterfaceColMenu extends Component {
       <TreeNode
             style={{ width: '100%' }}
             key={'case_' + interfaceCase._id}
+            dataRef={interfaceCase}
             title={
               <div
                   className="menu-title"
@@ -610,22 +650,22 @@ export default class InterfaceColMenu extends Component {
     };
 
     let currentKes = defaultExpandedKeys();
-    let list = this.state.list;
-
-    if (this.state.filterValue) {
-      // 过滤逻辑保持不变
-      list = list.filter(item => {
-        item.caseList = item.caseList.filter(inter => {
-          if (inter.casename.indexOf(this.state.filterValue) === -1
-              && inter.path.indexOf(this.state.filterValue) === -1
-          ) {
-            return false;
-          }
-          return true;
-        });
-        return true;
-      });
-    }
+    // let list = this.props.interfaceColList;
+    //
+    // if (this.state.filterValue) {
+    //   // 过滤逻辑保持不变
+    //   list = list.filter(item => {
+    //     item.caseList = item.caseList.filter(inter => {
+    //       if (inter.casename.indexOf(this.state.filterValue) === -1
+    //           && inter.path.indexOf(this.state.filterValue) === -1
+    //       ) {
+    //         return false;
+    //       }
+    //       return true;
+    //     });
+    //     return true;
+    //   });
+    // }
 
     return (
       <div>
@@ -653,9 +693,9 @@ export default class InterfaceColMenu extends Component {
                 autoExpandParent
                 draggable
                 onExpand={this.onExpand}
-                // onDrop={this.onDrop}
+                onDrop={this.onDrop}
             >
-            {this.buildTreeNodes(list)}
+            {this.buildTreeNodes(this.props.interfaceColList)}
           </Tree>
         </div>
         <ColModalForm

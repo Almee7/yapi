@@ -345,6 +345,7 @@ exports.sandbox = async (sandbox, script) => {
         // ✅ 注入默认变量
         sandbox.vars = sandbox.vars || {};
         sandbox.sqlassert = sandbox.sqlassert || [];
+        sandbox.sql = sandbox.sql || [];
         sandbox.console = console;
         sandbox.assert = assert;
 
@@ -683,6 +684,7 @@ ${JSON.stringify(schema, null, 2)}`)
             logs.push('执行脚本:' + script)
             result = await yapi.commons.sandbox(context, script);
             result.vars = context.vars;
+            console.log("1111111111111111111",result)
         }
         result.logs = logs;
         return yapi.commons.resReturn(result);

@@ -252,7 +252,6 @@ class InterfaceColContent extends Component {
       console.log('after:', item);
     })
     this.setState({ rows: newRows });
-    console.log("newRows--------------", newRows);
   };
 
 ///开始测试入口
@@ -818,6 +817,7 @@ class InterfaceColContent extends Component {
         item._id === id ? {...item, enable_async: checked} : item
     );
     this.setState({rows: newRows});
+    console.log("1111111",)
   };
 
 
