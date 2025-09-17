@@ -18,7 +18,7 @@ const renderToHtml = require('../utils/reportHtml');
 // const axios = require('axios');
 const HanldeImportData = require('../../common/HandleImportData');
 const _ = require('underscore');
-const createContex = require('../../common/createContext')
+// const createContex = require('../../common/createContext')
 
 /**
  * {
@@ -326,7 +326,7 @@ class openController extends baseController {
     };
     try {
       options.taskId = this.getUid();
-      let data = await crossRequest(options, interfaceData.pre_script, interfaceData.after_script,createContex(
+      let data = await crossRequest(options, interfaceData.pre_script, interfaceData.after_script,interfaceData.pre_request_script,(
         this.getUid(),
         interfaceData.project_id,
         interfaceData.interface_id

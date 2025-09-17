@@ -348,18 +348,44 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
   });
 
   if (!isEmptyString(preScript)) {
+    // 1. 执行前置脚本
     context = await sandbox(context, preScript);
+
+    // 2. 替换 requestBody 中的 {{xxx}} 占位符
+    if (context.requestBody) {
+      context.requestBody = replaceTemplateVars(context.requestBody, context.vars);
+    }
+
+    // 3. 更新 URL（如果 query 或 pathname 被前置脚本修改）
     defaultOptions.url = options.url = URL.format({
       protocol: urlObj.protocol,
       host: urlObj.host,
       query: context.query,
       pathname: context.pathname
     });
+
+    // 4. 更新 headers
     defaultOptions.headers = options.headers = context.requestHeader;
+
+    // 5. 更新请求体 data
     defaultOptions.data = options.data = context.requestBody;
   }
+
   if (!isEmptyString(pre_request_script)) {
     context = await sandbox(context, pre_request_script);
+    defaultOptions.data = options.data = context.requestBody;
+  }
+
+  if (!isEmptyString(pre_request_script)) {
+    // 1. 执行 pre_request_script
+    context = await sandbox(context, pre_request_script);
+
+    // 2. 替换 requestBody 中的 {{xxx}} 占位符
+    if (context.requestBody) {
+      context.requestBody = replaceTemplateVars(context.requestBody, context.vars);
+    }
+
+    // 3. 更新请求体 data
     defaultOptions.data = options.data = context.requestBody;
   }
 
@@ -527,6 +553,24 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
     }
     return requestOptions;
   }
+
+function replaceTemplateVars(obj, vars) {
+  if (typeof obj === 'string') {
+    return obj.replace(/{{(.*?)}}/g, (_, key) => {
+      key = key.trim();
+      return vars[key] !== undefined ? vars[key] : obj;
+    });
+  } else if (Array.isArray(obj)) {
+    return obj.map(item => replaceTemplateVars(item, vars));
+  } else if (obj && typeof obj === 'object') {
+    const result = {};
+    for (let k in obj) {
+      result[k] = replaceTemplateVars(obj[k], vars);
+    }
+    return result;
+  }
+  return obj;
+}
 
   exports.checkRequestBodyIsRaw = checkRequestBodyIsRaw;
   exports.handleParams = handleParams;
