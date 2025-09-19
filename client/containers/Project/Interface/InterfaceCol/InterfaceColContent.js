@@ -56,10 +56,6 @@ function handleReport(json) {
   }
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 @connect(
     state => {
       return {
@@ -147,8 +143,10 @@ class InterfaceColContent extends Component {
           enable: false,
           content: ''
         }
-      }
+      },
+      results: []
     };
+    this.cancelTokens = {} // 用于取消异步请求
     this.onRow = this.onRow.bind(this);
     this.onMoveRow = this.onMoveRow.bind(this);
   }
@@ -251,94 +249,76 @@ class InterfaceColContent extends Component {
     this.setState({ rows: newRows });
   };
 
-///开始测试入口
+  //开始测试入口
   executeTests = async () => {
-    // 如果正在运行，点击就是取消
+    console.log("开始测试", this.state);
+
+    // 点击取消
     if (this.state.loading) {
       this.setState({ loading: false });
+      Object.values(this.cancelTokens).forEach(source => {
+        source.cancel('用户取消了请求');
+      });
+      this.cancelTokens = {};
       return;
     }
-      const selectedIds = this.state.selectedIds;
-      if (!selectedIds.length) {
-          message.warning("请先选择用例");
-          return;
-      }
-    // 开始测试前，清空之前的状态
+
+    const selectedIds = this.state.selectedIds;
+    if (!selectedIds.length) {
+      message.warning("请先选择用例");
+      return;
+    }
+
+    // 开始测试前清空状态
     this.setState({
       loading: true,
       rows: this.state.rows.map(row => ({ ...row, loading: '' }))
     });
-    // 清空 reports 要单独写
     this.reports = {};
-    // 切换按钮状态
-    this.setState({ loading: true });
-    // 让 React 有一次渲染机会（按钮立即变取消）
-    await Promise.resolve();
+    await Promise.resolve(); // 让 React 立即渲染按钮状态
 
     const rows_w = {};
+    const asyncTasks = []; // 存放异步 case 的 Promise
 
     for (let i = 0; i < this.state.rows.length; i++) {
-      // 如果点击了取消，直接中断循环
-      if (!this.state.loading) break;
+      if (!this.state.loading) break; // 已取消
 
       const curRow = this.state.rows[i];
-      const checkRow = this.state.selectedIds;
-      if (!checkRow.includes(curRow._id)) continue;
+      if (!selectedIds.includes(curRow._id)) continue;
 
       rows_w[curRow._id] = curRow;
 
-      let envItem = _.find(this.props.envList, item => item._id === curRow.project_id);
+      const envItem = _.find(this.props.envList, item => item._id === curRow.project_id);
 
-      let curitem = {
-            ...curRow,
-            env: envItem.env,
-            pre_script: this.props.currProject.pre_script,
-            after_script: this.props.currProject.after_script,
-            test_status: 'loading'
-        };
+      const curitem = {
+        ...curRow,
+        env: envItem.env,
+        pre_script: this.props.currProject.pre_script,
+        after_script: this.props.currProject.after_script,
+        test_status: 'loading'
+      };
 
-        // 更新行为 loading
+      // 更新 UI 状态
       this.setState(prev => {
         const newRows = [...prev.rows];
         newRows[i] = curitem;
         return { rows: newRows };
-    });
+      });
 
-        let status = 'error';
-      let result;
-
-      try {
-        if (curitem.method === 'WS'){
-          result = await this.handleWSTest(curitem);
-        }else{
-          result = await this.handleTest(curitem);
-        }
-        if (result.code === 0) {
-          status = 'ok';
-        } else if (result.code === 1) {
-          status = 'invalid';
-        }
-      } catch (e) {
-        console.error(e);
-        result = e;
+      // 根据 enable_async 决定是否 await
+      if (curitem.enable_async) {
+        asyncTasks.push(this.runCase(curitem, i)); // 异步收集 Promise
+      } else {
+        await this.runCase(curitem, i); // 同步阻塞
       }
-
-      this.reports[curitem._id] = result;
-      this.records[curitem._id] = {
-        status: result.status,
-        params: result.params,
-        body: result.res_body
-      };
-
-      const newRows = [...this.state.rows];
-      newRows[i] = { ...curitem, test_status: status };
-      this.setState({ rows: newRows });
-
-      //用于测试终止测试
-      await sleep(1000);
-
     }
 
+    // 等待所有异步 case 完成
+    if (asyncTasks.length) {
+      await Promise.all(asyncTasks);
+    }
+
+    // 全部接口执行完再上传报告
     if (this.state.loading) {
       await axios.post('/api/col/up_col', {
         col_id: this.props.currColId,
@@ -347,7 +327,64 @@ class InterfaceColContent extends Component {
     }
 
     this.setState({ loading: false });
+    this.cancelTokens = {}; // 清理 cancelTokens
   };
+
+
+  // 统一用例执行方法
+  runCase = async (curitem, index) => {
+    let result, status = 'error';
+    // 创建 cancelToken
+    let source = axios.CancelToken.source();
+    this.cancelTokens[curitem._id] = source;
+
+    try {
+      if (curitem.method === 'WS') {
+        result = await this.handleWSTest(curitem, source.token);
+      } else {
+        // crossRequest / handleTest 内部需支持 cancelToken
+        result = await this.handleTest({
+          ...curitem,
+          cancelToken: source.token
+        });
+      }
+
+      if (!this.state.loading) {
+        // 用户点击取消
+        result = { code: 1, msg: '用户取消' };
+        status = 'invalid';
+      } else if (result.code === 0) {
+        status = 'ok';
+      } else if (result.code === 1) {
+        status = 'invalid';
+      }
+
+    } catch (e) {
+      if (axios.isCancel(e)) {
+        result = { code: 1, msg: '用户取消' };
+        status = 'invalid';
+      } else {
+        console.error(e);
+        result = e;
+      }
+    }
+
+    delete this.cancelTokens[curitem._id];
+
+    // 更新 reports / records
+    this.reports[curitem._id] = result;
+    this.records[curitem._id] = {
+      status: result.status,
+      params: result.params,
+      body: result.res_body
+    };
+
+    // 更新 UI 状态
+    const newRows = [...this.state.rows];
+    newRows[index] = { ...curitem, test_status: status };
+    this.setState({ rows: newRows });
+  };
+
 
   handleWSTest = async interfaceData => {
     let result = {
@@ -443,9 +480,9 @@ class InterfaceColContent extends Component {
     }));
     try {
       let data = await crossRequest(options, interfaceData.pre_script, interfaceData.after_script,interfaceData.pre_request_script, createContext(
-        this.props.curUid,
-        this.props.match.params.id,
-        interfaceData.interface_id
+          this.props.curUid,
+          this.props.match.params.id,
+          interfaceData.interface_id
       ));
       options.taskId = this.props.curUid;
       let res = (data.res.body = json_parse(data.res.body));
@@ -485,17 +522,17 @@ class InterfaceColContent extends Component {
       );
 
       // 断言测试
-        await this.handleScriptTest(interfaceData, responseData, validRes, requestParams, scriptVars);
-        if ([0, 2].includes(validRes[0].message)) {
-            validRes[0].message = validRes[0].message === 0 ? "验证通过" : "无脚本";
-            result.code = 0;
-            result.validRes = validRes.slice(0, 1)
-        } else {
-            validRes[0].message = "验证失败";
-            result.code = 1;
-            validRes.splice(1, 1)
-            result.validRes = validRes
-        }
+      await this.handleScriptTest(interfaceData, responseData, validRes, requestParams, scriptVars);
+      if ([0, 2].includes(validRes[0].message)) {
+        validRes[0].message = validRes[0].message === 0 ? "验证通过" : "无脚本";
+        result.code = 0;
+        result.validRes = validRes.slice(0, 1)
+      } else {
+        validRes[0].message = "验证失败";
+        result.code = 1;
+        validRes.splice(1, 1)
+        result.validRes = validRes
+      }
     } catch (data) {
       result = {
         ...options,
@@ -892,8 +929,8 @@ class InterfaceColContent extends Component {
               return (
                 <Link to={'/project/' + currProjectId + '/interface/case/' + record._id}>
                   {record.casename && record.casename.length > 23
-                    ? record.casename.substr(0, 20) + '...'
-                    : record.casename}
+                        ? record.casename.substr(0, 20) + '...'
+                        : record.casename}
                 </Link>
               );
             }
@@ -964,11 +1001,11 @@ class InterfaceColContent extends Component {
                   </div>
                 );
               }
-                if (code === undefined || code === null) {
-                    return <div style={{ minHeight: 16 }} />;
-                }
+              if (code === undefined || code === null) {
+                return <div style={{ minHeight: 16 }} />;
+              }
 
-                switch (code) {
+              switch (code) {
                 case 0:
                   return (
                     <div>
@@ -1213,43 +1250,43 @@ class InterfaceColContent extends Component {
               </Col>
               <Col className="col-item" span="14">
                 <div><Switch onChange={e=>{
-                  let {commonSetting} = this.state;
-                  this.setState({
-                    commonSetting :{
-                      ...commonSetting,
-                      checkScript: {
-                        ...this.state.checkScript,
-                        enable: e
+                    let {commonSetting} = this.state;
+                    this.setState({
+                      commonSetting :{
+                        ...commonSetting,
+                        checkScript: {
+                          ...this.state.checkScript,
+                          enable: e
+                        }
                       }
-                    }
-                  })
-                }} checked={this.state.commonSetting.checkScript.enable}  checkedChildren="开" unCheckedChildren="关"  /></div>
+                    })
+                  }} checked={this.state.commonSetting.checkScript.enable}  checkedChildren="开" unCheckedChildren="关"  /></div>
 
                 <AceEditor
-                    onChange={this.onChangeTest}
-                    className="case-script"
-                    data={this.state.commonSetting.checkScript.content}
-                    ref={aceEditor => {
-                      this.aceEditor = aceEditor;
-                    }}
-                />
+                      onChange={this.onChangeTest}
+                      className="case-script"
+                      data={this.state.commonSetting.checkScript.content}
+                      ref={aceEditor => {
+                        this.aceEditor = aceEditor;
+                      }}
+                  />
               </Col>
               <Col span="6">
                 <div className="insert-code">
                   {InsertCodeMap.map(item => {
-                    return (
-                      <div
-                            style={{ cursor: 'pointer' }}
-                            className="code-item"
-                            key={item.title}
-                            onClick={() => {
-                              this.handleInsertCode('\n' + item.code);
-                            }}
-                        >
-                        {item.title}
-                      </div>
-                    );
-                  })}
+                      return (
+                        <div
+                              style={{ cursor: 'pointer' }}
+                              className="code-item"
+                              key={item.title}
+                              onClick={() => {
+                                this.handleInsertCode('\n' + item.code);
+                              }}
+                          >
+                          {item.title}
+                        </div>
+                      );
+                    })}
                 </div>
               </Col>
             </Row>
@@ -1307,16 +1344,16 @@ class InterfaceColContent extends Component {
                 </Tooltip>
                     )}
                 <Button onClick={this.openCommonSetting} style={{
-                        marginRight: '8px'
-                      }} >通用规则配置</Button>
-                &nbsp;
+                      marginRight: '8px'
+                    }} >通用规则配置</Button>
+                    &nbsp;
                 <Button
-                    type="primary"
-                    onClick={this.executeTests}      // 原来的方法
-                    disabled={!hasPlugin}            // 根据条件禁用
-                    style={{ marginLeft: 10 }}       // 样式
-                    icon={loading ? 'loading' : ''} // 图标，loading 时显示加载
-                >
+                        type="primary"
+                        onClick={this.executeTests}      // 原来的方法
+                        disabled={!hasPlugin}            // 根据条件禁用
+                        style={{ marginLeft: 10 }}       // 样式
+                        icon={loading ? 'loading' : ''} // 图标，loading 时显示加载
+                    >
                   {/*根据 loading 状态切换*/}
                   {loading ? '取消' : '开始测试'}
                 </Button>
@@ -1387,7 +1424,7 @@ class InterfaceColContent extends Component {
               maskClosable={false}
           >
           <h3>
-            是否开启: 
+            是否开启:
             <Switch
                   checked={this.state.enableScript}
                   onChange={e => this.setState({ enableScript: e })}
