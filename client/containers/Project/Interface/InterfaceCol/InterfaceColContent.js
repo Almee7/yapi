@@ -217,7 +217,6 @@ class InterfaceColContent extends Component {
 
   // 整合header信息
   handleReqHeader = (project_id, req_header, case_env) => {
-    console.log("props---",this.props)
     let envItem = _.find(this.props.envList, item => {
       return item._id === project_id;
     });
@@ -241,7 +240,6 @@ class InterfaceColContent extends Component {
     let that = this;
     let newRows =  rows || []
     newRows.forEach(item => {
-      console.log('before:', item);
       item.id = item._id;
       item._test_status = item.test_status;
 
@@ -249,7 +247,6 @@ class InterfaceColContent extends Component {
         item.case_env = currColEnvObj[item.project_id];
       }
       item.req_headers = that.handleReqHeader(item.project_id, item.req_headers, item.case_env);
-      console.log('after:', item);
     })
     this.setState({ rows: newRows });
   };
@@ -271,13 +268,10 @@ class InterfaceColContent extends Component {
       loading: true,
       rows: this.state.rows.map(row => ({ ...row, loading: '' }))
     });
-
-      // 清空 reports 要单独写
-      this.reports = {};
-
+    // 清空 reports 要单独写
+    this.reports = {};
     // 切换按钮状态
     this.setState({ loading: true });
-
     // 让 React 有一次渲染机会（按钮立即变取消）
     await Promise.resolve();
 
@@ -811,13 +805,33 @@ class InterfaceColContent extends Component {
   };
 
   // 切换启用状态
-  handleToggleEnableScript = (id, checked) => {
+  handleToggleEnableScript = async (id, checked) => {
     // 更新数据的方法，例如：
+    const prevRows = [...this.state.rows];
+    let colId = prevRows[0].col_id
     const newRows = this.state.rows.map(item =>
         item._id === id ? {...item, enable_async: checked} : item
     );
     this.setState({rows: newRows});
-    console.log("1111111",)
+    console.log("查看开关的参数", id, checked);
+    const params = {
+      id: id,
+      enable_async: checked
+    }
+    try {
+      let result = await axios.post('/api/col/up_case', params);
+      if (result.data.errcode === 0) {
+        message.success('修改成功')
+        await this.props.fetchCaseList(colId);
+      } else {
+        message.error(result.data.errmsg || '修改失败');
+        this.setState({ rows: prevRows });
+      }
+    } catch (error) {
+      message.error('网络异常，请稍后重试');
+      console.log(error)
+      this.setState({ rows: prevRows });
+    }
   };
 
 

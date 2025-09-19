@@ -272,15 +272,15 @@ export default class Run extends Component {
     this.setState(
       {
         ...this.state,
-        test_res_header: cachedHeader ? JSON.parse(cachedHeader) : null,
-        test_res_body: cachedResBody || null,
-        pre_request_script: cachedPreScript || '',
         ...data,
         ...example,
         req_body_other: cached || body,
         resStatusCode: null,
         test_valid_msg: null,
-        resStatusText: null
+        resStatusText: null,
+        test_res_header: cachedHeader ? JSON.parse(cachedHeader) : null,
+        test_res_body: cachedResBody || null,
+        pre_request_script: cachedPreScript || ''
       },
       () => this.props.type === 'inter' && this.initEnvState(data.case_env, data.env)
     );

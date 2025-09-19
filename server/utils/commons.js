@@ -572,9 +572,7 @@ exports.getCaseList = async function getCaseList(id) {
     const projectInst = yapi.getInst(projectModel);
     const interfaceInst = yapi.getInst(interfaceModel);
     let parentId = await colInst.getParentId(id,"parent_id")
-    // console.log("parentId-------", parentId);
     let resultList = await caseInst.list(parentId, 'all');
-    // console.log("resultList-------", resultList);
     let colData = await colInst.get(id);
     for (let index = 0; index < resultList.length; index++) {
         let result = resultList[index].toObject();
@@ -600,7 +598,6 @@ exports.getCaseList = async function getCaseList(id) {
     });
     let ctxBody = yapi.commons.resReturn(resultList);
     ctxBody.colData = colData;
-    console.log("ctxBody-------", ctxBody);
     return ctxBody;
 };
 

@@ -26,7 +26,6 @@ class interfaceColController extends baseController {
    * @example
    */
   async list(ctx) {
-    console.log("12333333",ctx.query.project_id)
     try {
       let id = ctx.query.project_id;
       let project = await this.projectModel.getBaseInfo(id);
@@ -586,6 +585,8 @@ class interfaceColController extends baseController {
 
   async upCase(ctx) {
     // console.log("12333333",ctx.request.body)
+    console.log("ctx=request=body========",ctx.request.body)
+    console.log("ctx=body=========",ctx.body)
     try {
       let params = ctx.request.body;
       params = yapi.commons.handleParams(params, {
