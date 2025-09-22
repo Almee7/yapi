@@ -135,6 +135,19 @@ class interfaceCase extends baseModel {
       }
     );
   }
+
+  async getMaxIndex(col_id) {
+    let lastCase = await this.model
+        .find({ col_id })
+        .sort({ index: -1 })   // 按 index 倒序，最大值在最前面
+        .limit(1)
+        .exec();
+
+    if (lastCase.length === 0) {
+      return 0; // 没有数据时，最大 index 为 0
+    }
+    return lastCase[0].index;
+  }
 }
 
 module.exports = interfaceCase;

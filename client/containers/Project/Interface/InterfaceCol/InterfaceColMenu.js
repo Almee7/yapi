@@ -405,23 +405,48 @@ export default class InterfaceColMenu extends Component {
     // 集合拖拽
     if (dragKey.startsWith('col_')) {
       const dragColId = dragKey.split('_')[1];
+      const dropColId = dropKey.split('_')[1];
+      const dropPosArr = e.node.props.pos.split('-');
+      const dropPosition = e.dropPosition - Number(dropPosArr[dropPosArr.length - 1]);
+
       let parentId = 0;
-      if (dropKey.startsWith('col_') && e.dropPosition - Number(e.node.props.pos.split('-').pop()) === 0) {
-        parentId = dropKey.split('_')[1];
+
+      // 1. 拖到集合上（作为子目录）
+      if (dropPosition === 0) {
+        parentId = dropColId;
+      } else {
+        // 2. 拖到集合前后（同级排序）
+        parentId = (e.node.props.dataRef && e.node.props.dataRef.parent_id) || 0;
       }
 
+      // 获取同级集合列表
+      const sameLevelCols = interfaceColList.filter(col => col.parent_id === parentId);
+      console.log("sameLevelCols",sameLevelCols);
+      const dragIndex = sameLevelCols.findIndex(c => c._id === dragColId);
+      const dropIndex = dropPosition === 0 ? sameLevelCols.length : sameLevelCols.findIndex(c => c._id === dropColId);
+
+      // 计算新的顺序
+      const changes = arrayChangeIndex(sameLevelCols, dragIndex, dropIndex);
+
       try {
-        const res = await axios.post('/api/col/up_col', { col_id: dragColId, parent_id: parentId });
-        if (!res.data.errcode) {
-          message.success('集合移动成功');
-          this.getList();
-        } else {
-          message.error(res.data.errmsg);
+        // 更新顺序
+        if (changes.length) {
+          await axios.post('/api/col/up_col_index', changes);
         }
+
+        // 更新父级 id（如果拖动到子目录）
+        await axios.post('/api/col/up_col', {
+          col_id: dragColId,
+          parent_id: parentId
+        });
+
+        message.success('集合移动成功');
+        this.getList();
       } catch (err) {
         console.error('集合拖拽更新失败:', err);
         message.error('集合移动失败');
       }
+
       return;
     }
 
@@ -433,9 +458,13 @@ export default class InterfaceColMenu extends Component {
     try {
       let dropColId = dragColId;
       let targetCaseList = [];
+      // 计算拖拽的 index
+      const dragPos = e.dragNode.props.pos.split('-');
+      const dragIndex = Number(dragPos[dragPos.length - 1]);
+      const dropPos = e.node.props.pos.split('-');
+      const dropIndex = Number(dropPos[dropPos.length - 1]);
 
       if (dropKey.startsWith('case_')) {
-        // 拖到另一个用例上
         const dropCaseId = dropKey.split('_')[1];
         const dropCol = interfaceColList.find(col =>
             col.caseList && col.caseList.some(c => String(c._id) === String(dropCaseId))
@@ -448,18 +477,11 @@ export default class InterfaceColMenu extends Component {
           await axios.post('/api/col/up_case', { id: caseId, col_id: dropColId });
         }
       } else if (dropKey.startsWith('col_')) {
-        // 拖到集合节点，放到最后
         dropColId = (e.node.props.dataRef && e.node.props.dataRef._id) || dropKey.split('_')[1];
         const dropCol = interfaceColList.find(col => col._id === dropColId);
         targetCaseList = dropCol ? dropCol.caseList : [];
         await axios.post('/api/col/up_case', { id: caseId, col_id: dropColId });
       }
-
-      // 计算拖拽的 index
-      const dragPos = e.dragNode.props.pos.split('-');
-      const dragIndex = Number(dragPos[dragPos.length - 1]);
-      const dropPos = e.node.props.pos.split('-');
-      const dropIndex = Number(dropPos[dropPos.length - 1]);
 
       // 更新顺序
       if (targetCaseList.length) {
@@ -468,6 +490,7 @@ export default class InterfaceColMenu extends Component {
           await axios.post('/api/col/up_case_index', changes);
         }
       }
+
       this.getList();
       this.props.setColData({ isRander: true });
     } catch (err) {
@@ -495,6 +518,7 @@ export default class InterfaceColMenu extends Component {
           return (
             <TreeNode
                   key={'col_' + col._id}
+                  dataRef={col}
                   title={
                     <div className="menu-title">
                       <span>
