@@ -18,7 +18,7 @@ const renderToHtml = require('../utils/reportHtml');
 // const axios = require('axios');
 const HanldeImportData = require('../../common/HandleImportData');
 const _ = require('underscore');
-const createContex = require('../../common/createContext')
+// const createContex = require('../../common/createContext')
 
 /**
  * {
@@ -253,7 +253,8 @@ class openController extends baseController {
         len = testList.length,
         msg = '';
       testList.forEach(item => {
-        const firstMessage = item.validRes && item.validRes[0] && item.validRes[0].message;;
+        // const firstMessage = item.validRes && item.validRes[0] && item.validRes[0].message;;
+        const firstMessage = item.code;
         if (firstMessage === 0) {
           successNum++;
         }
