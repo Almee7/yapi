@@ -18,6 +18,8 @@ const jsf = require('json-schema-faker');
 const { schemaValidator } = require('../../common/utils');
 const http = require('http');
 const { GrpcAgentClient } = require('../grpc/dbClient.js')
+const ExtraAssert = require('../../common/extraAssert.js');
+console.log("ExtraAssert ===>", ExtraAssert);
 const assert = require("assert");
 const WsTestController = require("../controllers/wsTest");
 const vm = require('vm');
@@ -339,6 +341,11 @@ function assertResult(actualResult, params) {
  * @example let a = sandbox({a: 1}, 'a=2')
  * a = {a: 2}
  */
+// 把 ExtraAssert 的静态方法挂到 assert 上
+Object.keys(ExtraAssert).forEach(fn => {
+    assert[fn] = ExtraAssert[fn];
+});
+
 exports.sandbox = async (sandbox, script) => {
     try {
         sandbox = sandbox || {};
@@ -348,7 +355,7 @@ exports.sandbox = async (sandbox, script) => {
         sandbox.sql = sandbox.sql || [];
         sandbox.console = console;
         sandbox.assert = assert;
-
+        console.log("sandbox=============",sandbox)
         const context = vm.createContext(sandbox);
 
         // 检查是否有 readWS 调用
@@ -681,7 +688,6 @@ ${JSON.stringify(schema, null, 2)}`)
             logs.push('执行脚本:' + script)
             result = await yapi.commons.sandbox(context, script);
             result.vars = context.vars;
-            console.log("1111111111111111111",result)
         }
         result.logs = logs;
         return yapi.commons.resReturn(result);
