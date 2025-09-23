@@ -97,35 +97,35 @@ function handleValueWithFilter(context) {
   };
 }
 
+// handleFilter 保证返回字符串
 function handleFilter(str, match, context) {
   match = match.trim();
   try {
-    let a = filter(match, handleValueWithFilter(context));
-
-    return a;
+    const a = filter(match, handleValueWithFilter(context));
+    return a !== undefined && a !== null ? String(a) : '';
   } catch (err) {
     return str;
   }
 }
 
 function handleParamsValue(val, context = {}) {
-  const variableRegexp = /\{\{\s*([^}]+?)\}\}/g;
-  if (!val || typeof val !== 'string') {
-    return val;
-  }
+  const variableRegexp = /\{\{\s*([^}]+?)\s*\}\}/g;
+  if (!val || typeof val !== 'string') return val;
   val = val.trim();
-  let match = val.match(/^\{\{([^\}]+)\}\}$/);
-  if (!match) {
-    // val ==> @name 或者 $.body
-    if (val[0] === '@' || val[0] === '$') {
-      return handleFilter(val, val, context);
-    }
-  } else {
-    return handleFilter(val, match[1], context);
+  // 如果整个值是 @mock 或 $.jsonPath
+  if (val[0] === '@' || val.indexOf('$.') === 0 || val.indexOf('global.') === 0) {
+    return handleFilter(val, val, context);
   }
-
-  return val.replace(variableRegexp, (str, match) => {
-    return handleFilter(str, match, context);
+  // 如果整个值完全被 {{}} 包裹
+  const fullMatch = val.match(/^\{\{\s*([^\}]+?)\s*\}\}$/);
+  if (fullMatch) {
+    return handleFilter(val, fullMatch[1], context);
+  }
+  // 部分替换 {{xxx}} 的情况
+  return val.replace(variableRegexp, (raw, match) => {
+    const result = handleFilter(raw, match, context);
+    // 确保返回字符串
+    return result !== undefined && result !== null ? String(result) : '';
   });
 }
 

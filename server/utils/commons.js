@@ -23,6 +23,7 @@ console.log("ExtraAssert ===>", ExtraAssert);
 const assert = require("assert");
 const WsTestController = require("../controllers/wsTest");
 const vm = require('vm');
+const {validate} = require("compare-versions");
 jsf.extend('mock', function () {
     return {
         mock: function (xx) {
@@ -331,6 +332,42 @@ function assertResult(actualResult, params) {
     }
 }
 
+//替换变量
+function replaceVarsInScript(scriptStr, vars = {}, global = {}) {
+    if (!scriptStr || typeof scriptStr !== 'string') return scriptStr;
+
+    vars = vars || {};
+    global = global || {};
+
+    // 匹配 {{xxx}} 或 {{global.xxx}}
+    const variableRegexp = /\{\{\s*([^}]+?)\s*\}\}/g;
+
+    return scriptStr.replace(variableRegexp, (raw, key) => {
+        key = key.trim();
+        let value;
+
+        // 判断是 global 变量还是普通 vars
+        if (key.startsWith('global.')) {
+            const realKey = key.slice(7);
+            value = global[realKey];
+        } else {
+            value = vars[key];
+        }
+
+        // 找不到值返回标记字符串
+        if (value === undefined || value === null) {
+            return `"{{__NOT_FOUND__${key}}}"`;
+        }
+
+        // 字符串加双引号，其他类型直接返回
+        if (typeof value === 'string') {
+            return `"${value}"`;
+        } else {
+            return value;
+        }
+    });
+}
+
 
 /**
  * 沙盒执行 js 代码
@@ -351,11 +388,12 @@ exports.sandbox = async (sandbox, script) => {
         sandbox = sandbox || {};
         // ✅ 注入默认变量
         sandbox.vars = sandbox.vars || {};
+        sandbox.global = sandbox.vars || {};
         sandbox.sqlassert = sandbox.sqlassert || [];
         sandbox.sql = sandbox.sql || [];
         sandbox.console = console;
         sandbox.assert = assert;
-        console.log("sandbox=============",sandbox)
+        script = replaceVarsInScript(script, sandbox.vars, sandbox.global)
         const context = vm.createContext(sandbox);
 
         // 检查是否有 readWS 调用
@@ -636,12 +674,12 @@ exports.runCaseScript = async function runCaseScript(params, colId, interfaceId)
         records: params.records,
         params: params.params,
         vars: params.vars || {},
+        global: params.global,
         sqlAssert: [],
         log: msg => {
             logs.push('log: ' + convertString(msg));
         }
     };
-
     let result = {};
     try {
 

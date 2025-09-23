@@ -43,7 +43,6 @@ import copy from 'copy-to-clipboard';
 
 export let scriptVars = {};
 
-
 const defaultModalStyle = {
   top: 10
 }
@@ -558,6 +557,16 @@ class InterfaceColContent extends Component {
   // 断言测试
   handleScriptTest = async (interfaceData, response, validRes, requestParams, scriptVars) => {
     // ✅ 判断是否启用测试脚本
+    let env = interfaceData.case_env
+    const getGlobalMap = (envs, envName) => {
+      const target = envs.find(e => e.name === envName);
+      if (!target || !target.global) return {};
+      return Object.fromEntries(target.global.map(({ name, value }) => [name, value]));
+    };
+
+    // 使用示例
+    const globalArr = getGlobalMap(interfaceData.env, env);
+    console.log('globalArr', globalArr)
     if (!interfaceData.enable_script) {
       validRes.push({ message: 2 });
       return
@@ -570,7 +579,8 @@ class InterfaceColContent extends Component {
         params: requestParams,
         col_id: this.props.currColId,
         interface_id: interfaceData.interface_id,
-        vars: scriptVars
+        vars: scriptVars,
+        global: globalArr
       });
       validRes.push({message : test.data.errcode})
       test.data.data.logs.forEach(item => {
