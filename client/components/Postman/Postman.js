@@ -75,6 +75,26 @@ export const InsertCodeMap = [
     code: 'wsLog = await readWS("ws://api-im-pre.jinqidongli.com");\n' +
         'assert.equal(wsLog,xxxx);',
     title: '读取ws日志执行断言'
+  },
+  {
+    code: 'assert.in("张三", ["张三", "李四"])',
+    title: '断言 "张三" 在数组 ["张三", "李四"] 中'
+  },
+  {
+    code: 'assert.not_in("李四", ["张三"])',
+    title: '断言 "李四" 不在数组 ["张三"] 中'
+  },
+  {
+    code: 'assert.exists(vars.token)',
+    title: '断言 vars.token 存在'
+  },
+  {
+    code: 'assert.not_exists(vars.deletedField)',
+    title: '断言 vars.deletedField 不存在'
+  },
+  {
+    code: 'assert.subset([1, 2], [1, 2, 3])',
+    title: '断言数组 [1, 2] 是 [1, 2, 3] 的子集'
   }
 ];
 

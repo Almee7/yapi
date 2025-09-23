@@ -209,7 +209,6 @@ class InterfaceMenu extends Component {
       localStorage.removeItem(`res_header_cache_${id}`);
       localStorage.removeItem(`res_body_cache_${id}`);
       localStorage.removeItem(`pre_request_script_${id}`);
-      console.log(`接口 ${interfaceKey} 缓存已清理`);
     } catch (err) {
       console.error('清理接口缓存失败', err);
     }

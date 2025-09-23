@@ -250,8 +250,6 @@ class InterfaceColContent extends Component {
 
   //开始测试入口
   executeTests = async () => {
-    console.log("开始测试", this.state);
-
     // 点击取消
     if (this.state.loading) {
       this.setState({ loading: false });
@@ -566,7 +564,6 @@ class InterfaceColContent extends Component {
 
     // 使用示例
     const globalArr = getGlobalMap(interfaceData.env, env);
-    console.log('globalArr', globalArr)
     if (!interfaceData.enable_script) {
       validRes.push({ message: 2 });
       return

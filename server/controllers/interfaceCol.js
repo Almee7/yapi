@@ -120,7 +120,6 @@ class interfaceColController extends baseController {
       if (params.parent_id) {
         colData.parent_id = params.parent_id;
       }
-      console.log("colData-----",colData);
       let result = await this.colModel.save(colData);
 
       let username = this.getUsername();
@@ -750,7 +749,6 @@ class interfaceColController extends baseController {
   async upCaseIndex(ctx) {
     try {
       let params = ctx.request.body;
-      console.log("aaa----------------",ctx.query.body);
       if (!params || !Array.isArray(params)) {
         ctx.body = yapi.commons.resReturn(null, 400, '请求参数必须是数组');
       }

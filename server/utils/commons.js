@@ -19,7 +19,6 @@ const { schemaValidator } = require('../../common/utils');
 const http = require('http');
 const { GrpcAgentClient } = require('../grpc/dbClient.js')
 const ExtraAssert = require('../../common/extraAssert.js');
-console.log("ExtraAssert ===>", ExtraAssert);
 const assert = require("assert");
 const WsTestController = require("../controllers/wsTest");
 const vm = require('vm');
@@ -393,7 +392,9 @@ exports.sandbox = async (sandbox, script) => {
         sandbox.sql = sandbox.sql || [];
         sandbox.console = console;
         sandbox.assert = assert;
+        console.log("变量值=======",sandbox.vars)
         script = replaceVarsInScript(script, sandbox.vars, sandbox.global)
+        console.log("替换后的脚本===========",script)
         const context = vm.createContext(sandbox);
 
         // 检查是否有 readWS 调用
@@ -619,7 +620,6 @@ exports.getCaseList = async function getCaseList(id) {
 
     let caseList = await caseInst.list(id, 'all');
     let parentId = await colInst.getParentId(id, "parent_id");
-    console.log("parentId", parentId);
 
     let allList = [];
     if (parentId) {
@@ -641,7 +641,6 @@ exports.getCaseList = async function getCaseList(id) {
 
     // 分别对两个集合的case按index排序
     currentCollectionCases.sort((a, b) => a.index - b.index);
-    console.log("currentCollectionCases", currentCollectionCases);
 
     // 对父级集合的case按collectionId和index进行分组排序
     const groupedParentCases = {};
@@ -657,7 +656,6 @@ exports.getCaseList = async function getCaseList(id) {
     Object.keys(groupedParentCases).forEach(colId => {
         groupedParentCases[colId].sort((a, b) => a.index - b.index);
     });
-    console.log("groupedParentCases", groupedParentCases);
 
     // 合并两个集合的case（先当前集合，再父级集合）
     let resultList = [...currentCollectionCases];
@@ -696,7 +694,6 @@ exports.getCaseList = async function getCaseList(id) {
 
     let ctxBody = yapi.commons.resReturn(resultList);
     ctxBody.colData = colData;
-    console.log("ctxBody-------", ctxBody);
     return ctxBody;
 };
 
