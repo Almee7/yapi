@@ -111,7 +111,7 @@ class interfaceCol extends baseModel {
       .find({
         project_id: project_id
       })
-      .select('name uid project_id desc add_time up_time, index, parent_id')
+      .select('name uid project_id desc add_time up_time index parent_id')
       .exec();
   }
 
@@ -146,6 +146,14 @@ class interfaceCol extends baseModel {
         index: index
       }
     );
+  }
+  async getMaxIndex(parent_id) {
+    let doc = await this.model
+        .findOne({parent_id: parent_id})   // 筛选条件：当前集合
+        .sort({index: -1})           // 按 index 倒序取第一个
+        .exec();
+
+    return doc ? doc.index : -1;      // 如果没有数据就返回 0
   }
 }
 

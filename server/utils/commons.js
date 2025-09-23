@@ -616,11 +616,66 @@ exports.getCaseList = async function getCaseList(id) {
     const colInst = yapi.getInst(interfaceColModel);
     const projectInst = yapi.getInst(projectModel);
     const interfaceInst = yapi.getInst(interfaceModel);
-    let parentId = await colInst.getParentId(id,"parent_id")
-    let resultList = await caseInst.list(parentId, 'all');
+
+    let caseList = await caseInst.list(id, 'all');
+    let parentId = await colInst.getParentId(id, "parent_id");
+    console.log("parentId", parentId);
+
+    let allList = [];
+    if (parentId) {
+        allList = await caseInst.list(parentId, 'all');
+    }
+
+    // 分别处理两个集合的case
+    const currentCollectionCases = caseList.map(item => ({
+        ...item.toObject(),
+        collectionType: 'current',
+        collectionId: id
+    }));
+
+    const parentCollectionCases = allList.map(item => ({
+        ...item.toObject(),
+        collectionType: 'parent',
+        collectionId: parentId
+    }));
+
+    // 分别对两个集合的case按index排序
+    currentCollectionCases.sort((a, b) => a.index - b.index);
+    console.log("currentCollectionCases", currentCollectionCases);
+
+    // 对父级集合的case按collectionId和index进行分组排序
+    const groupedParentCases = {};
+    parentCollectionCases.forEach(item => {
+        const colId = item.col_id || item.collectionId;
+        if (!groupedParentCases[colId]) {
+            groupedParentCases[colId] = [];
+        }
+        groupedParentCases[colId].push(item);
+    });
+
+    // 对每个子集合的case按index排序
+    Object.keys(groupedParentCases).forEach(colId => {
+        groupedParentCases[colId].sort((a, b) => a.index - b.index);
+    });
+    console.log("groupedParentCases", groupedParentCases);
+
+    // 合并两个集合的case（先当前集合，再父级集合）
+    let resultList = [...currentCollectionCases];
+
+    // 添加父级集合的case（按集合分组顺序）
+    Object.keys(groupedParentCases).forEach(colId => {
+        resultList = [...resultList, ...groupedParentCases[colId]];
+    });
+
+    // 去重（基于_id）
+    resultList = resultList.filter(
+        (item, index, self) =>
+            index === self.findIndex(t => t._id.toString() === item._id.toString())
+    );
+
     let colData = await colInst.get(id);
     for (let index = 0; index < resultList.length; index++) {
-        let result = resultList[index].toObject();
+        let result = resultList[index];
         let data = await interfaceInst.get(result.interface_id);
         if (!data) {
             await caseInst.del(result._id);
@@ -638,11 +693,10 @@ exports.getCaseList = async function getCaseList(id) {
         result.req_params = handleParamsValue(data.req_params, result.req_params);
         resultList[index] = result;
     }
-    resultList = resultList.sort((a, b) => {
-        return a.index - b.index;
-    });
+
     let ctxBody = yapi.commons.resReturn(resultList);
     ctxBody.colData = colData;
+    console.log("ctxBody-------", ctxBody);
     return ctxBody;
 };
 

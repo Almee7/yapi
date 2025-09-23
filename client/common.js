@@ -219,20 +219,23 @@ exports.safeAssign = (Obj, nextObj) => {
 
 // 交换数组的位置
 exports.arrayChangeIndex = (arr, start, end) => {
-  let newArr = [].concat(arr);
-  // newArr[start] = arr[end];
-  // newArr[end] = arr[start];
-  let startItem = newArr[start];
-  newArr.splice(start, 1);
-  // end自动加1
-  newArr.splice(end, 0, startItem);
-  let changes = [];
-  newArr.forEach((item, index) => {
-    changes.push({
-      id: item._id,
-      index: index
-    });
-  });
+  // 过滤掉 null/undefined
+  const validArr = arr.filter(item => item != null);
+
+  // 深拷贝避免引用问题
+  const newArr = JSON.parse(JSON.stringify(validArr));
+
+  // 取出要移动的元素
+  const [movedItem] = newArr.splice(start, 1);
+
+  // 插入到目标位置
+  newArr.splice(end, 0, movedItem);
+
+  // 构建变化数组
+  const changes = newArr.map((item, index) => ({
+    id: item._id,
+    index
+  }));
 
   return changes;
 };

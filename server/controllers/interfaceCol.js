@@ -97,6 +97,8 @@ class interfaceColController extends baseController {
       if (!auth) {
         return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));
       }
+      let maxIndex = await this.colModel.getMaxIndex(params.parent_id);
+      console.log("maxIndex",maxIndex)
 
       // 保存接口集
       let colData = {
@@ -107,6 +109,7 @@ class interfaceColController extends baseController {
                 : params.parent_id
         ) || 0,
         project_id: params.project_id,
+        index: maxIndex + 1,
         desc: params.desc,
         uid: this.getUid(),
         add_time: yapi.commons.time(),
@@ -359,9 +362,10 @@ class interfaceColController extends baseController {
       if (!params.casename) {
         return (ctx.body = yapi.commons.resReturn(null, 400, '用例名称不能为空'));
       }
+      let maxIndex = await this.caseModel.getMaxIndex(params.col_id);
 
       params.uid = this.getUid();
-      params.index = 0;
+      params.index = maxIndex+1;
       params.add_time = yapi.commons.time();
       params.up_time = yapi.commons.time();
       let result = await this.caseModel.save(params);
@@ -412,45 +416,50 @@ class interfaceColController extends baseController {
         return (ctx.body = yapi.commons.resReturn(null, 400, '接口集id不能为空'));
       }
 
-      let data = {
-        uid: this.getUid(),
-        index: 0,
-        add_time: yapi.commons.time(),
-        up_time: yapi.commons.time(),
-        project_id: params.project_id,
-        col_id: params.col_id
-      };
+      let maxIndex = await this.caseModel.getMaxIndex(params.col_id);
 
       for (let i = 0; i < params.interface_list.length; i++) {
         let interfaceData = await this.interfaceModel.get(params.interface_list[i]);
-        data.interface_id = params.interface_list[i];
-        data.casename = interfaceData.title;
 
-        // 处理json schema 解析
+        let data = {
+          uid: this.getUid(),
+          index: maxIndex + i + 1, // 每新增一个用例 index 递增
+          add_time: yapi.commons.time(),
+          up_time: yapi.commons.time(),
+          project_id: params.project_id,
+          col_id: params.col_id,
+          interface_id: params.interface_list[i],
+          casename: interfaceData.title
+        };
+
+        // 处理 json schema
         if (
-          interfaceData.req_body_type === 'json' &&
-          interfaceData.req_body_other &&
-          interfaceData.req_body_is_json_schema
+            interfaceData.req_body_type === 'json' &&
+            interfaceData.req_body_other &&
+            interfaceData.req_body_is_json_schema
         ) {
           let req_body_other = yapi.commons.json_parse(interfaceData.req_body_other);
           req_body_other = yapi.commons.schemaToJson(req_body_other, {
             alwaysFakeOptionals: true
           });
-
           data.req_body_other = JSON.stringify(req_body_other);
         } else {
           data.req_body_other = interfaceData.req_body_other;
         }
 
         data.req_body_type = interfaceData.req_body_type;
+
+        // 保存用例
         let caseResultData = await this.caseModel.save(data);
+
+        // 保存日志
         let username = this.getUsername();
         this.colModel.get(params.col_id).then(col => {
           yapi.commons.saveLog({
             content: `<a href="/user/profile/${this.getUid()}">${username}</a> 在接口集 <a href="/project/${
-              params.project_id
+                params.project_id
             }/interface/col/${params.col_id}">${col.name}</a> 下导入了测试用例 <a href="/project/${
-              params.project_id
+                params.project_id
             }/interface/case/${caseResultData._id}">${data.casename}</a>`,
             type: 'project',
             uid: this.getUid(),
