@@ -618,84 +618,65 @@ exports.getCaseList = async function getCaseList(id) {
     const projectInst = yapi.getInst(projectModel);
     const interfaceInst = yapi.getInst(interfaceModel);
 
-    let caseList = await caseInst.list(id, 'all');
-    let parentId = await colInst.getParentId(id, "parent_id");
+    // 1️⃣ 获取父 + 子节点的 col_id 列表，顺序已父-子排列
+    const colIds = await colInst.getParentId(id);
 
-    let allList = [];
-    if (parentId) {
-        allList = await caseInst.list(parentId, 'all');
-    }
+    // 2️⃣ 根据 col_id 列表一次性获取所有 case（list 内部已按 index 排序）
+    const allCases = await caseInst.newList(colIds, 'all');
 
-    // 分别处理两个集合的case
-    const currentCollectionCases = caseList.map(item => ({
-        ...item.toObject(),
-        collectionType: 'current',
-        collectionId: id
-    }));
-
-    const parentCollectionCases = allList.map(item => ({
-        ...item.toObject(),
-        collectionType: 'parent',
-        collectionId: parentId
-    }));
-
-    // 分别对两个集合的case按index排序
-    currentCollectionCases.sort((a, b) => a.index - b.index);
-
-    // 对父级集合的case按collectionId和index进行分组排序
-    const groupedParentCases = {};
-    parentCollectionCases.forEach(item => {
-        const colId = item.col_id || item.collectionId;
-        if (!groupedParentCases[colId]) {
-            groupedParentCases[colId] = [];
-        }
-        groupedParentCases[colId].push(item);
-    });
-
-    // 对每个子集合的case按index排序
-    Object.keys(groupedParentCases).forEach(colId => {
-        groupedParentCases[colId].sort((a, b) => a.index - b.index);
-    });
-
-    // 合并两个集合的case（先当前集合，再父级集合）
-    let resultList = [...currentCollectionCases];
-
-    // 添加父级集合的case（按集合分组顺序）
-    Object.keys(groupedParentCases).forEach(colId => {
-        resultList = [...resultList, ...groupedParentCases[colId]];
-    });
-
-    // 去重（基于_id）
-    resultList = resultList.filter(
-        (item, index, self) =>
-            index === self.findIndex(t => t._id.toString() === item._id.toString())
+    // 3️⃣ 按 colIds 顺序合并 case，保持父-子顺序
+    let resultList = colIds.flatMap(colId =>
+        allCases.filter(item => item.col_id === colId)
     );
 
-    let colData = await colInst.get(id);
-    for (let index = 0; index < resultList.length; index++) {
-        let result = resultList[index];
-        let data = await interfaceInst.get(result.interface_id);
+    // 4️⃣ 批量获取 interface 数据
+    const interfaceIds = resultList.map(c => c.interface_id);
+    const interfaceList = await interfaceInst.getByIds(interfaceIds);
+
+    // 5️⃣ 批量获取 project 数据
+    const projectIds = [...new Set(interfaceList.map(i => i.project_id))];
+    const projectList = await projectInst.getBaseInfoByIds(projectIds);
+
+    // 6️⃣ 建立 Map 便于快速查找
+    const interfaceMap = new Map();
+    interfaceList.forEach(i => interfaceMap.set(i._id.toString(), i));
+
+    const projectMap = new Map();
+    projectList.forEach(p => projectMap.set(p._id.toString(), p));
+
+    // 7️⃣ 遍历每个 case，组合接口和项目路径
+    const colData = await colInst.get(id);
+    for (let i = 0; i < resultList.length; i++) {
+        const result = resultList[i];
+        const data = interfaceMap.get(result.interface_id.toString());
         if (!data) {
             await caseInst.del(result._id);
             continue;
         }
-        let projectData = await projectInst.getBaseInfo(data.project_id);
+        const projectData = projectMap.get(data.project_id.toString());
+        if (!projectData) {
+            await caseInst.del(result._id);
+            continue;
+        }
+
         result.path = projectData.basepath + data.path;
         result.method = data.method;
         result.title = data.title;
         result.req_body_type = data.req_body_type;
-        result.req_headers = handleParamsValue(data.req_headers, result.req_headers);
         result.res_body_type = data.res_body_type;
+        result.req_headers = handleParamsValue(data.req_headers, result.req_headers);
         result.req_body_form = handleParamsValue(data.req_body_form, result.req_body_form);
         result.req_query = handleParamsValue(data.req_query, result.req_query);
         result.req_params = handleParamsValue(data.req_params, result.req_params);
-        resultList[index] = result;
+        resultList[i] = result;
     }
 
-    let ctxBody = yapi.commons.resReturn(resultList);
+    // 8️⃣ 返回结果
+    const ctxBody = yapi.commons.resReturn(resultList);
     ctxBody.colData = colData;
     return ctxBody;
 };
+
 
 function convertString(variable) {
     if (variable instanceof Error) {

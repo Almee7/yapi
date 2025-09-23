@@ -114,6 +114,14 @@ class interfaceModel extends baseModel {
       .exec();
   }
 
+  getByIds(ids, select) {
+    select = select || 'all';
+    let dbQuery = this.model.find({ _id: { $in: ids } });
+    if (select !== 'all') dbQuery = dbQuery.select(select);
+
+    return dbQuery.lean().exec();
+  }
+
   getBaseinfo(id) {
     return this.model
       .findOne({

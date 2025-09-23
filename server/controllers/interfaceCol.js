@@ -818,6 +818,7 @@ class interfaceColController extends baseController {
     try {
       let id = ctx.query.col_id;
       let colData = await this.colModel.get(id);
+      let colIds = await this.colModel.getParentId(id);
       if (!colData) {
         ctx.body = yapi.commons.resReturn(null, 400, '不存在的id');
       }
@@ -828,8 +829,8 @@ class interfaceColController extends baseController {
           return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));
         }
       }
-      let result = await this.colModel.del(id);
-      await this.caseModel.delByCol(id);
+      let result = await this.colModel.del(colIds);
+      await this.caseModel.delByCol(colIds);
       let username = this.getUsername();
       yapi.commons.saveLog({
         content: `<a href="/user/profile/${this.getUid()}">${username}</a> 删除了接口集 ${

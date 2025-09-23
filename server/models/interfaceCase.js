@@ -84,15 +84,24 @@ class interfaceCase extends baseModel {
     const query = Array.isArray(col_id)
         ? { col_id: { $in: col_id } }
         : { col_id: col_id };
-    if (select === 'all') {
-      return this.model
-          .find(query)
-          .exec();
+
+    let dbQuery = this.model.find(query).sort({ index: 1 }); // 按 index 升序排序
+
+    if (select !== 'all') {
+      dbQuery = dbQuery.select(select);
     }
-    return this.model
-        .find(query)
-        .select(select)
-        .exec();
+
+    return dbQuery.exec();
+  }
+
+  newList(col_id, select) {
+    select = select || 'casename uid col_id _id index interface_id project_id';
+    const query = Array.isArray(col_id) ? { col_id: { $in: col_id } } : { col_id: col_id };
+
+    let dbQuery = this.model.find(query).sort({ index: 1 }); // 按 index 升序排序
+    if (select !== 'all') dbQuery = dbQuery.select(select);
+
+    return dbQuery.lean().exec(); // ✅ 使用 lean() 返回普通对象
   }
 
 
@@ -114,9 +123,10 @@ class interfaceCase extends baseModel {
     });
   }
 
-  delByCol(id) {
-    return this.model.remove({
-      col_id: id
+  delByCol(colIds) {
+    const ids = Array.isArray(colIds) ? colIds : [colIds];
+    return this.model.deleteMany({
+      col_id: { $in: ids }
     });
   }
 
