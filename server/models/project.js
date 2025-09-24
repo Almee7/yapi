@@ -148,6 +148,7 @@ class projectModel extends baseModel {
       .select(select)
       .exec().then(this.handleEnvNullData);
   }
+
   getBaseInfoByIds(ids, select) {
     select =
         select ||

@@ -131,6 +131,17 @@ class interfaceModel extends baseModel {
       .exec();
   }
 
+  listByIds(ids) {
+    if (!Array.isArray(ids)) {
+      ids = [ids]; // 兼容单个 id
+    }
+    return this.model
+        .find({ _id: { $in: ids } })
+        .select('path method uid title project_id cat_id status')
+        .lean()
+        .exec();
+  }
+
   getVar(project_id, method) {
     return this.model
       .find({

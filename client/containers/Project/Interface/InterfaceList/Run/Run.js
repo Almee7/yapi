@@ -32,7 +32,10 @@ export default class Run extends Component {
     super(props);
   }
 
-  componentWillMount() {}
+  flag = 0
+  componentWillMount() {
+    console.log('-----', ++this.flag)
+  }
 
   componentWillReceiveProps() {}
 

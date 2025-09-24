@@ -27,41 +27,62 @@ class interfaceColController extends baseController {
    */
   async list(ctx) {
     try {
-      let id = ctx.query.project_id;
-      let project = await this.projectModel.getBaseInfo(id);
+      const projectId = ctx.query.project_id;
+
+      // 获取项目基本信息
+      const project = await this.projectModel.getBaseInfo(projectId);
+
+      // 权限校验
       if (project.project_type === 'private') {
-        if ((await this.checkAuth(project._id, 'project', 'view')) !== true) {
+        const hasAuth = await this.checkAuth(project._id, 'project', 'view');
+        if (!hasAuth) {
           return (ctx.body = yapi.commons.resReturn(null, 406, '没有权限'));
         }
       }
-      let result = await this.colModel.list(id);
-      // console.log("body",result);
-      result = result.sort((a, b) => {
-        return a.index - b.index;
-      });
 
-      for (let i = 0; i < result.length; i++) {
-        result[i] = result[i].toObject();
-        let caseList = await this.caseModel.list(result[i]._id);
+      // 获取该项目下的集合列表（普通对象 + 按 index 排序）
+      let colList = await this.colModel.newList(projectId);
+      if (!colList.length) return (ctx.body = yapi.commons.resReturn([]));
+      colList.sort((a, b) => (a.index || 0) - (b.index || 0));
 
-        for(let j=0; j< caseList.length; j++){
-          let item = caseList[j].toObject();
-          let interfaceData = await this.interfaceModel.getBaseinfo(item.interface_id);
-          item.path = interfaceData.path;
-          caseList[j] = item;
-        }
+      // 批量获取所有用例（普通对象）
+      const colIds = colList.map(col => col._id);
+      let allCases = await this.caseModel.newList(colIds); // 已是普通对象
+      allCases.sort((a, b) => (a.index || 0) - (b.index || 0));
 
-        caseList = caseList.sort((a, b) => {
-          return a.index - b.index;
-        });
-        result[i].caseList = caseList;
-        
+      // 批量获取接口信息（普通对象）
+      const interfaceIds = [...new Set(allCases.map(c => c.interface_id).filter(Boolean))];
+      let interfaces = [];
+      if (interfaceIds.length > 0) {
+        interfaces = await this.interfaceModel.listByIds(interfaceIds);
       }
-      ctx.body = yapi.commons.resReturn(result);
+      const interfaceMap = new Map(interfaces.map(itf => [itf._id.toString(), itf]));
+
+      // 按 col_id 分组并补充 path
+      const colCaseMap = new Map();
+      for (let c of allCases) {
+        const itf = interfaceMap.get(c.interface_id?.toString());
+        c.path = itf ? itf.path : '';
+
+        const colKey = c.col_id.toString();
+        if (!colCaseMap.has(colKey)) colCaseMap.set(colKey, []);
+        colCaseMap.get(colKey).push(c);
+      }
+
+      // 给每个集合挂载 caseList，并按 index 排序
+      for (let col of colList) {
+        const cases = colCaseMap.get(col._id.toString()) || [];
+        col.caseList = cases.sort((a, b) => (a.index || 0) - (b.index || 0));
+      }
+
+      ctx.body = yapi.commons.resReturn(colList);
     } catch (e) {
       ctx.body = yapi.commons.resReturn(null, 402, e.message);
     }
   }
+
+
+
 
   /**
    * 增加接口集

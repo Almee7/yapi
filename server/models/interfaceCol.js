@@ -104,6 +104,14 @@ class interfaceCol extends baseModel {
       .exec();
   }
 
+  newList(project_id) {
+    return this.model
+        .find({ project_id })
+        .select('name uid project_id desc add_time up_time index parent_id')
+        .lean() // 返回普通对象
+        .exec();
+  }
+
   del(ids) {
     // 如果传入单个 id，则包装成数组
     const idArr = Array.isArray(ids) ? ids : [ids];

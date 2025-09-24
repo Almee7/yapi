@@ -226,16 +226,6 @@ export default class Run extends Component {
       };
   };
 
-  getCacheKeys = (id) => {
-    const key = id || 'default';
-    return {
-      cacheKey: `req_body_cache_${key}`,
-      headerCacheKey: `res_header_cache_${key}`,
-      bodyCacheKey: `res_body_cache_${key}`,
-      preRequestKey: `pre_request_script_${key}`
-    };
-  };
-
   async initState(data) {
     if (!this.checkInterfaceData(data)) {
       return null;
@@ -294,13 +284,13 @@ export default class Run extends Component {
         ...this.state,
         ...data,
         ...example,
-        req_body_other: cached || body,
         resStatusCode: null,
         test_valid_msg: null,
         resStatusText: null,
+        req_body_other: cached || body,
+        pre_request_script: cachedPreScript || '',
         test_res_header: cachedHeader ? JSON.parse(cachedHeader) : null,
-        test_res_body: cachedResBody || null,
-        pre_request_script: cachedPreScript || ''
+        test_res_body: cachedResBody || null
       },
       () => this.props.type === 'inter' && this.initEnvState(data.case_env, data.env)
     );
@@ -326,6 +316,7 @@ export default class Run extends Component {
   }
 
   componentWillMount() {
+    console.log('componentWillMount');
     const {cacheKey} = this.getCacheKeys(this.props.data._id);
     const cachedBody  = localStorage.getItem(cacheKey);
     // 如果有缓存，则赋值到 state
@@ -336,6 +327,7 @@ export default class Run extends Component {
     }
   }
   componentDidMount() {
+    console.log('componentDidMount');
     this._crossRequestInterval = initCrossRequest(hasPlugin => {
       this.setState({
         hasPlugin: hasPlugin
@@ -344,28 +336,33 @@ export default class Run extends Component {
     this.initState(this.props.data);
   }
   componentWillUnmount() {
+    console.log('componentWillUnmount');
     clearInterval(this._crossRequestInterval);
     // 保存参数到 localStorage
     const { cacheKey, headerCacheKey, bodyCacheKey ,preRequestKey} = this.getCacheKeys(this.props.data._id);
+
     localStorage.setItem(headerCacheKey, JSON.stringify(this.state.test_res_header || {}));
     localStorage.setItem(bodyCacheKey, this.state.test_res_body || '');
     localStorage.setItem(cacheKey, this.state.req_body_other || '');
     localStorage.setItem(preRequestKey, this.state.pre_request_script || '');
   }
 
-  componentWillReceiveProps(nextProps) {
+  async componentWillReceiveProps(nextProps) {
+    console.log('componentWillReceiveProps');
     if (this.checkInterfaceData(nextProps.data) && this.checkInterfaceData(this.props.data)) {
+      console.log("nextProps", nextProps)
+      console.log("this.props.data", this.props.data)
       if (nextProps.data._id !== this.props.data._id) {
         // 切换接口前先保存当前缓存
-        const { cacheKey: oldCacheKey, preRequestKey: oldPreKey } = this.getCacheKeys(
+        const {cacheKey: oldCacheKey, preRequestKey: oldPreKey} = this.getCacheKeys(
             this.props.data._id
         );
         localStorage.setItem(oldCacheKey, this.state.req_body_other || '');
         localStorage.setItem(oldPreKey, this.state.pre_request_script || '');
         // 加载新接口缓存或默认值
-        this.initState(nextProps.data);
-      } else if (nextProps.data.interface_up_time !== this.props.data.interface_up_time) {
-        this.initState(nextProps.data);
+        await this.initState(nextProps.data);
+      } else if (nextProps.data.up_time !== this.props.data.up_time) {
+        await this.initState(nextProps.data);
       }
       if (nextProps.data.env !== this.props.data.env) {
         this.initEnvState(this.state.case_env, nextProps.data.env);
