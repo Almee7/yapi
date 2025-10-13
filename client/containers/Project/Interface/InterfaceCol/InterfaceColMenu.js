@@ -401,6 +401,8 @@ export default class InterfaceColMenu extends Component {
     const { interfaceColList } = this.props;
     const dragKey = e.dragNode.props.eventKey;
     const dropKey = e.node.props.eventKey;
+    console.log('dragKey', dragKey);
+    console.log('dropKey', dropKey);
 
     // 集合拖拽
     if (dragKey.startsWith('col_')) {
@@ -408,6 +410,8 @@ export default class InterfaceColMenu extends Component {
       const dropColId = dropKey.split('_')[1];
       const dropPosArr = e.node.props.pos.split('-');
       const dropPosition = e.dropPosition - Number(dropPosArr[dropPosArr.length - 1]);
+      console.log('dropPosArr', dropPosArr);
+      console.log('dropPosition',dropPosition)
 
       let parentId = 0;
 

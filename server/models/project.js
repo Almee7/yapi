@@ -149,6 +149,15 @@ class projectModel extends baseModel {
       .exec().then(this.handleEnvNullData);
   }
 
+  getBaseInfoByIds(ids, select) {
+    select =
+        select ||
+        '_id uid name basepath switch_notice desc group_id project_type env icon color add_time up_time pre_script after_script project_mock_script is_mock_open strice is_json5 tag';
+
+    let dbQuery = this.model.find({ _id: { $in: ids } }).select(select);
+    return dbQuery.lean().exec();
+  }
+
   getByDomain(domain) {
     return this.model
       .find({

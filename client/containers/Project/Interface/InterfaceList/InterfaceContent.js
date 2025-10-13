@@ -65,10 +65,11 @@ class Content extends Component {
     const search = new URLSearchParams(nextProps.location.search);
     const tab = search.get('tab'); // 从 ?tab=edit 提取值
     await this.props.fetchInterfaceData(params.actionId)
-
-    this.setState({
-      curtab: tab || 'view' // 有 tab 就用它，否则默认 'view'
-    });
+    if(tab) {
+      this.setState({
+        curtab: tab // 有 tab 就用它，否则默认 'view'
+      });
+    }
   }
 
   switchToView = () => {

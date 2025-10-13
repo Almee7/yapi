@@ -73,38 +73,27 @@ class interfaceCol extends baseModel {
   }
 
   async getParentId(col_id) {
-    // 查询整个表
     const allData = await this.model.find({}).lean().exec();
 
-    // 构建 parent_id -> 子节点 Map
     const map = new Map();
     for (const item of allData) {
-      const pid = item.parent_id?.toString() || null;
+      const pid = item.parent_id != null ? Number(item.parent_id) : null;
       if (!map.has(pid)) map.set(pid, []);
       map.get(pid).push(item);
     }
 
-    // 非递归获取所有子级 col_id（不包含自己）
-    const stack = [...(map.get(col_id?.toString()) || [])]; // 初始栈放直接子节点
     const resultIds = [];
 
-    while (stack.length > 0) {
-      const node = stack.pop();
-      resultIds.push(node._id); // 只保存 col_id
-
-      const children = map.get(node._id?.toString()) || [];
-      for (const child of children) {
-        stack.push(child);
-      }
+    function traverse(id) {
+      resultIds.push(Number(id)); // 父
+      const children = map.get(Number(id)) || [];
+      for (const child of children) traverse(child._id); // 按顺序遍历子节点
     }
 
-    // 如果找不到子级，返回原来的 col_id
-    if (resultIds.length === 0) {
-      return [col_id];
-    }
-
-    return resultIds; // 返回 col_id 数组
+    traverse(col_id);
+    return resultIds;
   }
+
 
   list(project_id) {
     return this.model
@@ -115,9 +104,19 @@ class interfaceCol extends baseModel {
       .exec();
   }
 
-  del(id) {
-    return this.model.remove({
-      _id: id
+  newList(project_id) {
+    return this.model
+        .find({ project_id })
+        .select('name uid project_id desc add_time up_time index parent_id')
+        .lean() // 返回普通对象
+        .exec();
+  }
+
+  del(ids) {
+    // 如果传入单个 id，则包装成数组
+    const idArr = Array.isArray(ids) ? ids : [ids];
+    return this.model.deleteMany({
+      _id: { $in: idArr }
     });
   }
 
