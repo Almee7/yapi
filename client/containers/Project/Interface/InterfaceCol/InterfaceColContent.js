@@ -554,25 +554,28 @@ class InterfaceColContent extends Component {
   //response, validRes
   // 断言测试
   handleScriptTest = async (interfaceData, response, validRes, requestParams, scriptVars) => {
-    // ✅ 判断是否启用测试脚本
+
     let env = interfaceData.case_env
     const getGlobalMap = (envs, envName) => {
       const target = envs.find(e => e.name === envName);
       if (!target || !target.global) return {};
       return Object.fromEntries(target.global.map(({ name, value }) => [name, value]));
     };
-
-    // 使用示例
     const globalArr = getGlobalMap(interfaceData.env, env);
-    if (!interfaceData.enable_script) {
-      validRes.push({ message: 2 });
-      return
-    }
+    const scripts = {
+      enable: interfaceData.enable_script,
+      content: interfaceData.test_script
+    };
+    // ✅ 判断是否启用测试脚本
+    // if (!interfaceData.enable_script) {
+    //   validRes.push({ message: 2 });
+    //   return
+    // }
     try {
       let test = await axios.post('/api/col/run_script', {
         response: response,
         records: this.records,
-        script: interfaceData.test_script,
+        scripts: scripts,
         params: requestParams,
         col_id: this.props.currColId,
         interface_id: interfaceData.interface_id,
@@ -857,7 +860,6 @@ class InterfaceColContent extends Component {
         item._id === id ? {...item, enable_async: checked} : item
     );
     this.setState({rows: newRows});
-    console.log("查看开关的参数", id, checked);
     const params = {
       id: id,
       enable_async: checked
@@ -1112,7 +1114,6 @@ class InterfaceColContent extends Component {
                 <Switch
                       checked={rowData.enable_async}
                       onChange={(checked) => {
-                        console.log('切换开关', rowData._id, '为', checked);
                         // 在此处调用修改方法，例如传入 rowData._id 与新值 checked
                         this.handleToggleEnableScript(rowData._id, checked);
                       }}
@@ -1256,18 +1257,22 @@ class InterfaceColContent extends Component {
                 </Tooltip></label>
               </Col>
               <Col className="col-item" span="14">
-                <div><Switch onChange={e=>{
-                    let {commonSetting} = this.state;
-                    this.setState({
-                      commonSetting :{
-                        ...commonSetting,
-                        checkScript: {
-                          ...this.state.checkScript,
-                          enable: e
+                <div><Switch
+                    onChange={e => {
+                      this.setState(prevState => ({
+                        commonSetting: {
+                          ...prevState.commonSetting,
+                          checkScript: {
+                            ...prevState.commonSetting.checkScript, // ✅ 保留原有内容
+                            enable: e
+                          }
                         }
-                      }
-                    })
-                  }} checked={this.state.commonSetting.checkScript.enable}  checkedChildren="开" unCheckedChildren="关"  /></div>
+                      }))
+                    }}
+                    checked={this.state.commonSetting.checkScript.enable}
+                    checkedChildren="开"
+                    unCheckedChildren="关"
+                /></div>
 
                 <AceEditor
                       onChange={this.onChangeTest}

@@ -32,11 +32,6 @@ export default class Run extends Component {
     super(props);
   }
 
-  flag = 0
-  componentWillMount() {
-    console.log('-----', ++this.flag)
-  }
-
   componentWillReceiveProps() {}
 
   savePostmanRef = postman => {

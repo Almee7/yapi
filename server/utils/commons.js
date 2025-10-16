@@ -735,26 +735,24 @@ exports.runCaseScript = async function runCaseScript(params, colId, interfaceId)
                 let schema = JSON.parse(interfaceData.res_body);
                 let result = schemaValidator(schema, context.body)
                 if (!result.valid) {
-                    throw (`返回Json 不符合 response 定义的数据结构,原因: ${result.message}
-数据结构如下：
-${JSON.stringify(schema, null, 2)}`)
+                    throw (`返回Json 不符合 response 定义的数据结构,原因: ${result.message}数据结构如下：${JSON.stringify(schema, null, 2)}`)
                 }
             }
         }
-
         if (colData.checkScript.enable) {
             let globalScript = colData.checkScript.content;
             // script 是断言
             if (globalScript) {
-                logs.push('执行脚本：' + globalScript)
+                logs.push('执行全局断言脚本：' + globalScript)
                 result = await yapi.commons.sandbox(context, globalScript);
                 result.vars = context.vars;
             }
         }
 
-        let script = params.script;
+        let script = params.scriptArr;
         // script 是断言
-        if (script) {
+        if (params.scripts.enable) {
+            script = params.scripts.content;
             logs.push('执行脚本:' + script)
             result = await yapi.commons.sandbox(context, script);
             result.vars = context.vars;
