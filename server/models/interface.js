@@ -380,6 +380,30 @@ class interfaceModel extends baseModel {
       .sort({ index: 1 })
       .exec();
   }
+  listByCatid1(catid, select) {
+    select = select || '_id title uid path method project_id catid edit_uid status add_time up_time index tag interface_key';
+
+    // 构造投影字段
+    const projectFields = select.split(' ').reduce((acc, key) => {
+      acc[key] = 1;
+      return acc;
+    }, {});
+
+    return this.model.aggregate([
+      { $match: { catid: catid } },
+      { $sort: { up_time: -1 } }, // 保留最新的在前
+      {
+        $group: {
+          _id: '$interface_key', // 按 interface_key 去重
+          doc: { $first: '$$ROOT' } // 取每组第一个（即最新）
+        }
+      },
+      { $replaceRoot: { newRoot: '$doc' } },
+      { $project: projectFields },
+      { $sort: { index: 1 } } // 保持原来的 index 排序
+    ]).exec();
+  }
+
 
   // Model.js
   listLatestByCatIds(catIds, select) {

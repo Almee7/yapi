@@ -476,6 +476,7 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
     const urlObj = URL.parse(joinPath(currDomain.domain, path), true);
     const url = URL.format({
       protocol: urlObj.protocol || 'http',
+      slashes: urlObj.slashes,
       host: urlObj.host,
       pathname: urlObj.pathname,
       query: Object.assign(urlObj.query, paramsToObjectWithEnable(interfaceRunData.req_query))

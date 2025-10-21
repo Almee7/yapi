@@ -401,8 +401,6 @@ export default class InterfaceColMenu extends Component {
     const { interfaceColList } = this.props;
     const dragKey = e.dragNode.props.eventKey;
     const dropKey = e.node.props.eventKey;
-    console.log('dragKey', dragKey);
-    console.log('dropKey', dropKey);
 
     // 集合拖拽
     if (dragKey.startsWith('col_')) {
@@ -410,8 +408,6 @@ export default class InterfaceColMenu extends Component {
       const dropColId = dropKey.split('_')[1];
       const dropPosArr = e.node.props.pos.split('-');
       const dropPosition = e.dropPosition - Number(dropPosArr[dropPosArr.length - 1]);
-      console.log('dropPosArr', dropPosArr);
-      console.log('dropPosition',dropPosition)
 
       let parentId = 0;
 
@@ -425,7 +421,6 @@ export default class InterfaceColMenu extends Component {
 
       // 获取同级集合列表
       const sameLevelCols = interfaceColList.filter(col => col.parent_id === parentId);
-      console.log("sameLevelCols",sameLevelCols);
       const dragIndex = sameLevelCols.findIndex(c => c._id === dragColId);
       const dropIndex = dropPosition === 0 ? sameLevelCols.length : sameLevelCols.findIndex(c => c._id === dropColId);
 

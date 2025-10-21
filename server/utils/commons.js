@@ -22,7 +22,7 @@ const ExtraAssert = require('../../common/extraAssert.js');
 const assert = require("assert");
 const WsTestController = require("../controllers/wsTest");
 const vm = require('vm');
-const {validate} = require("compare-versions");
+// const {validate} = require("compare-versions");
 jsf.extend('mock', function () {
     return {
         mock: function (xx) {
@@ -392,9 +392,7 @@ exports.sandbox = async (sandbox, script) => {
         sandbox.sql = sandbox.sql || [];
         sandbox.console = console;
         sandbox.assert = assert;
-        console.log("变量值=======",sandbox.vars)
         script = replaceVarsInScript(script, sandbox.vars, sandbox.global)
-        console.log("替换后的脚本===========",script)
         const context = vm.createContext(sandbox);
 
         // 检查是否有 readWS 调用
@@ -591,6 +589,8 @@ exports.createAction = (router, baseurl, routerController, action, path, method,
  */
 function handleParamsValue(params, val) {
     let value = {};
+    // 深拷贝 params，避免修改原始params
+    params = JSON.parse(JSON.stringify(params))
     try {
         params = params.toObject();
     } catch (e) { }
@@ -607,7 +607,7 @@ function handleParamsValue(params, val) {
             params[index].enable = value[item.name].enable;
         }
     });
-    return params;
+    return params
 }
 
 exports.handleParamsValue = handleParamsValue;
@@ -664,13 +664,11 @@ exports.getCaseList = async function getCaseList(id) {
         result.title = data.title;
         result.req_body_type = data.req_body_type;
         result.res_body_type = data.res_body_type;
-        result.req_headers = handleParamsValue(data.req_headers, result.req_headers);
-        result.req_body_form = handleParamsValue(data.req_body_form, result.req_body_form);
-        result.req_query = handleParamsValue(data.req_query, result.req_query);
-        result.req_params = handleParamsValue(data.req_params, result.req_params);
-        resultList[i] = result;
+        result.req_headers = handleParamsValue(data.req_headers, result.req_headers)
+        result.req_body_form = handleParamsValue(data.req_body_form, result.req_body_form)
+        result.req_query = handleParamsValue(data.req_query, result.req_query)
+        result.req_params = handleParamsValue(data.req_params, result.req_params)
     }
-
     // 8️⃣ 返回结果
     const ctxBody = yapi.commons.resReturn(resultList);
     ctxBody.colData = colData;
@@ -735,26 +733,24 @@ exports.runCaseScript = async function runCaseScript(params, colId, interfaceId)
                 let schema = JSON.parse(interfaceData.res_body);
                 let result = schemaValidator(schema, context.body)
                 if (!result.valid) {
-                    throw (`返回Json 不符合 response 定义的数据结构,原因: ${result.message}
-数据结构如下：
-${JSON.stringify(schema, null, 2)}`)
+                    throw (`返回Json 不符合 response 定义的数据结构,原因: ${result.message}数据结构如下：${JSON.stringify(schema, null, 2)}`)
                 }
             }
         }
-
         if (colData.checkScript.enable) {
             let globalScript = colData.checkScript.content;
             // script 是断言
             if (globalScript) {
-                logs.push('执行脚本：' + globalScript)
+                logs.push('执行全局断言脚本：' + globalScript)
                 result = await yapi.commons.sandbox(context, globalScript);
                 result.vars = context.vars;
             }
         }
 
-        let script = params.script;
+        let script = params.scriptArr;
         // script 是断言
-        if (script) {
+        if (params.scripts.enable) {
+            script = params.scripts.content;
             logs.push('执行脚本:' + script)
             result = await yapi.commons.sandbox(context, script);
             result.vars = context.vars;

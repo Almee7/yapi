@@ -1,5 +1,7 @@
 import React, { PureComponent as Component } from 'react';
 import PropTypes from 'prop-types';
+import cacheDB from '../../cacheDB.js';
+
 // import MonacoEditor from 'react-monaco-editor';
 import {
   Button,
@@ -216,25 +218,13 @@ export default class Run extends Component {
       req_headers: headers
     });
   };
-  getCacheKeys = (id) => {
-      const key = id || 'default';
-      return {
-          cacheKey: `req_body_cache_${key}`,
-          headerCacheKey: `res_header_cache_${key}`,
-          bodyCacheKey: `res_body_cache_${key}`,
-          preRequestKey: `pre_request_script_${key}`
-      };
-  };
 
   async initState(data) {
     if (!this.checkInterfaceData(data)) {
       return null;
     }
-    const { cacheKey, headerCacheKey, bodyCacheKey,preRequestKey} = this.getCacheKeys(data._id);
-    const cached = localStorage.getItem(cacheKey);
-    const cachedHeader = localStorage.getItem(headerCacheKey);
-    const cachedResBody = localStorage.getItem(bodyCacheKey);
-    const cachedPreScript = localStorage.getItem(preRequestKey);
+    //获取缓存数据
+    const cachedData = await cacheDB.getCache(data._id);
 
     const { req_body_other, req_body_type, req_body_is_json_schema } = data;
     let body = req_body_other;
@@ -284,13 +274,13 @@ export default class Run extends Component {
         ...this.state,
         ...data,
         ...example,
+        req_body_other: cachedData.ReqBodyCache || body,
+        pre_request_script: cachedData.PreScriptCache || data.pre_request_script,
         resStatusCode: null,
         test_valid_msg: null,
         resStatusText: null,
-        req_body_other: cached || body,
-        pre_request_script: cachedPreScript || '',
-        test_res_header: cachedHeader ? JSON.parse(cachedHeader) : null,
-        test_res_body: cachedResBody || null
+        test_res_header: cachedData.HeaderCache || null,
+        test_res_body: cachedData.ResBodyCache || null
       },
       () => this.props.type === 'inter' && this.initEnvState(data.case_env, data.env)
     );
@@ -315,19 +305,19 @@ export default class Run extends Component {
     );
   }
 
-  componentWillMount() {
-    console.log('componentWillMount');
-    const {cacheKey} = this.getCacheKeys(this.props.data._id);
-    const cachedBody  = localStorage.getItem(cacheKey);
+  async componentWillMount() {
+    const cachedData = await cacheDB.getCache(this.props.data._id);
     // 如果有缓存，则赋值到 state
-    if (cachedBody) {
+    if (cachedData) {
       this.setState({
-        req_body_other: cachedBody
+        req_body_other: cachedData.ReqBodyCache || '',
+        test_res_header: cachedData.HeaderCache || '',
+        test_res_body: cachedData.ResBodyCache || '',
+        pre_request_script: cachedData.PreScriptCache || ''
       });
     }
   }
   componentDidMount() {
-    console.log('componentDidMount');
     this._crossRequestInterval = initCrossRequest(hasPlugin => {
       this.setState({
         hasPlugin: hasPlugin
@@ -335,34 +325,39 @@ export default class Run extends Component {
     });
     this.initState(this.props.data);
   }
-  componentWillUnmount() {
-    console.log('componentWillUnmount');
+  async componentWillUnmount() {
+    // 停掉定时器
     clearInterval(this._crossRequestInterval);
-    // 保存参数到 localStorage
-    const { cacheKey, headerCacheKey, bodyCacheKey ,preRequestKey} = this.getCacheKeys(this.props.data._id);
-
-    localStorage.setItem(headerCacheKey, JSON.stringify(this.state.test_res_header || {}));
-    localStorage.setItem(bodyCacheKey, this.state.test_res_body || '');
-    localStorage.setItem(cacheKey, this.state.req_body_other || '');
-    localStorage.setItem(preRequestKey, this.state.pre_request_script || '');
+    // 统一存储到一个缓存对象里
+    const cacheData = {
+      HeaderCache: this.state.test_res_header || {},
+      ResBodyCache: this.state.test_res_body || '',
+      ReqBodyCache: this.state.req_body_other || '',
+      PreScriptCache: this.state.pre_request_script || '',
+      createdAt: Date.now()
+    };
+    await cacheDB.setCache(this.props.data._id, cacheData);
   }
 
+
   async componentWillReceiveProps(nextProps) {
-    console.log('componentWillReceiveProps');
     if (this.checkInterfaceData(nextProps.data) && this.checkInterfaceData(this.props.data)) {
-      console.log("nextProps", nextProps)
-      console.log("this.props.data", this.props.data)
       if (nextProps.data._id !== this.props.data._id) {
         // 切换接口前先保存当前缓存
-        const {cacheKey: oldCacheKey, preRequestKey: oldPreKey} = this.getCacheKeys(
-            this.props.data._id
-        );
-        localStorage.setItem(oldCacheKey, this.state.req_body_other || '');
-        localStorage.setItem(oldPreKey, this.state.pre_request_script || '');
-        // 加载新接口缓存或默认值
-        await this.initState(nextProps.data);
-      } else if (nextProps.data.up_time !== this.props.data.up_time) {
-        await this.initState(nextProps.data);
+        try {
+          const _prop_id = this.props.data._id
+          await Promise.all([
+              cacheDB.setCache(_prop_id,'ReqBodyCache', this.state.req_body_other || '' ),
+              cacheDB.setCache(_prop_id,'PreScriptCache', this.state.pre_request_script || '' )
+          ])
+          // 加载新接口缓存或默认值
+          this.initState(nextProps.data);
+        } catch (error) {
+          console.error("componentDidUpdate 异常：", error);
+        }
+
+      } else if (nextProps.data.interface_up_time !== this.props.data.interface_up_time) {
+        this.initState(nextProps.data);
       }
       if (nextProps.data.env !== this.props.data.env) {
         this.initEnvState(this.state.case_env, nextProps.data.env);
@@ -513,15 +508,14 @@ export default class Run extends Component {
       this.setState({ test_valid_msg: '' });
     }
     // ✅ 定义缓存 key
-    const { headerCacheKey, bodyCacheKey } = this.getCacheKeys(this.props.data._id);
     this.setState({
       resStatusCode: result.status,
       resStatusText: result.statusText,
       test_res_header: result.header,
       test_res_body: result.body
-    },() => {
-      localStorage.setItem(headerCacheKey, JSON.stringify(this.state.test_res_header || {}));
-      localStorage.setItem(bodyCacheKey, this.state.test_res_body || '');
+    },async () => {
+      await cacheDB.setCache(this.props.data._id,'HeaderCache', this.state.test_res_header || '');
+      await cacheDB.setCache(this.props.data._id,'ResBodyCache',this.state.test_res_body || '' );
     })
   };
 
@@ -553,21 +547,49 @@ export default class Run extends Component {
     });
   };
 
-  changeBody = (v, index, key) => {
+  changeBody = async (v, index, key) => {
     const bodyForm = deepCopyJson(this.state.req_body_form);
     key = key || 'value';
+
     if (key === 'value') {
       bodyForm[index].enable = !!v;
+
       if (bodyForm[index].type === 'file') {
-        bodyForm[index].value = 'file_' + index;
+        const fileInput = document.getElementById('file_' + index);
+        const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+        if (!file) {
+          bodyForm[index].value = null;
+        } else {
+          // base64 转换
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              const parts = (reader.result || '').split(',');
+              resolve(parts.length > 1 ? parts[1] : parts[0]);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
+          bodyForm[index].value = {
+            __isFile: true,
+            name: file.name,
+            mimeType: file.type || 'application/octet-stream',
+            base64,
+            size: file.size
+          };
+        }
       } else {
         bodyForm[index].value = v;
       }
     } else if (key === 'enable') {
       bodyForm[index].enable = v;
     }
+
     this.setState({ req_body_form: bodyForm });
   };
+
 
   // 模态框的相关操作
   showModal = (val, index, type) => {
@@ -684,11 +706,7 @@ export default class Run extends Component {
   handlePreRequestScript = code => {
     // code 是 AceEditor 传来的纯字符串
     this.setState({ pre_request_script: code.text});
-    // 如果要本地持久化
-    localStorage.setItem('pre_request_script', code);
   };
-
-
 
   render() {
     const {
@@ -978,6 +996,12 @@ export default class Run extends Component {
                     {'  '}
                     <Icon type="question-circle-o" />
                   </Tooltip>
+                  {/*<Button*/}
+                  {/*    disabled={!hasPlugin}*/}
+                  {/*    onClick={this.faethData}*/}
+                  {/*    type="primary"*/}
+                  {/*    style={{ marginLeft: 10 }}*/}
+                  {/*>恢复请求数据</Button>*/}
                 </div>
               )}
 
@@ -990,6 +1014,7 @@ export default class Run extends Component {
                 fullScreen={true}
               />
             </div>
+
 
             {HTTP_METHOD[method].request_body &&
               req_body_type === 'form' && (
@@ -1020,14 +1045,13 @@ export default class Run extends Component {
                         )}
                         <span className="eq-symbol">=</span>
                         {item.type === 'file' ? (
-                          '因Chrome最新版安全策略限制，不再支持文件上传'
-                          // <Input
-                          //   type="file"
-                          //   id={'file_' + index}
-                          //   onChange={e => this.changeBody(e.target.value, index, 'value')}
-                          //   multiple
-                          //   className="value"
-                          // />
+                          <Input
+                            type="file"
+                            id={'file_' + index}
+                            onChange={e => this.changeBody(e.target.value, index, 'value')}
+                            multiple
+                            className="value"
+                          />
                         ) : (
                           <Input
                             value={item.value}

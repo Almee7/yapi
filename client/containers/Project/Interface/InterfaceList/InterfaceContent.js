@@ -8,6 +8,8 @@ import { Prompt } from 'react-router';
 import { fetchInterfaceData } from '../../../../reducer/modules/interface.js';
 import { withRouter } from 'react-router-dom';
 import Run from './Run/Run.js';
+// import axios from "axios";
+// import cacheDB from "../../../../cacheDB";
 const plugin = require('client/plugin.js');
 
 const TabPane = Tabs.TabPane;
@@ -56,6 +58,7 @@ class Content extends Component {
     const params = nextProps.match.params;
     if (params.actionId !== this.actionId) {
       this.actionId = params.actionId;
+      // params.actionId = this.actionId
       this.handleRequest(nextProps);
     }
   }
@@ -153,7 +156,11 @@ class Content extends Component {
           switchToView={this.switchToView}
           onVersionChange={(project_id, interfaceId) => {
             this.props.history.push(`/project/${project_id}/interface/api/${interfaceId}?tab=edit`)
-      }} />;
+      }
+          //   onVersionChange={() => {
+          //   this.props.history.push(`${window.location.pathname}?tab=edit`)
+          // }
+      } />;
     }
 
     return (

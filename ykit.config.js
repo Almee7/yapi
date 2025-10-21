@@ -9,7 +9,7 @@ var assetsPluginInstance = new AssetsPlugin({
   }
 });
 var fs = require('fs');
-var package = require('./package.json');
+var pkg = require('./package.json');
 var yapi = require('./server/yapi');
 var isWin = require('os').platform() === 'win32'
 
@@ -126,7 +126,7 @@ module.exports = {
         baseConfig.plugins.push(
           new this.webpack.DefinePlugin({
             'process.env.NODE_ENV': JSON.stringify(ENV_PARAMS),
-            'process.env.version': JSON.stringify(package.version),
+            'process.env.version': JSON.stringify(pkg.version),
             'process.env.versionNotify': yapi.WEBCONFIG.versionNotify
           })
         );
