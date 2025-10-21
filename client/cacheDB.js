@@ -51,7 +51,6 @@ function promisifyRequest(req) {
  * ✅ 设置缓存
  */
 async function setCache(id, keyOrData, value) {
-    console.log("setCachesetCachesetCache",id, keyOrData, value)
     if (!id) throw new Error('Cache item must have an id');
 
     const db = await openDB();
@@ -153,23 +152,11 @@ async function clearExpiredCache(maxAge = DEFAULT_MAX_AGE) {
     return true;
 }
 
-/**
- * ✅ 获取所有缓存（调试用）
- */
-async function getAllCache() {
-    const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const result = await promisifyRequest(store.getAll());
-    logDebug('GET_ALL', 'ALL_KEYS', result);
-    return result;
-}
 
 // CommonJS 导出
 module.exports = {
     setCache,
     getCache,
     deleteCache,
-    clearExpiredCache,
-    getAllCache
+    clearExpiredCache
 };

@@ -275,7 +275,7 @@ export default class Run extends Component {
         ...data,
         ...example,
         req_body_other: cachedData.ReqBodyCache || body,
-        pre_request_script: cachedData.PreScriptCache || '',
+        pre_request_script: cachedData.PreScriptCache || data.pre_request_script,
         resStatusCode: null,
         test_valid_msg: null,
         resStatusText: null,

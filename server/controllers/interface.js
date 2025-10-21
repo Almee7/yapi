@@ -650,9 +650,11 @@ class interfaceController extends baseController {
         newResult = [];
       for (let i = 0, item, list; i < result.length; i++) {
         item = result[i].toObject();
-        list = await this.Model.listByCatid(item._id);
+        list = await this.Model.listByCatid1(item._id);
         for (let j = 0; j < list.length; j++) {
-          list[j] = list[j].toObject();
+          if (typeof list[j].toObject === 'function'){
+            list[j] = list[j].toObject();
+          }
         }
 
         item.list = list;

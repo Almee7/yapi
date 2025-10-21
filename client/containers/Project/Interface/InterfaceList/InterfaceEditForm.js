@@ -13,6 +13,7 @@ import AceEditor from 'client/components/AceEditor/AceEditor';
 import axios from 'axios';
 import { MOCK_SOURCE } from '../../../../constants/variable.js';
 import Editor from 'common/tui-editor/dist/tui-editor-Editor-all.min.js';
+// import cacheDB from '../../../../cacheDB.js';
 const jSchema = require('json-schema-editor-visual');
 const ResBodySchema = jSchema({ lang: 'zh_CN', mock: MOCK_SOURCE });
 const ReqBodySchema = jSchema({ lang: 'zh_CN', mock: MOCK_SOURCE });
@@ -69,6 +70,7 @@ import {
   AutoComplete,
   Switch
 } from 'antd';
+import cacheDB from "../../../../cacheDB";
 
 const Json5Example = `
   {
@@ -371,67 +373,84 @@ class InterfaceEditForm extends Component {
       this._changeRadioGroup(radio[0], radio[1]);
     });
   };
-  /** --- 多接口独立存储方法 --- **/
-  getLastSelection = (interfaceKey) => ({
-    interfaceId: localStorage.getItem(`${interfaceKey}_lastInterfaceId`),
-    version: parseInt(localStorage.getItem(`${interfaceKey}_lastVersion`), 10) || 0
-  });
-  // onlyLoadList = true 表示只加载列表，不触发默认选中
-  getVersionList = async (onlyLoadList = false) => {
-    if (this.state['versions'].length) {
-      return;
+  /** --- 获取上次选择 --- **/
+  getLastSelection = async (interfaceKey) => {
+    if (!interfaceKey) return { lastInterfaceId: null, lastVersion: 0 };
+
+    try {
+      const cache = await cacheDB.getCache(interfaceKey, 'lastInterfaceId', 'lastVersion');
+      return {
+        lastInterfaceId: cache.lastInterfaceId ? parseInt(cache.lastInterfaceId, 10) : null,
+        lastVersion: cache.lastVersion ? parseInt(cache.lastVersion, 10) : 0
+      };
+    } catch (err) {
+      console.error('getLastSelection error:', err);
+      return { lastInterfaceId: null, lastVersion: 0 };
     }
+  };
+  // onlyLoadList = true 表示只加载列表，不触发默认选中
+  /** --- 获取版本列表 --- **/
+  getVersionList = async (onlyLoadList = false) => {
+    if (this.state.versions.length) return;
     const res = await axios.post('/api/interface/getVersionList', {
-      interface_key: this.state['interface_key']
+      interface_key: this.state.interface_key
     });
+
     const data = JSON.parse(JSON.stringify(res.data.data || []));
     this.setState({ versions: data });
-    if (onlyLoadList) return; // 仅加载，不修改状态或缓存
+
+    if (onlyLoadList) return;
 
     if (data.length) {
-      // 取本地记录的上次选择
-      const lastSelection = this.getLastSelection(this.state['interface_key']);
+      const interfaceKey = this.state.interface_key;
+      const { lastInterfaceId } = await this.getLastSelection(interfaceKey);
 
-      // 优先选本地记录，否则选最新（数组第 0 个）
-      let selected = data.find(v => v._id === lastSelection.interfaceId) || data[0];
-      // 统一将 version 转整数
+      // 优先选缓存，否则选最新
+      let selected = data.find(v => v._id === lastInterfaceId) || data[0];
       const version = parseInt(selected.version, 10);
+
+      if (!this._isMounted) return;
+
       this.setState({
         versions: data,
         interfaceId: selected._id,
         version
-      }, () => {
-        // 更新缓存
-        const interfaceKey = this.state.interface_key;
-        localStorage.setItem(`${interfaceKey}_lastInterfaceId`, selected._id);
-        localStorage.setItem(`${interfaceKey}_lastVersion`, version);
+      }, async () => {
+        // ✅ 缓存到 IndexedDB（类型安全）
+        await cacheDB.setCache(interfaceKey, {
+          lastInterfaceId: String(selected._id),
+          lastVersion: version
+        });
 
-        // 通知父组件
+        // ✅ 通知父组件刷新
         this.props.onVersionChange(this.state.project_id, selected._id);
       });
     }
   };
 
-
-
+  /** --- 切换版本 --- **/
   onChangeVersion = async ({ version, interfaceId }) => {
-    const interfaceKey = this.state.interface_key; // 当前页面接口唯一 key
-    // 统一类型为整数
     version = parseInt(version, 10);
-    // 判断是否需要更新
+
     if (version === this.state.version) return;
 
-    this.setState({ version, interfaceId }, () => {
-      // ✅ 状态更新后再执行
-      localStorage.setItem(`${interfaceKey}_lastInterfaceId`, interfaceId);
-      localStorage.setItem(`${interfaceKey}_lastVersion`, version);
+    const interfaceKey = this.state.interface_key;
+
+    this.setState({ version, interfaceId }, async () => {
+      // ✅ 缓存到 IndexedDB（类型安全）
+      await cacheDB.setCache(interfaceKey, {
+        lastInterfaceId: String(interfaceId),
+        lastVersion: version
+      });
+
       this.props.onVersionChange(this.state.project_id, interfaceId);
     });
   };
 
+  /** --- 初始化加载 --- **/
   componentDidMount() {
-    EditFormContext = this;
     this._isMounted = true;
+    EditFormContext = this;
     // 初始化请求类型
     this.setState({
       req_radio_type: HTTP_METHOD[this.state.method].request_body ? 'req-body' : 'req-query'
@@ -449,17 +468,26 @@ class InterfaceEditForm extends Component {
       height: '500px',
       initialValue: this.state.markdown || this.state.desc
     });
-    // 读取上次选择的版本
-    const interfaceKey = this.state.interface_key;
-    const { interfaceId, version } = this.getLastSelection(interfaceKey);
+    // ✅ 异步加载最近选择版本
+    const loadLastSelection = async () => {
+      const interfaceKey = this.state.interface_key;
+      const { lastInterfaceId, lastVersion } = await this.getLastSelection(interfaceKey);
 
-    if (interfaceId) {
-      this.setState({ interfaceId, version }, () => {
-        this.props.onVersionChange(this.state.project_id, interfaceId);
-      });
-    } else {
-      this.getVersionList(); // 默认最新版本
-    }
+      if (!this._isMounted) return;
+
+      if (lastInterfaceId) {
+        this.setState({
+          interfaceId: lastInterfaceId,
+          version: lastVersion
+        }, () => {
+          this.props.onVersionChange(this.state.project_id, lastInterfaceId);
+        });
+      } else {
+        this.getVersionList(); // 默认最新版本
+      }
+    };
+
+    loadLastSelection().catch(err => console.error('componentDidMount load error:', err));
   }
 
   componentWillUnmount() {
