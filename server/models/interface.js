@@ -400,7 +400,7 @@ class interfaceModel extends baseModel {
       },
       { $replaceRoot: { newRoot: '$doc' } },
       { $project: projectFields },
-      { $sort: { index: 1 } } // 保持原来的 index 排序
+      { $sort: { index: 1} } // 保持原来的 index 排序
     ]).exec();
   }
 

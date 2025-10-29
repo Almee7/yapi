@@ -22,7 +22,7 @@ const ExtraAssert = require('../../common/extraAssert.js');
 const assert = require("assert");
 const WsTestController = require("../controllers/wsTest");
 const vm = require('vm');
-// const {validate} = require("compare-versions");
+const {validate} = require("compare-versions");
 jsf.extend('mock', function () {
     return {
         mock: function (xx) {
@@ -289,6 +289,7 @@ async function executeQuery(params = [], vars = {},serverName) {
     });
     return client.invoke(replacedAsserts);
 }
+
 //执行断言
 function assertResult(actualResult, params) {
     for (let i = 0; i < params.length; i++) {
@@ -384,6 +385,8 @@ Object.keys(ExtraAssert).forEach(fn => {
 
 exports.sandbox = async (sandbox, script) => {
     try {
+        console.log("断言",sandbox)
+        console.log("脚本",script)
         sandbox = sandbox || {};
         // ✅ 注入默认变量
         sandbox.vars = sandbox.vars || {};
@@ -696,6 +699,7 @@ exports.runCaseScript = async function runCaseScript(params, colId, interfaceId)
     const colInst = yapi.getInst(interfaceColModel);
     let colData = await colInst.get(colId);
     const logs = [];
+    console.log("断言params",params)
     const context = {
         assert: require('assert'),
         status: params.response.status,

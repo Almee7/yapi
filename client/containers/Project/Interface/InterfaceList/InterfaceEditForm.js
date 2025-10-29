@@ -1,5 +1,6 @@
 import React, { PureComponent as Component } from 'react';
 import PropTypes from 'prop-types';
+import { Spin } from 'antd';
 import { connect } from 'react-redux';
 import _ from 'underscore';
 import constants from '../../../../constants/variable.js';
@@ -13,7 +14,7 @@ import AceEditor from 'client/components/AceEditor/AceEditor';
 import axios from 'axios';
 import { MOCK_SOURCE } from '../../../../constants/variable.js';
 import Editor from 'common/tui-editor/dist/tui-editor-Editor-all.min.js';
-// import cacheDB from '../../../../cacheDB.js';
+import cacheDB from '../../../../cacheDB.js';
 const jSchema = require('json-schema-editor-visual');
 const ResBodySchema = jSchema({ lang: 'zh_CN', mock: MOCK_SOURCE });
 const ReqBodySchema = jSchema({ lang: 'zh_CN', mock: MOCK_SOURCE });
@@ -70,7 +71,6 @@ import {
   AutoComplete,
   Switch
 } from 'antd';
-import cacheDB from "../../../../cacheDB";
 
 const Json5Example = `
   {
@@ -162,6 +162,7 @@ class InterfaceEditForm extends Component {
         headers: 'hide'
       }
     };
+
     curdata['hideTabs']['req'][HTTP_METHOD[curdata.method].default_tab] = '';
     return Object.assign(
       {
@@ -269,6 +270,7 @@ class InterfaceEditForm extends Component {
           values.req_params = values.req_params || [];
           values.req_headers = values.req_headers || [];
           values.req_body_form = values.req_body_form || [];
+
           let isfile = false,
             isHaveContentType = false;
           if (values.req_body_type === 'form') {
@@ -280,7 +282,7 @@ class InterfaceEditForm extends Component {
 
             values.req_headers.map(item => {
               if (item.name === 'Content-Type') {
-                item.value = isfile ? 'multipart/form-data' : 'application/x-www-form-urlencoded';
+                item.value = item.value || (isfile ? 'multipart/form-data' : 'application/x-www-form-urlencoded')
                 isHaveContentType = true;
               }
             });
@@ -478,16 +480,21 @@ class InterfaceEditForm extends Component {
       if (lastInterfaceId) {
         this.setState({
           interfaceId: lastInterfaceId,
-          version: lastVersion
+          version: lastVersion,
+          initialized: true
         }, () => {
           this.props.onVersionChange(this.state.project_id, lastInterfaceId);
         });
       } else {
         this.getVersionList(); // 默认最新版本
+        this.setState({ initialized: true });
       }
     };
 
-    loadLastSelection().catch(err => console.error('componentDidMount load error:', err));
+    loadLastSelection().catch(err => {
+      console.error('componentDidMount load error:', err);
+      this.setState({ initialized: true }); // 确保渲染不挂
+    });
   }
 
   componentWillUnmount() {
@@ -707,6 +714,8 @@ class InterfaceEditForm extends Component {
       labelCol: { span: 4 },
       wrapperCol: { span: 18 }
     };
+
+    const { initialized, versions, interfaceId, version } = this.state;
 
     const res_body_use_schema_editor = checkIsJsonSchema(this.state.res_body) || '';
 
@@ -1025,40 +1034,44 @@ class InterfaceEditForm extends Component {
                 </Col>
               </Row>
             </FormItem>
+
             <FormItem
                 className="interface-version-item"
                 {...formItemLayout}
                 label={<span>接口版本</span>}
             >
               <InputGroup compact>
-                <Select
-                    value={{
-                      key: this.state.interfaceId,
-                      label: this.state.version === 0 ? '初始版本' : `v${this.state.version}`
-                    }}
-                    labelInValue
-                    onFocus={() => {
-                      // 仅加载版本列表，不修改缓存
-                      if (!this.state.versions.length) {
-                        this.getVersionList(true);
-                      }
-                    }}
-                    onChange={({ key, label }) => {
-                      const ver = label === '初始版本' ? 0 : Number(label.replace(/^v/, ''));
-                      this.onChangeVersion({ interfaceId: key, version: ver });
-                    }}
-                    style={{ width: '20%' }}
-                >
-                  {(this.state.versions || []).map(v => {
-                    const label = v.version === 0 ? '初始版本' : `v${v.version}`;
-                    return (
-                      <Option key={v._id} value={v._id}>
-                        {label}
-                      </Option>
-                    );
-                  })}
-                </Select>
-
+                {!initialized ? (
+                    // ✅ 延迟渲染避免闪烁
+                  <Spin tip="加载版本中..." style={{ width: '20%' }} />
+                ) : (
+                  <Select
+                        value={{
+                          key: interfaceId,
+                          label: version === 0 ? '初始版本' : `v${version}`
+                        }}
+                        labelInValue
+                        onFocus={() => {
+                          if (!versions.length) {
+                            this.getVersionList(true);
+                          }
+                        }}
+                        onChange={({ key, label }) => {
+                          const ver = label === '初始版本' ? 0 : Number(label.replace(/^v/, ''));
+                          this.onChangeVersion({ interfaceId: key, version: ver });
+                        }}
+                        style={{ width: '20%' }}
+                    >
+                    {(versions || []).map(v => {
+                        const label = v.version === 0 ? '初始版本' : `v${v.version}`;
+                        return (
+                          <Option key={v._id} value={v._id}>
+                            {label}
+                          </Option>
+                        );
+                      })}
+                  </Select>
+                )}
               </InputGroup>
 
               <Row className="interface-edit-item">

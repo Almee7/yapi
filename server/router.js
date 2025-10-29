@@ -12,6 +12,7 @@ const followController = require('./controllers/follow.js');
 const openController = require('./controllers/open.js');
 const { createAction } = require('./utils/commons.js');
 const wsTestController = require('./controllers/wsTest');
+const fileController = require("./controllers/files");
 
 const router = koaRouter();
 
@@ -55,6 +56,10 @@ let INTERFACE_CONFIG = {
   wsTest: {
     prefix: '/ws-test/',
     controller: wsTestController
+  },
+  files: {
+    prefix: '/files/',
+    controller: fileController
   }
 };
 
@@ -65,8 +70,6 @@ let routerConfig = {
       path: 'get_mygroup',
       method: 'get'
     },
-
-    
     {
       action: 'list',
       path: 'list',
@@ -508,6 +511,11 @@ let routerConfig = {
       action: 'getCaseEnvList',
       path: 'case_env_list',
       method: 'get'
+    },
+    {
+      action: 'runSql',
+      path: 'runSql',
+      method: 'post'
     }
   ],
   test: [
@@ -615,6 +623,23 @@ let routerConfig = {
       path: 'frontend',               // 对应前端 WS 的路径
       method: 'get',                  // 前端 WS 一般用 GET
       websocket: true                 // 标记这是 WebSocket 接口（YApi 里支持 websocket）
+    }
+  ],
+  files: [
+    {
+      action: 'upload',
+      path: 'upload',
+      method: 'post'
+    },
+    {
+      action: 'getFile',
+      path: 'getFile',
+      method: 'post'
+    },
+    {
+      action: 'deleteFile',
+      path: 'deleteFile',
+      method: 'post'
     }
   ]
 };

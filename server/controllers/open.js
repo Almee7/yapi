@@ -383,7 +383,6 @@ class openController extends baseController {
   }
 
   async handleScriptTest(interfaceData, response, validRes, requestParams) {
-    
     try {
       let test = await yapi.commons.runCaseScript({
         response: response,

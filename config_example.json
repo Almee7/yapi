@@ -6,7 +6,7 @@
   "okrServer": "http://192.168.6.218:3399",
   "xpaServer": "http://196.168.1.143:8080",
   "db": {
-    "servername": "192.168.6.128",
+    "servername": "127.0.0.1",
     "DATABASE": "yapi",
     "port": 27017,
     "user": "root",

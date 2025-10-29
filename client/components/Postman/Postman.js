@@ -548,20 +548,19 @@ export default class Run extends Component {
   };
 
   changeBody = async (v, index, key) => {
-    const bodyForm = deepCopyJson(this.state.req_body_form);
     key = key || 'value';
-
+    const bodyForm = deepCopyJson(this.state.req_body_form);
     if (key === 'value') {
       bodyForm[index].enable = !!v;
 
+      // === 文件类型处理 ===
       if (bodyForm[index].type === 'file') {
         const fileInput = document.getElementById('file_' + index);
         const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
-
         if (!file) {
           bodyForm[index].value = null;
         } else {
-          // base64 转换
+          // 👉 1. 先转 base64
           const base64 = await new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = () => {
@@ -571,22 +570,44 @@ export default class Run extends Component {
             reader.onerror = reject;
             reader.readAsDataURL(file);
           });
-
-          bodyForm[index].value = {
-            __isFile: true,
-            name: file.name,
-            mimeType: file.type || 'application/octet-stream',
-            base64,
-            size: file.size
-          };
+          // 👉 2. 检查大小
+          if (file.size > 1024 * 1024) {
+            console.log('文件不能超过 1MB');
+            return;
+          }
+          // 👉 3. 上传到后端
+          try {
+            const res = await axios.post('/api/files/upload', {
+              interfaceId: this.state._id,
+              base64,
+              name: file.name,
+              mimeType: file.type || 'application/octet-stream',
+              size: file.size
+            });
+            if (res.data.errcode === 0) {
+              // ✅ 上传成功，存 file_id
+              bodyForm[index].value = {
+                __isFile: true,
+                file_id: res.data.data.file_id,
+                name: file.name,
+                type: file.type,
+                size: file.size
+              };
+              console.log('文件上传成功');
+            } else {
+              console.log('文件上传失败：' + res.data.errmsg);
+            }
+          } catch (err) {
+            console.error('文件上传失败', err);
+          }
         }
       } else {
+        // 非文件参数
         bodyForm[index].value = v;
       }
     } else if (key === 'enable') {
       bodyForm[index].enable = v;
     }
-
     this.setState({ req_body_form: bodyForm });
   };
 

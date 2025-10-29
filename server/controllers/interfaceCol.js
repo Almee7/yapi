@@ -4,7 +4,8 @@ const interfaceModel = require('../models/interface.js');
 const projectModel = require('../models/project.js');
 const baseController = require('./base.js');
 const yapi = require('../yapi.js');
-const _ = require('underscore')
+// const _ = require('underscore')
+const {GrpcAgentClient} = require("../grpc/dbClient");
 
 class interfaceColController extends baseController {
   constructor(ctx) {
@@ -61,7 +62,7 @@ class interfaceColController extends baseController {
       // 按 col_id 分组并补充 path
       const colCaseMap = new Map();
       for (let c of allCases) {
-        const itf = interfaceMap.get(c.interface_id?.toString());
+        const itf = interfaceMap.get(c.interface_id ? c.interface_id.toString() : undefined);
         c.path = itf ? itf.path : '';
 
         const colKey = c.col_id.toString();
@@ -928,6 +929,40 @@ class interfaceColController extends baseController {
       return item[compare];
     });
   }
+  async runSql(ctx) {
+    const sql = ctx.request.body.sql;
+    const vars = ctx.request.body.vars || {};
+    const serverName = ctx.request.body.serverName || 'okr';
+
+    if (!sql || !Array.isArray(sql)) {
+      return (ctx.body = yapi.commons.resReturn(null, 400, 'sql不能为空或格式错误'));
+    }
+
+    const client = new GrpcAgentClient(serverName);
+
+    const replacedAsserts = sql.map(item => {
+      let replacedQuery = item.query;
+      replacedQuery = replacedQuery.replace(/\$\{([^}]+)\}/g, (_, expr) => {
+        try {
+          const fn = new Function('vars', `with(vars) { return ${expr}; }`);
+          const val = fn(vars);
+          return Array.isArray(val) ? val.join(',') : val;
+        } catch (e) {
+          console.error(`替换表达式 ${expr} 失败:`, e);
+          return '';
+        }
+      });
+      return { ...item, query: replacedQuery };
+    });
+
+    try {
+      const result = await client.invoke(replacedAsserts);
+      ctx.body = yapi.commons.resReturn(result, 200, '执行成功');
+    } catch (err) {
+      ctx.body = yapi.commons.resReturn(null, 500, err.message);
+    }
+  }
+
 }
 
 module.exports = interfaceColController;

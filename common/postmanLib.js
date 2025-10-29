@@ -10,8 +10,6 @@ const CryptoJS = require('crypto-js');
 const jsrsasign = require('jsrsasign');
 const https = require('' +
     'https');
-// const { handleParamsValue} = require('common/utils.js');
-
 const isNode = typeof global == 'object' && global.global === global;
 const ContentTypeMap = {
   'application/json': 'json',
@@ -255,10 +253,25 @@ function replaceWithEnv(obj, env) {
   }
 }
 
-function sandboxByBrowser(context = {}, script ) {
+async function sandboxByBrowser(context = {}, script) {
   if (!script || typeof script !== 'string') {
     return context;
   }
+  console.log("context前置的上下文", context)
+  console.log('script前置的脚本', script, typeof script);
+  // 提取 sql
+  let sql = [];
+  const match = script.match(/sql\s*=\s*(\[[\s\S]*?\]);?/);
+  if (match) {
+    const sqlStr = match[1];
+    try {
+      sql = new Function('return ' + sqlStr)();
+      console.log('✅ 提取到 sql:', sql);
+    } catch (err) {
+      console.error('❌ 解析失败:', err);
+    }
+  }
+
   let beginScript = '';
   beginScript += `var vars = context.vars;\n`;
   try {
