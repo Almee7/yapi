@@ -253,45 +253,135 @@ function replaceWithEnv(obj, env) {
   }
 }
 
-async function sandboxByBrowser(context = {}, script) {
-  if (!script || typeof script !== 'string') {
-    return context;
+/**
+ * 只提取脚本中的第一个 sql = [...] 块并解析成对象数组（支持 JSON 或 JS 表达式）
+ * 返回：{ sql: Array|null, sqlMatchStr: string|null }
+ */
+function extractSqlOnly(script) {
+  const result = { sql: null, sqlMatchStr: null };
+
+  // 匹配第一个 sql = [...]，支持换行、末尾可有分号
+  const sqlRegex = /sql\s*=\s*(\[[\s\S]*?\])\s*(?:;|\n|$)/m;
+  const m = script.match(sqlRegex);
+  if (!m) {
+    return result;
   }
-  console.log("context前置的上下文", context)
-  console.log('script前置的脚本', script, typeof script);
-  // 提取 sql
-  let sql = [];
-  const match = script.match(/sql\s*=\s*(\[[\s\S]*?\]);?/);
-  if (match) {
-    const sqlStr = match[1];
+
+  let sqlStr = m[1].trim().replace(/;$/, '').trim();
+  result.sqlMatchStr = m[0];
+
+  try {
+    // 优先尝试 JSON.parse（更安全）
+    result.sql = JSON.parse(sqlStr);
+    console.log('✅ JSON 解析 sql 成功');
+  } catch (jsonErr) {
     try {
-      sql = new Function('return ' + sqlStr)();
-      console.log('✅ 提取到 sql:', sql);
+      // 回退到 JS 解析（支持单引号等情况）
+      result.sql = new Function('return ' + sqlStr)();
+      console.log('✅ JS 表达式解析 sql 成功');
     } catch (err) {
-      console.error('❌ 解析失败:', err);
+      console.error('❌ 解析 sql 失败', err);
+      result.sql = null;
     }
   }
 
-  let beginScript = '';
-  beginScript += `var vars = context.vars;\n`;
-  try {
-    eval(beginScript + script);
-    //替换变量
-    context.requestBody = replaceWithEnv(context.requestBody, context.vars);
-  } catch (err) {
-    let message = `Script:
-                   ----CodeBegin----:
-                   ${beginScript}
-                   ${script}
-                   ----CodeEnd----
-                  `;
-    err.message = `Script: ${message}
-    message: ${err.message}`;
+  return result;
+}
 
+/**
+ * 将 SQL 返回的对象（如 { bl1: '破坏者', bl2: '444' }）
+ * 转换成 vars.bl1 = "破坏者"; vars.bl2 = "444";
+ * 并同步写入 context.vars（如果提供）。
+ */
+function convertResultRowToVarsScript(row, context) {
+  if (!row || typeof row !== 'object') return '';
+
+  const lines = Object.entries(row).map(([k, v]) => {
+    // 使用 JSON.stringify 保证字符串安全转义
+    return `vars.${k} = ${JSON.stringify(v)};`;
+  });
+
+  // 如果提供 context，写入 context.vars 方便后端/前端后续使用（可选，但通常有用）
+  if (context && typeof context === 'object') {
+    context.vars = context.vars || {};
+    Object.entries(row).forEach(([k, v]) => {
+      context.vars[k] = v;
+    });
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * 最终 sandboxByBrowser —— 只提取 sql，移除原脚本 sql 段，调用后端，注入 SQL 结果为 vars，执行剩余脚本。
+ */
+async function sandboxByBrowser(context = {}, script) {
+  if (!script || typeof script !== 'string') return context;
+
+  // 确保 context.vars 初始化
+  context.vars = context.vars || {};
+
+  // 1) 提取 sql（仅第一个）
+  const parsed = extractSqlOnly(script);
+
+  // 2) 如果发现并解析到 sql，则调用后端
+  let data = [];
+  if (Array.isArray(parsed.sql) && parsed.sql.length > 0) {
+    try {
+      const res = await axios.post('/api/col/runSql', { sql: parsed.sql });
+      data = res && res.data && res.data.data ? res.data.data : [];
+      console.log('sandboxByBrowser--SQL 返回数据：', data);
+    } catch (err) {
+      console.error('❌ runSql 请求失败：', err);
+      data = [];
+    }
+  } else {
+    console.log('ℹ️ 脚本中未包含 sql 或解析失败，跳过 runSql 请求');
+  }
+
+  // 3) 将后端返回的第一个结果集的第一行转换为 vars 赋值脚本，并写回 context.vars
+  let varsFromSqlScript = '';
+  if (Array.isArray(data) && data.length > 0 && Array.isArray(data[0]) && data[0].length > 0) {
+    const firstRow = data[0][0];
+    varsFromSqlScript = convertResultRowToVarsScript(firstRow, context);
+    console.log('✅ 将 SQL 结果转换为 vars 脚本：\n', varsFromSqlScript);
+  }
+
+  // 4) 从原脚本中移除匹配到的 sql 段（只移除第一个匹配）
+  let scriptWithoutSql = script;
+  if (parsed.sqlMatchStr) {
+    scriptWithoutSql = script.replace(parsed.sqlMatchStr, '').trim();
+  }
+
+  // 5) 合并最终执行脚本：先注入 SQL 返回的 vars，再执行原脚本（已移除 sql）
+  //    选择将 varsFromSql 放在最前面，保证后续脚本能直接使用这些 vars
+  const finalScript = [varsFromSqlScript, scriptWithoutSql].filter(Boolean).join('\n');
+
+  // 6) 执行（保持原有行为：注入 context.vars => 执行 finalScript）
+  const beginScript = `var vars = context.vars;\n`;
+  try {
+    console.log('--- 将执行的 finalScript ---\n', finalScript);
+    eval(beginScript + finalScript);
+
+    // 可选：替换 context.requestBody 中占位变量（若有实现）
+    if (typeof replaceWithEnv === 'function') {
+      context.requestBody = replaceWithEnv(context.requestBody, context.vars);
+    }
+  } catch (err) {
+    const message = `
+Script:
+----CodeBegin----
+${beginScript}
+${finalScript}
+----CodeEnd----
+`;
+    err.message = `${message}\n错误信息: ${err.message}`;
     throw err;
   }
+
   return context;
 }
+
 
 
 

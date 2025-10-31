@@ -929,6 +929,8 @@ class interfaceColController extends baseController {
       return item[compare];
     });
   }
+
+
   async runSql(ctx) {
     const sql = ctx.request.body.sql;
     const vars = ctx.request.body.vars || {};
@@ -940,6 +942,7 @@ class interfaceColController extends baseController {
 
     const client = new GrpcAgentClient(serverName);
 
+    // ✅ 替换 ${var} 表达式
     const replacedAsserts = sql.map(item => {
       let replacedQuery = item.query;
       replacedQuery = replacedQuery.replace(/\$\{([^}]+)\}/g, (_, expr) => {
@@ -956,12 +959,31 @@ class interfaceColController extends baseController {
     });
 
     try {
-      const result = await client.invoke(replacedAsserts);
-      ctx.body = yapi.commons.resReturn(result, 200, '执行成功');
+      const rawResult = await client.invoke(replacedAsserts);
+      // 假设返回：[[{ userName: '破坏者', password: '444' }]]
+
+      // ✅ 数据映射
+      const finalResult = replacedAsserts.map((item, index) => {
+        const rows = rawResult[index] || [];
+        const { varsName = [], fields = [] } = item;
+
+        return rows.map(row => {
+          const mapped = {};
+          for (let i = 0; i < varsName.length && i < fields.length; i++) {
+            mapped[varsName[i]] = row[fields[i]];
+          }
+          return mapped;
+        });
+      });
+
+      // ✅ 使用 yapi.commons.resReturn 标准返回
+      ctx.body = yapi.commons.resReturn(finalResult, 200, '执行成功');
+
     } catch (err) {
       ctx.body = yapi.commons.resReturn(null, 500, err.message);
     }
   }
+
 
 }
 

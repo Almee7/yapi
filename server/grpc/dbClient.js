@@ -10,7 +10,6 @@ class GrpcAgentClient {
      * @param {string} serverName - 前端传入的 serverName，例如 'okr' 或 'xpa'
      */
     constructor(serverName) {
-        console.log('GrpcAgentClient', serverName);
         this.serverName = serverName;
         if (!serverName) {
             throw new Error('serverName 必须传入');
@@ -39,7 +38,6 @@ class GrpcAgentClient {
      * @returns {Promise<Object|string>} - 解析后的 JSON 对象或字符串结果
      */
     invoke(paramsObj) {
-        console.log(paramsObj)
         return new Promise((resolve, reject) => {
             const request = new AgentRequest();
             // 去掉 expect 字段

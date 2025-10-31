@@ -22,7 +22,7 @@ const ExtraAssert = require('../../common/extraAssert.js');
 const assert = require("assert");
 const WsTestController = require("../controllers/wsTest");
 const vm = require('vm');
-const {validate} = require("compare-versions");
+// const {validate} = require("compare-versions");
 jsf.extend('mock', function () {
     return {
         mock: function (xx) {
@@ -280,7 +280,7 @@ function replaceVars(template, vars) {
 
 
 //执行sql
-async function executeQuery(params = [], vars = {},serverName) {
+async function executeQuery(params = [], vars = {}, serverName) {
     const client = new GrpcAgentClient(serverName);
     // 替换变量，构造新数组，避免修改原始 asserts
     const replacedAsserts = params.map(item => {
@@ -316,8 +316,8 @@ function assertResult(actualResult, params) {
                 assert.deepStrictEqual(actualFlat[0], expect);
                 console.log(`✅ 断言通过: ${JSON.stringify(expect)} == ${JSON.stringify(actualFlat[0])}`);
             } catch (e) {
-                console.error(`❌ 断言失败: ${JSON.stringify(expect)} != ${JSON.stringify(actualFlat[0])}\nSQL: ${query}`);
-                throw e;
+                const errMsg = `❌ 断言失败: ${JSON.stringify(expect)} != ${JSON.stringify(actualFlat[0])}\nSQL: ${query}`;
+                throw new Error(errMsg);
             }
         } else {
             const actualValue = actualRows && actualRows[0] ? actualRows[0][fields[0]] : undefined;
@@ -326,7 +326,8 @@ function assertResult(actualResult, params) {
                 assert.strictEqual(actualValue, expect);
                 console.log(`✅ 断言通过: "${expect}" == "${actualValue}"`);
             } catch (e) {
-                throw new Error(`❌ 断言失败: ${expect} != ${actualValue}\nSQL: ${query}`);
+                const Error = `❌ 断言失败: ${expect} != ${actualValue}\nSQL: ${query}`;
+                throw new Error(Error);
             }
         }
     }
@@ -367,8 +368,6 @@ function replaceVarsInScript(scriptStr, vars = {}, global = {}) {
         }
     });
 }
-
-
 /**
  * 沙盒执行 js 代码
  * @sandbox Object context
@@ -385,19 +384,17 @@ Object.keys(ExtraAssert).forEach(fn => {
 
 exports.sandbox = async (sandbox, script) => {
     try {
-        console.log("断言",sandbox)
-        console.log("脚本",script)
+        let serverName = sandbox.body.serverName;
         sandbox = sandbox || {};
         // ✅ 注入默认变量
         sandbox.vars = sandbox.vars || {};
-        sandbox.global = sandbox.vars || {};
-        sandbox.sqlassert = sandbox.sqlassert || [];
+        sandbox.global = sandbox.global || {};
+        sandbox.sqlAssert = sandbox.sqlAssert || [];
         sandbox.sql = sandbox.sql || [];
         sandbox.console = console;
         sandbox.assert = assert;
         script = replaceVarsInScript(script, sandbox.vars, sandbox.global)
         const context = vm.createContext(sandbox);
-
         // 检查是否有 readWS 调用
         const regex = /readWS\s*\(\s*["']([^"']+)["']\s*\)/;
         const match = script.match(regex);
@@ -409,23 +406,15 @@ exports.sandbox = async (sandbox, script) => {
                 return msg;              // 👈 同时返回，脚本里也能接收
             };
         }
-
+        // ✅ 统一执行脚本，支持 async/await
+        const wrappedScript = new vm.Script(`(async () => {${script}})()`);
+        await wrappedScript.runInContext(context);
         // 如果有 sqlAssert，执行断言
         if (Array.isArray(sandbox.sqlAssert) && sandbox.sqlAssert.length > 0) {
-            const actualValue = await executeQuery(sandbox.sqlAssert, sandbox.vars);
+            const actualValue = await executeQuery(sandbox.sqlAssert, sandbox.vars, serverName);
             assertResult(actualValue, sandbox.sqlAssert);
             sandbox.wsLog = null; // 保证有 wsLog 字段
         }
-
-        // ✅ 统一执行脚本，支持 async/await
-        const wrappedScript = new vm.Script(`
-      (async () => {
-        ${script}
-      })()
-    `);
-
-        await wrappedScript.runInContext(context);
-
         return sandbox; // 👈 统一一个 return
     } catch (err) {
         err.__sandboxFailed = true;
@@ -699,7 +688,6 @@ exports.runCaseScript = async function runCaseScript(params, colId, interfaceId)
     const colInst = yapi.getInst(interfaceColModel);
     let colData = await colInst.get(colId);
     const logs = [];
-    console.log("断言params",params)
     const context = {
         assert: require('assert'),
         status: params.response.status,
