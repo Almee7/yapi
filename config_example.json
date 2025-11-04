@@ -15,5 +15,10 @@
   },
   "mail": {
     "enable": false
-  }
+  },
+  "plugins": [
+    {
+      "name": "autotest-copy"
+    }
+  ]
 }

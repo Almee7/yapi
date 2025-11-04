@@ -98,10 +98,10 @@ export default class ProjectInterfaceSync extends Component {
     this.setState({
       sync_data: {}
     });
-    //默认每份钟同步一次,取一个随机数
-    this.setState({
-      random_corn: '*/2 * * * *'
-    });
+    //根据设置走 不随机生成
+    // this.setState({
+    //   random_corn: '*/2 * * * *'
+    // });
     this.getSyncData();
   }
 
@@ -216,14 +216,14 @@ export default class ProjectInterfaceSync extends Component {
               {getFieldDecorator('sync_cron', {
                 rules: [
                   {
-                    required: true,
+                    required: false,
                     message: '输入node-schedule的类cron表达式!'
                   },
                   {
                     validator: this.sync_cronCheck
                   }
                 ],
-                initialValue: this.state.sync_data.sync_cron ? this.state.sync_data.sync_cron : this.state.random_corn
+                initialValue: this.state.sync_data.sync_cron ? this.state.sync_data.sync_cron : ""
               })(<Input />)}
             </FormItem>
           </div>
