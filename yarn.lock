@@ -18207,10 +18207,10 @@ yallist@^4.0.0:
   resolved "https://registry.yarnpkg.com/yallist/-/yallist-4.0.0.tgz#9bb92790d9c0effec63be73519e11a35019a3a72"
   integrity sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==
 
-yapi-plugin-autotest-copy@^1.0.0:
-  version "1.0.0"
-  resolved "https://registry.yarnpkg.com/yapi-plugin-autotest-copy/-/yapi-plugin-autotest-copy-1.0.0.tgz#b53115b6fd55eb2a48026a4386eeafba8b3b6bac"
-  integrity sha512-ymGQyrx04KK7SUnkA2LpyLQrCUeqjYyLxnkC3F+kYb5Z+HjlvLue0mV/zG4SKJjljbCjEg9fE8WdLjz6CspraQ==
+yapi-plugin-autotest-copy@1.1.0:
+  version "1.1.0"
+  resolved "https://registry.yarnpkg.com/yapi-plugin-autotest-copy/-/yapi-plugin-autotest-copy-1.1.0.tgz#63152781ca5aa9023123f74c05d473fb3661bcff"
+  integrity sha512-OJjpH/Dnnlz3/wM7wrm1ZZpAJ1H4tjrSJ0FUD0Rupok51ZqPPpx0g+tJVA6zmQjX3NKzQVHokG+xn2XcIMamVw==
 
 yapi-plugin-qsso@^1.1.0:
   version "1.1.1"
