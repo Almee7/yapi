@@ -620,7 +620,6 @@ class interfaceColController extends baseController {
         id: 'number',
         casename: 'string'
       });
-
       if (!params.id) {
         return (ctx.body = yapi.commons.resReturn(null, 400, '用例id不能为空'));
       }
@@ -634,7 +633,14 @@ class interfaceColController extends baseController {
       if (!auth) {
         return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));
       }
-
+      // 如果前端把 req_body_form 当字符串发过来，尝试解析
+      if (params.req_body_form && typeof params.req_body_form === 'string') {
+        try {
+          params.req_body_form = JSON.parse(params.req_body_form);
+        } catch (err) {
+          return (ctx.body = yapi.commons.resReturn(null, 400, 'req_body_form 不是合法 JSON'));
+        }
+      }
       params.uid = this.getUid();
 
       //不允许修改接口id和项目id
@@ -700,6 +706,22 @@ class interfaceColController extends baseController {
         data.req_body_form,
         result.req_body_form
       );
+      // 处理 file 类型字段，保留 base64 等信息
+      result.req_body_form = result.req_body_form.map((field) => {
+        if (field.type === 'file' && field.value) {
+          return {
+            ...field,
+            value: {
+              name: field.value.name || 'file',
+              type: field.value.type || 'application/octet-stream',
+              size: field.value.size || 0,
+              base64: field.value.base64 || '',
+              __isFile: true, // 标记前端可转 File
+            }
+          };
+        }
+        return field;
+      });
       result.req_query = yapi.commons.handleParamsValue(data.req_query, result.req_query);
       result.req_params = yapi.commons.handleParamsValue(data.req_params, result.req_params);
       result.interface_up_time = data.up_time;

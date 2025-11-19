@@ -238,6 +238,7 @@ class interfaceController extends baseController {
    * @param  {String} [desc] 接口描述
    * @returns {Object}
    * @example ./api/interface/add.json
+   * @param ctx
    */
   async add(ctx) {
     let params = ctx.params;
@@ -863,7 +864,7 @@ class interfaceController extends baseController {
 
       let data = await this.Model.get(id);
 
-      if (data.uid != this.getUid()) {
+      if (data.uid !== this.getUid()) {
         let auth = await this.checkAuth(data.project_id, 'project', 'danger');
         if (!auth) {
           return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));

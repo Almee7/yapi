@@ -10,7 +10,7 @@ const interfaceModel = require('../models/interface.js');
 const userModel = require('../models/user.js');
 const json5 = require('json5');
 const _ = require('underscore');
-const Ajv = require('ajv');
+const Ajv = require('ajv')
 const Mock = require('mockjs');
 const sandboxFn = require('./sandbox')
 const ejs = require('easy-json-schema');
@@ -298,20 +298,16 @@ function assertResult(actualResult, params) {
         const fields = testItem.fields;
         const query = testItem.query;
         const actualRows = actualResult[i];
-
         if (Array.isArray(expect)) {
             if (!actualRows || !Array.isArray(actualRows)) {
                 throw new Error(`断言失败：返回结果为空或格式不正确，SQL: ${query}`);
             }
-
             const actualFlat = actualRows.map(row =>
                 fields.map(f => row[f])
             );
-
             if (actualFlat.length === 0) {
                 throw new Error(`断言失败：没有查询到数据，SQL: ${query}`);
             }
-
             try {
                 assert.deepStrictEqual(actualFlat[0], expect);
                 console.log(`✅ 断言通过: ${JSON.stringify(expect)} == ${JSON.stringify(actualFlat[0])}`);
@@ -321,7 +317,6 @@ function assertResult(actualResult, params) {
             }
         } else {
             const actualValue = actualRows && actualRows[0] ? actualRows[0][fields[0]] : undefined;
-
             try {
                 assert.strictEqual(actualValue, expect);
                 console.log(`✅ 断言通过: "${expect}" == "${actualValue}"`);

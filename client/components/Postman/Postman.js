@@ -223,8 +223,10 @@ export default class Run extends Component {
     if (!this.checkInterfaceData(data)) {
       return null;
     }
+
     //获取缓存数据
     const cachedData = await cacheDB.getCache(data._id);
+    console.log('cached data', cachedData.data);
 
     const { req_body_other, req_body_type, req_body_is_json_schema } = data;
     let body = req_body_other;
@@ -268,12 +270,12 @@ export default class Run extends Component {
         {}
       )
     }
-
     this.setState(
       {
         ...this.state,
         ...data,
         ...example,
+        test_script: data.test_script || null,
         req_body_other: cachedData.ReqBodyCache || body,
         pre_request_script: cachedData.PreScriptCache || data.pre_request_script,
         resStatusCode: null,
@@ -547,69 +549,58 @@ export default class Run extends Component {
     });
   };
 
-  changeBody = async (v, index, key) => {
-    key = key || 'value';
-    const bodyForm = deepCopyJson(this.state.req_body_form);
+  changeBody = async (v, index = 0, key = 'value') => {
+    let bodyForm = deepCopyJson(this.state.req_body_form);
+
     if (key === 'value') {
       bodyForm[index].enable = !!v;
 
-      // === 文件类型处理 ===
-      if (bodyForm[index].type === 'file') {
-        const fileInput = document.getElementById('file_' + index);
-        const file = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
-        if (!file) {
-          bodyForm[index].value = null;
-        } else {
-          // 👉 1. 先转 base64
-          const base64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const parts = (reader.result || '').split(',');
-              resolve(parts.length > 1 ? parts[1] : parts[0]);
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-          // 👉 2. 检查大小
-          if (file.size > 1024 * 1024) {
-            console.log('文件不能超过 1MB');
-            return;
-          }
-          // 👉 3. 上传到后端
-          try {
-            const res = await axios.post('/api/files/upload', {
-              interfaceId: this.state._id,
-              base64,
-              name: file.name,
-              mimeType: file.type || 'application/octet-stream',
-              size: file.size
-            });
-            if (res.data.errcode === 0) {
-              // ✅ 上传成功，存 file_id
-              bodyForm[index].value = {
-                __isFile: true,
-                file_id: res.data.data.file_id,
-                name: file.name,
-                type: file.type,
-                size: file.size
-              };
-              console.log('文件上传成功');
-            } else {
-              console.log('文件上传失败：' + res.data.errmsg);
-            }
-          } catch (err) {
-            console.error('文件上传失败', err);
-          }
-        }
+      if (v instanceof File) {
+        // 1) 转 Base64
+        const base64 = await this.fileToBase64(v);
+
+        // 2) 存 meta + base64
+        bodyForm[index].value = {
+          __isFile: true,
+          name: v.name,
+          type: v.type,
+          size: v.size,
+          base64: base64
+        };
+
+        console.log("最终存储:", bodyForm[index].value);
       } else {
-        // 非文件参数
         bodyForm[index].value = v;
       }
-    } else if (key === 'enable') {
-      bodyForm[index].enable = v;
     }
+
+    // 更新 state
     this.setState({ req_body_form: bodyForm });
+
+    // 发送 JSON
+    const requestData = {
+      id: this.state._id,
+      req_body_form: bodyForm
+    };
+
+    try {
+      const res = await axios.post('/api/col/up_case', requestData);
+      console.log("保存成功:", res.data);
+    } catch (err) {
+      console.error("保存失败:", err);
+    }
   };
+
+// File → Base64 工具函数
+  fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
 
 
   // 模态框的相关操作
@@ -1066,28 +1057,36 @@ export default class Run extends Component {
                         )}
                         <span className="eq-symbol">=</span>
                         {item.type === 'file' ? (
-                          <Input
-                            type="file"
-                            id={'file_' + index}
-                            onChange={e => this.changeBody(e.target.value, index, 'value')}
-                            multiple
-                            className="value"
-                          />
+                          <div>
+                            <Input
+                                  type="file"
+                                  id={'file_' + index}
+                                  onChange={e => this.changeBody(e.target.files[0], index, 'value')}
+                                  multiple
+                                  className="value"
+                              />
+                            {item.value && (
+                              <div style={{ marginTop: 4, fontSize: 14, color: '#555' }}>
+                                已选择文件: {item.value.name} ({(item.value.size / 1024).toFixed(2)} KB)
+                              </div>
+                              )}
+                          </div>
                         ) : (
                           <Input
-                            value={item.value}
-                            className="value"
-                            onChange={e => this.changeBody(e.target.value, index)}
-                            placeholder="参数值"
-                            id={`req_body_form_${index}`}
-                            addonAfter={
-                              <Icon
-                                type="edit"
-                                onClick={() => this.showModal(item.value, index, 'req_body_form')}
-                              />
-                            }
-                          />
+                                value={item.value}
+                                className="value"
+                                onChange={e => this.changeBody(e.target.value, index)}
+                                placeholder="参数值"
+                                id={`req_body_form_${index}`}
+                                addonAfter={
+                                  <Icon
+                                      type="edit"
+                                      onClick={() => this.showModal(item.value, index, 'req_body_form')}
+                                  />
+                                }
+                            />
                         )}
+
                       </div>
                     );
                   })}

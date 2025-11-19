@@ -251,6 +251,7 @@ class InterfaceColContent extends Component {
   //开始测试入口
   executeTests = async () => {
     // 点击取消
+    console.log("开始测试时的集合参数:是否失败停止", this.state.commonSetting.stopFail);
     if (this.state.loading) {
       this.setState({ loading: false });
       Object.values(this.cancelTokens).forEach(source => {
@@ -259,7 +260,6 @@ class InterfaceColContent extends Component {
       this.cancelTokens = {};
       return;
     }
-
     const selectedIds = this.state.selectedIds;
     if (!selectedIds.length) {
       message.warning("请先选择用例");
@@ -294,7 +294,6 @@ class InterfaceColContent extends Component {
         after_script: this.props.currProject.after_script,
         test_status: 'loading'
       };
-
       // 更新 UI 状态
       this.setState(prev => {
         const newRows = [...prev.rows];
@@ -308,8 +307,10 @@ class InterfaceColContent extends Component {
       } else {
         await this.runCase(curitem, i); // 同步阻塞
       }
+      let reportsId = curitem._id;
+      let resultCode = this.reports[reportsId] ? this.reports[reportsId].code : undefined;
+      if(this.state.commonSetting.stopFail && resultCode !== 0) break; //是否终止执行
     }
-
     // 等待所有异步 case 完成
     if (asyncTasks.length) {
       await Promise.all(asyncTasks);
@@ -880,7 +881,6 @@ class InterfaceColContent extends Component {
     }
   };
 
-
   render() {
     const {
       loading,
@@ -1247,6 +1247,27 @@ class InterfaceColContent extends Component {
                       }
                     })
                   }} checked={this.state.commonSetting.checkResponseSchema}  checkedChildren="开" unCheckedChildren="关" />
+              </Col>
+            </Row>
+
+            <Row className="setting-item">
+              <Col className="col-item" span="4">
+                <label>遇到失败时停止:&nbsp;
+                  <Tooltip title="如果开启，接口失败会中断集合执行">
+                    <Icon type="question-circle-o" style={{ width: '10px' }} />
+                  </Tooltip>
+                </label>
+              </Col>
+              <Col className="col-item"  span="18">
+                <Switch onChange={e=>{
+                  let {commonSetting} = this.state;
+                  this.setState({
+                    commonSetting :{
+                      ...commonSetting,
+                      stopFail: e
+                    }
+                  })
+                }} checked={this.state.commonSetting.stopFail}  checkedChildren="开" unCheckedChildren="关" />
               </Col>
             </Row>
 

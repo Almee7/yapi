@@ -705,7 +705,7 @@ export default class InterfaceColMenu extends Component {
             </Button>
           </Tooltip>
         </div>
-        <div className="tree-wrapper" style={{ maxHeight: parseInt(document.body.clientHeight) - headHeight + 'px'}}>
+        <div className="tree-wrapper" style={{ maxHeight:"100%"- headHeight + 'px'}}>
           <Tree
                 className="col-list-tree"
                 defaultExpandedKeys={currentKes.expands}

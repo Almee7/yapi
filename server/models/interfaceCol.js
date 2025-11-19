@@ -17,6 +17,10 @@ class interfaceCol extends baseModel {
       up_time: Number,
       index: { type: Number, default: 0 },
       test_report: { type: String, default: '{}' },
+      stopFail: {
+        type:Boolean,
+        default: false
+      },
       checkHttpCodeIs200: {
         type:Boolean,
         default: false
