@@ -43,7 +43,7 @@ class interfaceCase extends baseModel {
       req_body_form: [
         {
           name: String,
-          value: String,
+          value: Schema.Types.Mixed,
           enable: { type: Boolean, default: true }
         }
       ],

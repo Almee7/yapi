@@ -633,7 +633,14 @@ class interfaceColController extends baseController {
       if (!auth) {
         return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));
       }
-
+      // 如果前端把 req_body_form 当字符串发过来，尝试解析
+      if (params.req_body_form && typeof params.req_body_form === 'string') {
+        try {
+          params.req_body_form = JSON.parse(params.req_body_form);
+        } catch (err) {
+          return (ctx.body = yapi.commons.resReturn(null, 400, 'req_body_form 不是合法 JSON'));
+        }
+      }
       params.uid = this.getUid();
 
       //不允许修改接口id和项目id

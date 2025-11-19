@@ -390,7 +390,7 @@ class InterfaceColContent extends Component {
       validRes: []
     };
     let requestParams = {};
-    let options = handleParams(interfaceData, this.handleValue, requestParams);
+    let options = await handleParams(interfaceData, this.handleValue, requestParams);
     try {
       const postData = {
         url: options.url,              // ws:// or wss://
@@ -461,7 +461,7 @@ class InterfaceColContent extends Component {
 
   handleTest = async interfaceData => {
     let requestParams = {};
-    let options = handleParams(interfaceData, this.handleValue, requestParams);
+    let options = await handleParams(interfaceData, this.handleValue, requestParams);
     options.vars = scriptVars
     let result = {
       code: 400,

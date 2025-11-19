@@ -427,50 +427,65 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
     return data;
   }
 
-  function handleParams(interfaceData, handleValue, requestParams) {
-    let interfaceRunData = Object.assign({}, interfaceData);
 
-    function paramsToObjectWithEnable(arr) {
-      const obj = {};
-      safeArray(arr).forEach(item => {
-        if (item && item.name && (item.enable || item.required === '1')) {
-          obj[item.name] = handleValue(item.value, currDomain.global);
-          if (requestParams) {
-            requestParams[item.name] = obj[item.name];
-          }
+function NewFile(fileData) {
+  const { name, type, content, lastModified } = fileData;
+
+  // 将 Base64 字符串转换为 Uint8Array
+  const byteString = atob(content); // decode base64
+  const byteArray = new Uint8Array(byteString.length);
+  for (let i = 0; i < byteString.length; i++) {
+    byteArray[i] = byteString.charCodeAt(i);
+  }
+
+  // 构造 File 对象
+  return new File([byteArray], name, {
+    type: type || 'application/octet-stream',
+    lastModified: lastModified || Date.now()
+  });
+}
+async function handleParams(interfaceData, handleValue, requestParams) {
+  let interfaceRunData = Object.assign({}, interfaceData);
+
+  function paramsToObjectWithEnable(arr) {
+    const obj = {};
+    safeArray(arr).forEach(item => {
+      if (item && item.name && (item.enable || item.required === '1')) {
+        obj[item.name] = handleValue(item.value, currDomain.global);
+        if (requestParams) {
+          requestParams[item.name] = obj[item.name];
         }
-      });
-      return obj;
-    }
-
-    function paramsToObjectUnWithEnable(arr) {
-      const obj = {};
-      safeArray(arr).forEach(item => {
-        if (item && item.name) {
-          obj[item.name] = handleValue(item.value, currDomain.global);
-          if (requestParams) {
-            requestParams[item.name] = obj[item.name];
-          }
-        }
-      });
-      return obj;
-    }
-
-    // 从对象 interfaceRunData 中提取若干字段，赋值给对应的变量：
-    let {case_env, path, env, _id} = interfaceRunData;
-    let currDomain,
-        requestBody,
-        requestOptions;
-    currDomain = handleCurrDomain(env, case_env);
-    interfaceRunData.req_params = interfaceRunData.req_params || [];
-    interfaceRunData.req_params.forEach(item => {
-      let val = handleValue(item.value, currDomain.global);
-      if (requestParams) {
-        requestParams[item.name] = val;
       }
-      path = path.replace(`:${item.name}`, val || `:${item.name}`);
-      path = path.replace(`{${item.name}}`, val || `{${item.name}}`);
     });
+    return obj;
+  }
+
+  function paramsToObjectUnWithEnable(arr) {
+    const obj = {};
+    safeArray(arr).forEach(item => {
+      if (item && item.name) {
+        obj[item.name] = handleValue(item.value, currDomain.global);
+        if (requestParams) {
+          requestParams[item.name] = obj[item.name];
+        }
+      }
+    });
+    return obj;
+  }
+
+  let { case_env, path, env, _id } = interfaceRunData;
+  let currDomain, requestBody, requestOptions;
+  currDomain = handleCurrDomain(env, case_env);
+
+  interfaceRunData.req_params = interfaceRunData.req_params || [];
+  interfaceRunData.req_params.forEach(item => {
+    let val = handleValue(item.value, currDomain.global);
+    if (requestParams) {
+      requestParams[item.name] = val;
+    }
+    path = path.replace(`:${item.name}`, val || `:${item.name}`);
+    path = path.replace(`{${item.name}}`, val || `{${item.name}}`);
+  });
 
     // 处理 URL 拼接与查询参数的注入
     const urlObj = URL.parse(joinPath(currDomain.domain, path), true);
@@ -482,76 +497,132 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
       query: Object.assign(urlObj.query, paramsToObjectWithEnable(interfaceRunData.req_query))
     });
 
-    let headers = paramsToObjectUnWithEnable(interfaceRunData.req_headers);
-    requestOptions = {
-      url,
-      caseId: _id,
-      method: interfaceRunData.method,
-      headers,
-      timeout: 82400000
-    };
+  let headers = paramsToObjectUnWithEnable(interfaceRunData.req_headers);
+  requestOptions = {
+    url,
+    caseId: _id,
+    method: interfaceRunData.method,
+    headers,
+    timeout: 82400000
+  };
 
-    // 对 raw 类型的 form 处理
-    try {
-      if (interfaceRunData.req_body_type === 'raw') {
-        if (headers && headers['Content-Type']) {
-          if (headers['Content-Type'].indexOf('application/x-www-form-urlencoded') >= 0) {
-            interfaceRunData.req_body_type = 'form';
-            let reqData = json_parse(interfaceRunData.req_body_other);
-            if (reqData && typeof reqData === 'object') {
-              interfaceRunData.req_body_form = [];
-              Object.keys(reqData).forEach(key => {
-                interfaceRunData.req_body_form.push({
-                  name: key,
-                  type: 'text',
-                  value: JSON.stringify(reqData[key]),
-                  enable: true
-                });
+  // 🔹 修正 raw -> form/json
+  try {
+    if (interfaceRunData.req_body_type === 'raw') {
+      if (headers && headers['Content-Type']) {
+        if (headers['Content-Type'].includes('application/x-www-form-urlencoded')) {
+          interfaceRunData.req_body_type = 'form';
+          let reqData = json_parse(interfaceRunData.req_body_other);
+          if (reqData && typeof reqData === 'object') {
+            interfaceRunData.req_body_form = [];
+            Object.keys(reqData).forEach(key => {
+              interfaceRunData.req_body_form.push({
+                name: key,
+                type: 'text',
+                value: JSON.stringify(reqData[key]),
+                enable: true
               });
-            }
-          } else if (headers['Content-Type'].indexOf('application/json') >= 0) {
-            interfaceRunData.req_body_type = 'json';
+            });
           }
+        } else if (headers['Content-Type'].includes('application/json')) {
+          interfaceRunData.req_body_type = 'json';
         }
       }
-    } catch (e) {
-      console.error('err', e);
     }
-    if (HTTP_METHOD[interfaceRunData.method].request_body) {
-      if (interfaceRunData.req_body_type === 'form') {
-        requestBody = paramsToObjectWithEnable(
-            safeArray(interfaceRunData.req_body_form).filter(item => {
-              return item.type === 'text';
-            })
-        );
-      } else if (interfaceRunData.req_body_type === 'json') {
-        let reqBody = isJson5(interfaceRunData.req_body_other);
-        if (reqBody === false) {
-          requestBody = interfaceRunData.req_body_other;
-        } else {
-          if (requestParams) {
-            requestParams = Object.assign(requestParams, reqBody);
-          }
-          requestBody = handleJson(reqBody, val => handleValue(val, currDomain.global));
-        }
-      } else {
-        requestBody = interfaceRunData.req_body_other;
-      }
-      requestOptions.data = requestBody;
-      if (interfaceRunData.req_body_type === 'form') {
-        requestOptions.files = paramsToObjectWithEnable(
-            safeArray(interfaceRunData.req_body_form).filter(item => {
-              return item.type === 'file';
-            })
-        );
-      } else if (interfaceRunData.req_body_type === 'file') {
-        requestOptions.file = 'single-file';
-      }
-    }
-    return requestOptions;
+  } catch (e) {
+    console.error('err', e);
   }
 
-  exports.checkRequestBodyIsRaw = checkRequestBodyIsRaw;
+  if (HTTP_METHOD[interfaceRunData.method].request_body) {
+    if (interfaceRunData.req_body_type === 'form') {
+      requestBody = paramsToObjectWithEnable(
+          safeArray(interfaceRunData.req_body_form).filter(item => item.type === 'text')
+      );
+    } else if (interfaceRunData.req_body_type === 'json') {
+      let reqBody = isJson5(interfaceRunData.req_body_other);
+      if (reqBody === false) {
+        requestBody = interfaceRunData.req_body_other;
+      } else {
+        if (requestParams) {
+          requestParams = Object.assign(requestParams, reqBody);
+        }
+        requestBody = handleJson(reqBody, val => handleValue(val, currDomain.global));
+      }
+    } else {
+      requestBody = interfaceRunData.req_body_other;
+    }
+    requestOptions.data = requestBody;
+
+    // ✅ 异步处理 formData
+    if (interfaceRunData.req_body_type === 'form') {
+      const formData = new FormData();
+      const formEntries = [];
+
+      // 🔸 FileReader 异步读取
+      const readFileAsBase64 = file =>
+          new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
+      const promises = safeArray(interfaceRunData.req_body_form).map(async item => {
+        if (item.type === 'file') {
+          let  file = item.value;
+          if (file && !(file instanceof File) && !(file instanceof Blob)) {
+            file = NewFile(file); // 转 File 对象
+          }
+          if (file && (file instanceof File || file instanceof Blob)) {
+            formData.append(item.name || 'file', file, file.name || 'uploaded_file');
+            const base64 = await readFileAsBase64(file);
+            formEntries.push({
+              key: item.name || 'file',
+              isFile: true,
+              name: file.name,
+              type: file.type,
+              content: base64
+            });
+          } else {
+            console.warn('⚠️ 文件对象无效:', item.name, file);
+            formData.append(item.name || 'file', '');
+            formEntries.push({ key: item.name || 'file', value: '' });
+          }
+        } else {
+          formData.append(item.name, item.value || '');
+          formEntries.push({ key: item.name, value: item.value || '' });
+        }
+      });
+
+      await Promise.all(promises);
+
+      // ✅ 输出调试信息
+      for (let [k, v] of formData.entries()) {
+        if (v instanceof File) {
+          console.log("✅ FormData 文件字段：", k, v.name, v.size, v.type);
+        } else {
+          console.log("✅ FormData 普通字段：", k, v);
+        }
+      }
+
+      console.log("原始 formData", formData);
+
+      requestOptions.isFormData = true;
+      requestOptions.data = { __formData: true, entries: formEntries };
+
+      console.log("序列化后的 requestOptions.data", requestOptions.data);
+    }
+    else if (interfaceRunData.req_body_type === 'file') {
+      const fileItem = safeArray(interfaceRunData.req_body_form).find(item => item.type === 'file');
+      requestOptions.data = fileItem ? fileItem.value : null;
+    }
+  }
+
+  return requestOptions;
+}
+
+
+exports.checkRequestBodyIsRaw = checkRequestBodyIsRaw;
   exports.handleParams = handleParams;
   exports.handleContentType = handleContentType;
   exports.crossRequest = crossRequest;
