@@ -165,7 +165,8 @@ export default class InterfaceColMenu extends Component {
         name,
         desc: desc || '',
         project_id,
-        parent_id: parentColId || 0
+        parent_id: parentColId || 0,
+        type: 'folder'
       });
     } else if (colModalType === 'edit') {
       res = await axios.post('/api/col/up_col', { name, desc, col_id });
@@ -264,7 +265,8 @@ export default class InterfaceColMenu extends Component {
       name,
       desc,
       project_id,
-      parent_id
+      parent_id,
+      type: 'folder'
     });
 
     if (add_col_res.data.errcode) {
@@ -399,6 +401,10 @@ export default class InterfaceColMenu extends Component {
 
   onDrop = async e => {
     const { interfaceColList } = this.props;
+    console.log('onDrop', e);
+    console.log('interfaceColList', { interfaceColList });
+    console.log('e.dragNode.props', e.dragNode.props);
+    console.log('e.node.props', e.node.props);
     const dragKey = e.dragNode.props.eventKey;
     const dropKey = e.node.props.eventKey;
 
@@ -498,7 +504,6 @@ export default class InterfaceColMenu extends Component {
     }
   };
 
-
   enterItem = id => {
     this.setState({ delIcon: id });
   };
@@ -507,88 +512,100 @@ export default class InterfaceColMenu extends Component {
     this.setState({ delIcon: null });
   };
 
-  // 递归构建树节点
+  // 递归构建树节点（平铺列表生成，可支持 case 和 folder/group 混排）
   buildTreeNodes = (data, parentId = 0) => {
-    return data
-        .filter(item => item.parent_id === parentId)
-        .map(col => {
-          const children = this.buildTreeNodes(data, col._id);
+    // 1. 当前层级的目录（folder/group）
+    const subDirs = data.filter(item => (item.type === 'folder' || item.type === 'group') && item.parent_id === parentId);
 
-          return (
-            <TreeNode
-                  key={'col_' + col._id}
-                  dataRef={col}
-                  title={
-                    <div className="menu-title">
-                      <span>
-                        <Icon type="folder-open" style={{ marginRight: 5 }} />
-                        <span>{col.name}</span>
-                        {/* 显示接口数量（包含子级） */}
-                        <span style={{ marginLeft: 8, color: '#999', fontSize: '12px' }}>
-                          ({this.getAllCasesFromColAndChildren(col._id, data).length})
-                        </span>
-                      </span>
-                      <div className="btns">
-                        <Tooltip title="删除集合">
-                          <Icon
-                              type="delete"
-                              className="interface-delete-icon"
-                              onClick={() => {
-                                this.showDelColConfirm(col._id);
-                              }}
-                          />
-                        </Tooltip>
-                        <Tooltip title="编辑集合">
-                          <Icon
-                              type="edit"
-                              className="interface-delete-icon"
-                              onClick={e => {
-                                e.stopPropagation();
-                                this.showColModal('edit', col);
-                              }}
-                          />
-                        </Tooltip>
-                        <Tooltip title="导入接口">
-                          <Icon
-                              type="plus"
-                              className="interface-delete-icon"
-                              onClick={e => {
-                                e.stopPropagation();
-                                this.showImportInterfaceModal(col._id);
-                              }}
-                          />
-                        </Tooltip>
-                        <Tooltip title="添加子目录">
-                          <Icon
-                              type="folder-add"
-                              className="interface-delete-icon"
-                              onClick={e => {
-                                e.stopPropagation();
-                                this.showColModal('add', null, true, col._id);
-                              }}
-                          />
-                        </Tooltip>
-                        <Tooltip title="克隆集合">
-                          <Icon
-                              type="copy"
-                              className="interface-delete-icon"
-                              onClick={e => {
-                                e.stopPropagation();
-                                this.copyInterface(col);
-                              }}
-                          />
-                        </Tooltip>
-                      </div>
-                    </div>
-                  }
-              >
-              {children}
-              {col.caseList && col.caseList.map(this.itemInterfaceColCreate)}
-            </TreeNode>
-          );
-        });
+    // 2. 当前层级的用例（case 的 parentId 通过 col_id 或 group_id 指向父目录）
+    const cases = data.filter(item => item.type === 'case' && (item.group_id || item.col_id) === parentId);
+
+    // 3. 合并并排序
+    const combined = [...subDirs, ...cases].sort((a, b) => (a.index || 0) - (b.index || 0));
+
+    // 4. 遍历渲染
+    return combined.map(item => {
+      if (item.type === 'folder' || item.type === 'group') {
+        const children = this.buildTreeNodes(data, item._id);
+        return (
+          <TreeNode
+                key={`${item.type}_${item._id}`}
+                dataRef={item}
+                title={this.renderColTitle(item)}
+            >
+            {children.length > 0 ? children : null}
+          </TreeNode>
+        );
+      } else {
+        return this.itemInterfaceColCreate(item);
+      }
+    });
+  };
+  // 渲染目录的标题（保持你原来的样式和按钮）
+  renderColTitle = (col) => {
+    return (
+      <div className="menu-title">
+        <span>
+          <Icon type="folder-open" style={{ marginRight: 5 }} />
+          <span>{col.name}</span>
+          <span style={{ marginLeft: 8, color: '#999', fontSize: '12px' }}>
+            ({this.getAllCasesFromColAndChildren(col._id, this.state.list).length})
+          </span>
+        </span>
+        <div className="btns">
+          <Tooltip title="删除集合">
+            <Icon
+                  type="delete"
+                  className="interface-delete-icon"
+                  onClick={() => this.showDelColConfirm(col._id)}
+              />
+          </Tooltip>
+          <Tooltip title="编辑集合">
+            <Icon
+                  type="edit"
+                  className="interface-delete-icon"
+                  onClick={e => {
+                    e.stopPropagation();
+                    this.showColModal('edit', col);
+                  }}
+              />
+          </Tooltip>
+          <Tooltip title="导入接口">
+            <Icon
+                  type="plus"
+                  className="interface-delete-icon"
+                  onClick={e => {
+                    e.stopPropagation();
+                    this.showImportInterfaceModal(col._id);
+                  }}
+              />
+          </Tooltip>
+          <Tooltip title="添加子目录">
+            <Icon
+                  type="folder-add"
+                  className="interface-delete-icon"
+                  onClick={e => {
+                    e.stopPropagation();
+                    this.showColModal('add', null, true, col._id);
+                  }}
+              />
+          </Tooltip>
+          <Tooltip title="克隆集合">
+            <Icon
+                  type="copy"
+                  className="interface-delete-icon"
+                  onClick={e => {
+                    e.stopPropagation();
+                    this.copyInterface(col);
+                  }}
+              />
+          </Tooltip>
+        </div>
+      </div>
+    );
   };
 
+  // 渲染单个用例节点 pre
   itemInterfaceColCreate = interfaceCase => {
     return (
       <TreeNode
@@ -614,7 +631,7 @@ export default class InterfaceColMenu extends Component {
                           e.stopPropagation();
                           this.showDelCaseConfirm(interfaceCase._id);
                         }}
-                        style={{ display: this.state.delIcon == interfaceCase._id ? 'block' : 'none' }}
+                        style={{ display: this.state.delIcon === interfaceCase._id ? 'block' : 'none' }}
                     />
                   </Tooltip>
                   <Tooltip title="克隆用例">
@@ -625,7 +642,7 @@ export default class InterfaceColMenu extends Component {
                           e.stopPropagation();
                           this.caseCopy(interfaceCase._id);
                         }}
-                        style={{ display: this.state.delIcon == interfaceCase._id ? 'block' : 'none' }}
+                        style={{ display: this.state.delIcon === interfaceCase._id ? 'block' : 'none' }}
                     />
                   </Tooltip>
                 </div>
@@ -705,7 +722,7 @@ export default class InterfaceColMenu extends Component {
             </Button>
           </Tooltip>
         </div>
-        <div className="tree-wrapper" style={{ maxHeight:"100%"- headHeight + 'px'}}>
+        <div className="tree-wrapper" style={{ maxHeight: `calc(100% - ${headHeight}px)` }}>
           <Tree
                 className="col-list-tree"
                 defaultExpandedKeys={currentKes.expands}

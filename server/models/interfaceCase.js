@@ -17,6 +17,7 @@ class interfaceCase extends baseModel {
       project_id: { type: Number, required: true },
       interface_id: { type: Number, required: true },
       parent_id: [],
+      group_id: Number,
       add_time: Number,
       up_time: Number,
       case_env: { type: String },
@@ -39,7 +40,6 @@ class interfaceCase extends baseModel {
           enable: { type: Boolean, default: true }
         }
       ],
-
       req_body_form: [
         {
           name: String,
@@ -95,7 +95,7 @@ class interfaceCase extends baseModel {
   }
 
   newList(col_id, select) {
-    select = select || 'casename uid col_id _id index interface_id project_id';
+    select = select || 'casename uid col_id _id index interface_id project_id group_id';
     const query = Array.isArray(col_id) ? { col_id: { $in: col_id } } : { col_id: col_id };
 
     let dbQuery = this.model.find(query).sort({ index: 1 }); // 按 index 升序排序
@@ -144,6 +144,32 @@ class interfaceCase extends baseModel {
         index: index
       }
     );
+  }
+  update(id, data) {
+    // data 示例: { index: 2, parent_id: 0 }
+    return this.model.update(
+        { _id: id },
+        data
+    );
+  }
+  async getMaxIndexByContainer(col_id, group_id = null) {
+    col_id = Number(col_id);
+
+    const query = { col_id };
+    if (group_id !== null) {
+      query.group_id = group_id;
+    } else {
+      query.group_id = null;
+    }
+
+    // 查当前容器下最大的 index
+    const doc = await this.model
+        .find(query)
+        .sort({ index: -1 })
+        .limit(1)
+        .exec();
+
+    return doc.length ? doc[0].index : -1;
   }
 
   async getMaxIndex(col_id) {

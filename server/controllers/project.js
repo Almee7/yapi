@@ -229,6 +229,8 @@ class projectController extends baseController {
       await colInst.save({
         name: '公共测试集',
         project_id: result._id,
+        parent_id: 0,
+        index: 0,
         desc: '公共测试集',
         uid: this.getUid(),
         add_time: yapi.commons.time(),
@@ -308,6 +310,8 @@ class projectController extends baseController {
         await colInst.save({
           name: '公共测试集',
           project_id: result._id,
+          parent_id: 0,
+          index: 0,
           desc: '公共测试集',
           uid: this.getUid(),
           add_time: yapi.commons.time(),

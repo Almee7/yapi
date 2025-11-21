@@ -13,6 +13,7 @@ class interfaceCol extends baseModel {
       project_id: { type: Number, required: true },
       parent_id: { type: Number, default: 0 },
       desc: String,
+      type: { type: String, required: true , default: 'folder' },
       add_time: Number,
       up_time: Number,
       index: { type: Number, default: 0 },
@@ -111,7 +112,7 @@ class interfaceCol extends baseModel {
   newList(project_id) {
     return this.model
         .find({ project_id })
-        .select('name uid project_id desc add_time up_time index parent_id')
+        .select('name uid project_id desc add_time up_time index parent_id type')
         .lean() // 返回普通对象
         .exec();
   }
@@ -150,13 +151,29 @@ class interfaceCol extends baseModel {
       }
     );
   }
+  update(id, data) {
+    // data 示例: { index: 2, parent_id: 0 }
+    return this.model.update(
+        { _id: id },
+        data
+    );
+  }
   async getMaxIndex(parent_id) {
     let doc = await this.model
         .findOne({parent_id: parent_id})   // 筛选条件：当前集合
         .sort({index: -1})           // 按 index 倒序取第一个
         .exec();
-
     return doc ? doc.index : -1;      // 如果没有数据就返回 0
+  }
+
+  async getIndexByParentId(project_id,parent_id) {
+    parent_id = Number(parent_id) || 0;
+    project_id = Number(project_id);
+    let doc = await this.model
+        .findOne({ parent_id, project_id })
+        .sort({ index: -1 })
+        .exec();
+    return doc ? doc.index : -1;
   }
 }
 

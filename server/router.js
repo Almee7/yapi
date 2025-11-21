@@ -488,9 +488,14 @@ let routerConfig = {
       method: 'post'
     },
     {
-      action: 'upColIndex',
-      path: 'up_col_index',
+      action: 'upIndexMix',
+      path: 'up_index_mix',
       method: 'post'
+    },
+    {
+      action: 'list',
+      path: 'list',
+      method: 'get'
     },
     {
       action: 'delCol',

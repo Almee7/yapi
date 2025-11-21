@@ -44,45 +44,22 @@ class interfaceColController extends baseController {
       // 获取该项目下的集合列表（普通对象 + 按 index 排序）
       let colList = await this.colModel.newList(projectId);
       if (!colList.length) return (ctx.body = yapi.commons.resReturn([]));
-      colList.sort((a, b) => (a.index || 0) - (b.index || 0));
 
       // 批量获取所有用例（普通对象）
       const colIds = colList.map(col => col._id);
       let allCases = await this.caseModel.newList(colIds); // 已是普通对象
-      allCases.sort((a, b) => (a.index || 0) - (b.index || 0));
+      // 给所有 case 加上 type 字段
+      allCases = allCases.map(c => ({
+        ...c,
+        type: 'case'
+      }));
+      const newList = [...colList, ...allCases];
 
-      // 批量获取接口信息（普通对象）
-      const interfaceIds = [...new Set(allCases.map(c => c.interface_id).filter(Boolean))];
-      let interfaces = [];
-      if (interfaceIds.length > 0) {
-        interfaces = await this.interfaceModel.listByIds(interfaceIds);
-      }
-      const interfaceMap = new Map(interfaces.map(itf => [itf._id.toString(), itf]));
-
-      // 按 col_id 分组并补充 path
-      const colCaseMap = new Map();
-      for (let c of allCases) {
-        const itf = interfaceMap.get(c.interface_id ? c.interface_id.toString() : undefined);
-        c.path = itf ? itf.path : '';
-
-        const colKey = c.col_id.toString();
-        if (!colCaseMap.has(colKey)) colCaseMap.set(colKey, []);
-        colCaseMap.get(colKey).push(c);
-      }
-
-      // 给每个集合挂载 caseList，并按 index 排序
-      for (let col of colList) {
-        const cases = colCaseMap.get(col._id.toString()) || [];
-        col.caseList = cases.sort((a, b) => (a.index || 0) - (b.index || 0));
-      }
-
-      ctx.body = yapi.commons.resReturn(colList);
+      ctx.body = yapi.commons.resReturn(newList);
     } catch (e) {
       ctx.body = yapi.commons.resReturn(null, 402, e.message);
     }
   }
-
-
 
 
   /**
@@ -101,58 +78,82 @@ class interfaceColController extends baseController {
   async addCol(ctx) {
     try {
       let params = ctx.request.body;
+
+      // ===== 参数校验 =====
       params = yapi.commons.handleParams(params, {
         name: 'string',
         project_id: 'number',
         desc: 'string',
-        parent_id: 'number'
+        parent_id: 'number',
+        type: 'string'     // folder | group
       });
 
       if (!params.project_id) {
-        return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
-      }
-      if (!params.name) {
-        return (ctx.body = yapi.commons.resReturn(null, 400, '名称不能为空'));
+        return ctx.body = yapi.commons.resReturn(null, 400, '项目ID不能为空');
       }
 
+      if (!params.name) {
+        return ctx.body = yapi.commons.resReturn(null, 400, '名称不能为空');
+      }
+
+      if (!['folder', 'group'].includes(params.type)) {
+        return ctx.body = yapi.commons.resReturn(null, 400, 'type 必须为 folder 或 group');
+      }
+
+      // ===== 权限检查 =====
       let auth = await this.checkAuth(params.project_id, 'project', 'edit');
       if (!auth) {
         return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));
       }
-      let maxIndex = await this.colModel.getMaxIndex(params.parent_id);
-      console.log("maxIndex",maxIndex)
 
-      // 保存接口集
+      // ===== parent_id 统一规范化为数字 =====
+      const parentId = Number(params.parent_id) || 0;
+
+      // ===== group 必须挂载 folder 下 =====
+      if (params.type === 'group') {
+        if (parentId === 0) {
+          return ctx.body = yapi.commons.resReturn(null, 400, 'group 必须在 folder 下，不允许在根目录');
+        }
+
+        const parentCol = await this.colModel.get(parentId);
+        if (!parentCol || parentCol.type !== 'folder') {
+          return ctx.body = yapi.commons.resReturn(null, 400, 'group 的 parent 必须是 folder');
+        }
+      }
+
+      // =====================================
+      //         index = maxIndex + 1
+      // =====================================
+      console.log("params.parentId", parentId , params.project_id);
+      const maxColIndex = await this.colModel.getIndexByParentId(params.project_id, parentId);
+      const maxCaseIndex = await this.caseModel.getMaxIndexByContainer(parentId, null);
+      console.log("newAddCol--------maxColIndex", maxColIndex);
+      console.log("newAddCol--------maxCaseIndex", maxCaseIndex);
+      let index = Math.max(maxColIndex, maxCaseIndex) +1
+
+      // ===== 保存数据 =====
       let colData = {
         name: params.name,
-        parent_id: Number(
-            params.parent_id && params.parent_id.id
-                ? params.parent_id.id
-                : params.parent_id
-        ) || 0,
         project_id: params.project_id,
-        index: maxIndex + 1,
+        parent_id: parentId,
+        type: params.type || 'folder',
+        index,
         desc: params.desc,
         uid: this.getUid(),
         add_time: yapi.commons.time(),
         up_time: yapi.commons.time()
       };
 
-      // 如果 parent_id 存在，说明是子级接口集
-      if (params.parent_id) {
-        colData.parent_id = params.parent_id;
-      }
-      let result = await this.colModel.save(colData);
+      const result = await this.colModel.save(colData);
 
-      let username = this.getUsername();
+      // ===== 日志 =====
+      const username = this.getUsername();
       let logContent = `<a href="/user/profile/${this.getUid()}">${username}</a> 添加了接口集 `;
 
-      if (params.parent_id) {
-        logContent += `<a href="/project/${params.project_id}/interface/col/${params.parent_id}">父级接口集</a> 的子集 <a href="/project/${
-            params.project_id
-        }/interface/col/${result._id}">${params.name}</a>`;
-      } else {
+      if (parentId === 0) {
         logContent += `<a href="/project/${params.project_id}/interface/col/${result._id}">${params.name}</a>`;
+      } else {
+        logContent += `父级 <a href="/project/${params.project_id}/interface/col/${parentId}">${parentId}</a> 下创建了子集 <a href="/project/${params.project_id}/interface/col/${result._id}">${params.name}</a>`;
       }
 
       yapi.commons.saveLog({
@@ -164,8 +165,9 @@ class interfaceColController extends baseController {
       });
 
       ctx.body = yapi.commons.resReturn(result);
+
     } catch (e) {
-      ctx.body = yapi.commons.resReturn(null, 402, e.message);
+      ctx.body = yapi.commons.resReturn(null, 500, e.message);
     }
   }
 
@@ -353,67 +355,6 @@ class interfaceColController extends baseController {
    */
 
   async addCase(ctx) {
-    try {
-      let params = ctx.request.body;
-      params = yapi.commons.handleParams(params, {
-        casename: 'string',
-        project_id: 'number',
-        col_id: 'number',
-        interface_id: 'number',
-        case_env: 'string'
-      });
-
-      if (!params.project_id) {
-        return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
-      }
-
-      if (!params.interface_id) {
-        return (ctx.body = yapi.commons.resReturn(null, 400, '接口id不能为空'));
-      }
-
-      let auth = await this.checkAuth(params.project_id, 'project', 'edit');
-      if (!auth) {
-        return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));
-      }
-
-      if (!params.col_id) {
-        return (ctx.body = yapi.commons.resReturn(null, 400, '接口集id不能为空'));
-      }
-
-      if (!params.casename) {
-        return (ctx.body = yapi.commons.resReturn(null, 400, '用例名称不能为空'));
-      }
-      let maxIndex = await this.caseModel.getMaxIndex(params.col_id);
-
-      params.uid = this.getUid();
-      params.index = maxIndex+1;
-      params.add_time = yapi.commons.time();
-      params.up_time = yapi.commons.time();
-      let result = await this.caseModel.save(params);
-      let username = this.getUsername();
-
-      this.colModel.get(params.col_id).then(col => {
-        yapi.commons.saveLog({
-          content: `<a href="/user/profile/${this.getUid()}">${username}</a> 在接口集 <a href="/project/${
-            params.project_id
-          }/interface/col/${params.col_id}">${col.name}</a> 下添加了测试用例 <a href="/project/${
-            params.project_id
-          }/interface/case/${result._id}">${params.casename}</a>`,
-          type: 'project',
-          uid: this.getUid(),
-          username: username,
-          typeid: params.project_id
-        });
-      });
-      this.projectModel.up(params.project_id, { up_time: new Date().getTime() }).then();
-
-      ctx.body = yapi.commons.resReturn(result);
-    } catch (e) {
-      ctx.body = yapi.commons.resReturn(null, 402, e.message);
-    }
-  }
-
-  async addCaseList(ctx) {
     try {
       let params = ctx.request.body;
       params = yapi.commons.handleParams(params, {
@@ -716,7 +657,7 @@ class interfaceColController extends baseController {
               type: field.value.type || 'application/octet-stream',
               size: field.value.size || 0,
               base64: field.value.base64 || '',
-              __isFile: true, // 标记前端可转 File
+              __isFile: true // 标记前端可转 File
             }
           };
         }
@@ -844,6 +785,39 @@ class interfaceColController extends baseController {
       return (ctx.body = yapi.commons.resReturn('成功！'));
     } catch (e) {
       ctx.body = yapi.commons.resReturn(null, 400, e.message);
+    }
+  }
+
+  /**
+   * 更新顺序不分类型 index
+   * @interface /col/up_col_index
+   * @method POST
+   * @category col
+   * @foldnumber 10
+   * @param {Array}  [id, index]
+   * @returns {Object}
+   * @example
+   */
+  async upIndexMix(ctx) {
+    try {
+      const { list } = ctx.request.body;
+      for (let item of list) {
+        if (item.type === 'folder' || item.type === 'group') {
+          await this.colModel.update(
+              { _id: item._id },
+              { index: item.index, parent_id: item.parent_id }
+          );
+        } else if (item.type === 'case') {
+          await this.caseModel.update(
+              { _id: item._id },
+              { index: item.index, col_id: item.col_id }
+          );
+        }
+      }
+
+      ctx.body = yapi.commons.resReturn('更新成功');
+    } catch (err) {
+      ctx.body = yapi.commons.resReturn(null, 500, err.message);
     }
   }
 
