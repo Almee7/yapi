@@ -401,9 +401,14 @@ exports.sandbox = async (sandbox, script) => {
                 return msg;              // 👈 同时返回，脚本里也能接收
             };
         }
+        let wrapped;
+        if (match) {
+            wrapped = new vm.Script(`(async () => {${script}})()`);
+        } else {
+            wrapped= new vm.Script(script);
+        }
         // ✅ 统一执行脚本，支持 async/await
-        const wrappedScript = new vm.Script(`(async () => {${script}})()`);
-        await wrappedScript.runInContext(context);
+        await wrapped.runInContext(context);
         // 如果有 sqlAssert，执行断言
         if (Array.isArray(sandbox.sqlAssert) && sandbox.sqlAssert.length > 0) {
             const actualValue = await executeQuery(sandbox.sqlAssert, sandbox.vars, serverName);
