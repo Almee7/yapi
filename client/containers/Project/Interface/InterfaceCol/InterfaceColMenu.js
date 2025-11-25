@@ -121,30 +121,34 @@ export default class InterfaceColMenu extends Component {
   // 获取集合及其所有子级集合的接口
   getAllCasesFromColAndChildren = (colId, list) => {
     const allCases = [];
-    const col = list.find(item => item._id === colId);
 
-    if (col && col.caseList) {
-      allCases.push(...col.caseList);
-    }
-
-    // 递归获取所有子级集合的接口
-    const getChildCases = (parentId) => {
+    // 1. 获取所有子级目录（递归）
+    const collectChildren = (parentId, result) => {
       list.forEach(item => {
-        if (item.parent_id === parentId) {
-          if (item.caseList) {
-            allCases.push(...item.caseList);
-          }
-          getChildCases(item._id); // 递归获取子级的子级
+        if ((item.type === 'folder' || item.type === 'group') && item.parent_id === parentId) {
+          result.push(item._id);
+          collectChildren(item._id, result);
         }
       });
     };
 
-    getChildCases(colId);
+    const subIds = [colId];
+    collectChildren(colId, subIds);
+
+    // 2. 找出所有 case，其 col_id 在上述所有目录 ID 中
+    list.forEach(item => {
+      if (item.type === 'case' && subIds.includes(item.col_id)) {
+        allCases.push(item);
+      }
+    });
+
     return allCases;
   };
 
+
   // 构建包含所有子级接口的集合数据
   buildAllColsWithChildren = (list) => {
+    console.log('buildAllColsWithChildren', list);
     return list.map(col => {
       const allCases = this.getAllCasesFromColAndChildren(col._id, list);
       return {
@@ -185,6 +189,7 @@ export default class InterfaceColMenu extends Component {
   };
 
   onExpand = keys => {
+    console.log('onExpand', keys);
     this.setState({ expands: keys });
   };
 
@@ -194,7 +199,7 @@ export default class InterfaceColMenu extends Component {
       const id = keys[0].split('_')[1];
       const project_id = this.props.match.params.id;
 
-      if (type === 'col') {
+      if (type === 'folder' || type === 'group' ) {
         this.props.setColData({
           isRander: false,
           // 设置当前选中的集合ID和所有子级接口
@@ -209,9 +214,9 @@ export default class InterfaceColMenu extends Component {
         this.props.history.push('/project/' + project_id + '/interface/case/' + id);
       }
     }
-    this.setState({
-      expands: null
-    });
+    // this.setState({
+    //   expands: null
+    // });
   }, 500);
 
   showDelColConfirm = colId => {
@@ -401,106 +406,109 @@ export default class InterfaceColMenu extends Component {
 
   onDrop = async e => {
     const { interfaceColList } = this.props;
-    console.log('onDrop', e);
-    console.log('interfaceColList', { interfaceColList });
-    console.log('e.dragNode.props', e.dragNode.props);
-    console.log('e.node.props', e.node.props);
-    const dragKey = e.dragNode.props.eventKey;
-    const dropKey = e.node.props.eventKey;
+    const dragNode = e.dragNode.props.dataRef;
+    const dropNode = e.node.props.dataRef;
 
-    // 集合拖拽
-    if (dragKey.startsWith('col_')) {
-      const dragColId = dragKey.split('_')[1];
-      const dropColId = dropKey.split('_')[1];
-      const dropPosArr = e.node.props.pos.split('-');
-      const dropPosition = e.dropPosition - Number(dropPosArr[dropPosArr.length - 1]);
+    console.log('dragNode', dragNode);
+    console.log('dropNode', dropNode);
 
-      let parentId = 0;
-
-      // 1. 拖到集合上（作为子目录）
-      if (dropPosition === 0) {
-        parentId = dropColId;
-      } else {
-        // 2. 拖到集合前后（同级排序）
-        parentId = (e.node.props.dataRef && e.node.props.dataRef.parent_id) || 0;
-      }
-
-      // 获取同级集合列表
-      const sameLevelCols = interfaceColList.filter(col => col.parent_id === parentId);
-      const dragIndex = sameLevelCols.findIndex(c => c._id === dragColId);
-      const dropIndex = dropPosition === 0 ? sameLevelCols.length : sameLevelCols.findIndex(c => c._id === dropColId);
-
-      // 计算新的顺序
-      const changes = arrayChangeIndex(sameLevelCols, dragIndex, dropIndex);
-
-      try {
-        // 更新顺序
-        if (changes.length) {
-          await axios.post('/api/col/up_col_index', changes);
-        }
-
-        // 更新父级 id（如果拖动到子目录）
-        await axios.post('/api/col/up_col', {
-          col_id: dragColId,
-          parent_id: parentId
-        });
-
-        message.success('集合移动成功');
-        this.getList();
-      } catch (err) {
-        console.error('集合拖拽更新失败:', err);
-        message.error('集合移动失败');
-      }
-
-      return;
+    // 1️⃣ 计算目标父节点
+    let targetParentId;
+    if (!e.dropToGap) {
+      targetParentId = (dropNode.type === 'folder' || dropNode.type === 'group') ? dropNode._id : dropNode.parent_id;
+    } else {
+      if (dropNode.type === 'folder') targetParentId = dropNode._id;
+      else if (dropNode.type === 'group' || dropNode.type === 'case') targetParentId = dropNode.parent_id;
+      else targetParentId = 0;
     }
 
-    // 用例拖拽
-    const dragNodeData = e.dragNode.props.dataRef || {};
-    const caseId = dragKey.split('_')[1];
-    const dragColId = dragNodeData.col_id || dragNodeData._id;
+    // 2️⃣ 校验规则
+    if (dragNode.type === 'case' && targetParentId === 0) {
+      return message.error('接口不能直接移动到根目录');
+    }
+
+    if (dragNode.type === 'group') {
+      const parentNode = interfaceColList.find(n => n._id === targetParentId);
+      if (!parentNode || parentNode.type !== 'folder') {
+        return message.error('分组只能放在文件夹下');
+      }
+    }
+
+    console.log('targetParentId', targetParentId);
+
+    // 3️⃣ 获取源文件夹和目标文件夹 siblings 并按 index 排序
+    const originSiblings = interfaceColList
+        .filter(n => n.parent_id === dragNode.parent_id)
+        .sort((a, b) => a.index - b.index);
+
+    const targetSiblings = interfaceColList
+        .filter(n => n.parent_id === targetParentId)
+        .sort((a, b) => a.index - b.index);
+
+    // 4️⃣ 删除源目录节点
+    const dragIndexInOrigin = originSiblings.findIndex(n => n._id === dragNode._id);
+    originSiblings.splice(dragIndexInOrigin, 1);
+    originSiblings.forEach((n, idx) => (n.index = idx));
+
+    // 5️⃣ 计算插入目标目录的 index
+    let insertIndex;
+    if (!e.dropToGap) {
+      // 放在内部 → 插到最后
+      insertIndex = targetSiblings.length;
+    } else {
+      const dropIndex = targetSiblings.findIndex(n => n._id === dropNode._id);
+      insertIndex = dropIndex + (e.dropPosition > 0 ? 1 : 0);
+    }
+
+    // 6️⃣ 插入拖拽节点并更新 parent_id, col_id, group_id
+    if (dropNode.type === 'folder') {
+      // 放到 folder 下
+      dragNode.parent_id = targetParentId;
+      dragNode.col_id = dropNode._id;
+      dragNode.group_id = null;
+    } else if (dropNode.type === 'group') {
+      // 放到 group 下
+      dragNode.parent_id = targetParentId;
+      dragNode.col_id = dropNode.col_id;
+      dragNode.group_id = dropNode._id;
+    } else {
+      // 放到 case 或其他同级
+      dragNode.parent_id = targetParentId;
+      dragNode.col_id = targetParentId; // folder id
+      dragNode.group_id = dropNode.type === 'group' ? dropNode._id : null;
+    }
+
+    targetSiblings.splice(insertIndex, 0, dragNode);
+    targetSiblings.forEach((n, idx) => (n.index = idx));
+
+    console.log('originSiblings after move', originSiblings);
+    console.log('targetSiblings after move', targetSiblings);
+
+    // 7️⃣合并需要更新的节点（源 + 目标）
+    const updates = [...originSiblings, ...targetSiblings].map(n => ({
+      id: n._id,
+      index: n.index,
+      type: n.type,
+      parent_id: n.parent_id,
+      col_id: n.col_id,
+      group_id: n.group_id || null
+    }));
+
+    console.log('更新列表', updates);
 
     try {
-      let dropColId = dragColId;
-      let targetCaseList = [];
-      // 计算拖拽的 index
-      const dragPos = e.dragNode.props.pos.split('-');
-      const dragIndex = Number(dragPos[dragPos.length - 1]);
-      const dropPos = e.node.props.pos.split('-');
-      const dropIndex = Number(dropPos[dropPos.length - 1]);
-
-      if (dropKey.startsWith('case_')) {
-        const dropCaseId = dropKey.split('_')[1];
-        const dropCol = interfaceColList.find(col =>
-            col.caseList && col.caseList.some(c => String(c._id) === String(dropCaseId))
-        );
-        dropColId = dropCol ? dropCol._id : dragColId;
-        targetCaseList = dropCol ? dropCol.caseList : [];
-
-        if (dragColId !== dropColId) {
-          // 跨集合，更新 col_id
-          await axios.post('/api/col/up_case', { id: caseId, col_id: dropColId });
-        }
-      } else if (dropKey.startsWith('col_')) {
-        dropColId = (e.node.props.dataRef && e.node.props.dataRef._id) || dropKey.split('_')[1];
-        const dropCol = interfaceColList.find(col => col._id === dropColId);
-        targetCaseList = dropCol ? dropCol.caseList : [];
-        await axios.post('/api/col/up_case', { id: caseId, col_id: dropColId });
-      }
-
-      // 更新顺序
-      if (targetCaseList.length) {
-        const changes = arrayChangeIndex(targetCaseList, dragIndex, dropIndex);
-        if (changes.length) {
-          await axios.post('/api/col/up_case_index', changes);
-        }
-      }
-
+      await axios.post('/api/col/up_index', { list: updates });
+      message.success('顺序更新成功');
       this.getList();
       this.props.setColData({ isRander: true });
+
+      // 8️⃣ 拖拽后自动展开目标父节点，同时保留原有展开状态
+      this.setState(prev => ({
+        expands: [...new Set([...prev.expands.map(k => k.toString()), targetParentId.toString()])]
+      }));
     } catch (err) {
-      console.error('用例拖拽更新失败:', err);
-      message.error('用例移动失败');
+      console.error('拖拽更新失败', err);
+      message.error('顺序更新失败');
     }
   };
 
@@ -515,12 +523,14 @@ export default class InterfaceColMenu extends Component {
   // 递归构建树节点（平铺列表生成，可支持 case 和 folder/group 混排）
   buildTreeNodes = (data, parentId = 0) => {
     // 1. 当前层级的目录（folder/group）
-    const subDirs = data.filter(item => (item.type === 'folder' || item.type === 'group') && item.parent_id === parentId);
+    const subDirs = data.filter(
+        item => (item.type === 'folder' || item.type === 'group') && item.parent_id === parentId
+    );
 
-    // 2. 当前层级的用例（case 的 parentId 通过 col_id 或 group_id 指向父目录）
-    const cases = data.filter(item => item.type === 'case' && (item.group_id || item.col_id) === parentId);
+    // 2. 当前层级的用例（case 的 parent_id 指向父目录）
+    const cases = data.filter(item => item.type === 'case' && item.parent_id === parentId);
 
-    // 3. 合并并排序
+    // 3. 合并并按 index 排序
     const combined = [...subDirs, ...cases].sort((a, b) => (a.index || 0) - (b.index || 0));
 
     // 4. 遍历渲染
@@ -541,7 +551,8 @@ export default class InterfaceColMenu extends Component {
       }
     });
   };
-  // 渲染目录的标题（保持你原来的样式和按钮）
+
+  // 渲染目录标题，保持原来的按钮和样式
   renderColTitle = (col) => {
     return (
       <div className="menu-title">
@@ -604,6 +615,7 @@ export default class InterfaceColMenu extends Component {
       </div>
     );
   };
+
 
   // 渲染单个用例节点 pre
   itemInterfaceColCreate = interfaceCase => {

@@ -16,7 +16,7 @@ class interfaceCase extends baseModel {
       index: { type: Number, default: 0 },
       project_id: { type: Number, required: true },
       interface_id: { type: Number, required: true },
-      parent_id: [],
+      parent_id: Number,
       group_id: Number,
       add_time: Number,
       up_time: Number,
@@ -95,7 +95,7 @@ class interfaceCase extends baseModel {
   }
 
   newList(col_id, select) {
-    select = select || 'casename uid col_id _id index interface_id project_id group_id';
+    select = select || 'casename uid col_id _id index interface_id project_id group_id parent_id';
     const query = Array.isArray(col_id) ? { col_id: { $in: col_id } } : { col_id: col_id };
 
     let dbQuery = this.model.find(query).sort({ index: 1 }); // 按 index 升序排序

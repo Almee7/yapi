@@ -70,7 +70,8 @@ export default class AddColModal extends Component {
   };
 
   render() {
-    const { interfaceColList = [] } = this.props;
+    let { interfaceColList = [] } = this.props;
+    const ColList = interfaceColList.filter(item => item.type === 'folder' || item.type === 'group');
     const { id } = this.state;
     return (
       <Modal
@@ -94,16 +95,16 @@ export default class AddColModal extends Component {
         </Row>
         <p>请选择添加到的集合：</p>
         <ul className="col-list">
-          {interfaceColList.length ? (
-            interfaceColList.map(col => (
-              <li
+          {ColList.length ? (
+              ColList.map(col => (
+                <li
                 key={col._id}
                 className={`col-item ${col._id === id ? 'selected' : ''}`}
                 onClick={() => this.select(col._id)}
               >
-                <Icon type="folder-open" style={{ marginRight: 6 }} />
-                {col.name}
-              </li>
+                  <Icon type="folder-open" style={{ marginRight: 6 }} />
+                  {col.name}
+                </li>
             ))
           ) : (
             <span>暂无集合，请添加！</span>

@@ -226,7 +226,6 @@ export default class Run extends Component {
 
     //获取缓存数据
     const cachedData = await cacheDB.getCache(data._id);
-    console.log('cached data', cachedData.data);
 
     const { req_body_other, req_body_type, req_body_is_json_schema } = data;
     let body = req_body_other;

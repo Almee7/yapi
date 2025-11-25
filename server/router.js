@@ -488,8 +488,8 @@ let routerConfig = {
       method: 'post'
     },
     {
-      action: 'upIndexMix',
-      path: 'up_index_mix',
+      action: 'upIndex',
+      path: 'up_index',
       method: 'post'
     },
     {

@@ -67,15 +67,15 @@ export default class InterfaceCaseContent extends Component {
   }
 
   getColId(colList, currCaseId) {
-    let currColId = 0;
-    colList.forEach(col => {
-      col.caseList.forEach(caseItem => {
-        if (+caseItem._id === +currCaseId) {
-          currColId = col._id;
-        }
-      });
-    });
-    return currColId;
+    // let currColId = 0;
+    // colList.forEach(col => {
+    //   col.caseList.forEach(caseItem => {
+    //     if (+caseItem._id === +currCaseId) {
+    //       currColId = col._id;
+    //     }
+    //   });
+    // });
+    return currCaseId;
   }
 
   async componentWillMount() {

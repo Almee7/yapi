@@ -135,7 +135,7 @@ class interfaceColController extends baseController {
       let colData = {
         name: params.name,
         project_id: params.project_id,
-        parent_id: parentId,
+        parent_id: parentId || 0,
         type: params.type || 'folder',
         index,
         desc: params.desc,
@@ -358,15 +358,20 @@ class interfaceColController extends baseController {
     try {
       let params = ctx.request.body;
       params = yapi.commons.handleParams(params, {
+        casename: 'string',
         project_id: 'number',
-        col_id: 'number'
+        col_id: 'number',
+        parent_id: 'number',
+        interface_id: 'number',
+        case_env: 'string'
       });
-      if (!params.interface_list || !Array.isArray(params.interface_list)) {
-        return (ctx.body = yapi.commons.resReturn(null, 400, 'interface_list 参数有误'));
-      }
 
       if (!params.project_id) {
         return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
+      }
+
+      if (!params.interface_id) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '接口id不能为空'));
       }
 
       let auth = await this.checkAuth(params.project_id, 'project', 'edit');
@@ -378,22 +383,97 @@ class interfaceColController extends baseController {
         return (ctx.body = yapi.commons.resReturn(null, 400, '接口集id不能为空'));
       }
 
-      let maxIndex = await this.caseModel.getMaxIndex(params.col_id);
+      if (!params.casename) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '用例名称不能为空'));
+      }
+      // ===== 计算当前容器下最大 index =====
+      let startIndex;
+      if (params.group_id) {
+        // group 内直接用 getMaxIndexByContainer
+        startIndex = await this.caseModel.getMaxIndexByContainer(params.col_id, params.group_id) + 1;
+      } else {
+        // 文件夹下：既考虑 col(type=folder/group) 又考虑 case(group_id=null
+        const maxColIndex = await this.colModel.getIndexByParentId(params.project_id,params.col_id);
+        const maxCaseIndex = await this.caseModel.getMaxIndexByContainer(params.col_id, null);
+        startIndex = Math.max(maxColIndex, maxCaseIndex) + 1;
+      }
+
+      params.uid = this.getUid();
+      params.index = startIndex;
+      params.add_time = yapi.commons.time();
+      params.up_time = yapi.commons.time();
+      params.parent_id = params.group_id || params.col_id;
+      let result = await this.caseModel.save(params);
+      let username = this.getUsername();
+
+      this.colModel.get(params.col_id).then(col => {
+        yapi.commons.saveLog({
+          content: `<a href=" ">${username}</a > 在接口集 <a href="/project/${
+              params.project_id
+          }/interface/col/${params.col_id}">${col.name}</a > 下添加了测试用例 <a href="/project/${
+              params.project_id
+          }/interface/case/${result._id}">${params.casename}</a >`,
+          type: 'project',
+          uid: this.getUid(),
+          username: username,
+          typeid: params.project_id
+        });
+      });
+      this.projectModel.up(params.project_id, { up_time: new Date().getTime() }).then();
+
+      ctx.body = yapi.commons.resReturn(result);
+    } catch (e) {
+      ctx.body = yapi.commons.resReturn(null, 402, e.message);
+    }
+  }
+
+  async addCaseList(ctx) {
+    try {
+      let params = ctx.request.body;
+      params = yapi.commons.handleParams(params, {
+        project_id: 'number',
+        col_id: 'number',
+        group_id: 'number'
+      });
+      if (!params.interface_list || !Array.isArray(params.interface_list)) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, 'interface_list 参数有误'));
+      }
+      if (!params.project_id) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
+      }
+      if (!params.col_id) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '接口集id不能为空'));
+      }
+      let auth = await this.checkAuth(params.project_id, 'project', 'edit');
+      if (!auth) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));
+      }
+      // ===== 计算当前容器下最大 index =====
+      let startIndex;
+      if (params.group_id) {
+        // group 内直接用 getMaxIndexByContainer
+        startIndex = await this.caseModel.getMaxIndexByContainer(params.col_id, params.group_id) + 1;
+      } else {
+        // 文件夹下：既考虑 col(type=folder/group) 又考虑 case(group_id=null
+        const maxColIndex = await this.colModel.getIndexByParentId(params.project_id,params.col_id);
+        const maxCaseIndex = await this.caseModel.getMaxIndexByContainer(params.col_id, null);
+        startIndex = Math.max(maxColIndex, maxCaseIndex) + 1;
+      }
 
       for (let i = 0; i < params.interface_list.length; i++) {
-        let interfaceData = await this.interfaceModel.get(params.interface_list[i]);
-
+        let interfaceData = await this.interfaceModel.get(params.interface_list[i])
         let data = {
           uid: this.getUid(),
-          index: maxIndex + i + 1, // 每新增一个用例 index 递增
+          index: startIndex + i,
           add_time: yapi.commons.time(),
           up_time: yapi.commons.time(),
           project_id: params.project_id,
           col_id: params.col_id,
+          group_id: params.group_id || null,
+          parent_id:  params.group_id || params.col_id,
           interface_id: params.interface_list[i],
           casename: interfaceData.title
         };
-
         // 处理 json schema
         if (
             interfaceData.req_body_type === 'json' &&
@@ -798,20 +878,46 @@ class interfaceColController extends baseController {
    * @returns {Object}
    * @example
    */
-  async upIndexMix(ctx) {
+  // async upIndex(ctx) {
+  //   try {
+  //     const { list } = ctx.request.body;
+  //     for (let item of list) {
+  //       console.log("item", item);
+  //       if (item.type === 'folder' || item.type === 'group') {
+  //         await this.colModel.update(
+  //             { _id: item.id },
+  //             { index: item.index, parent_id: item.parent_id }
+  //         );
+  //       } else if (item.type === 'case') {
+  //         const updateData = { index: item.index, parent_id: item.parent_id};
+  //         if (item.col_id !== undefined) updateData.col_id = item.col_id;
+  //         if (item.group_id !== undefined) updateData.group_id = item.group_id;
+  //
+  //         await this.caseModel.update({ _id: item.id }, updateData);
+  //       }
+  //     }
+  //
+  //     ctx.body = yapi.commons.resReturn('更新成功');
+  //   } catch (err) {
+  //     ctx.body = yapi.commons.resReturn(null, 500, err.message);
+  //   }
+  // }
+  async upIndex(ctx) {
     try {
       const { list } = ctx.request.body;
       for (let item of list) {
+        console.log("item", item);
         if (item.type === 'folder' || item.type === 'group') {
           await this.colModel.update(
-              { _id: item._id },
+              { _id: item.id },
               { index: item.index, parent_id: item.parent_id }
           );
         } else if (item.type === 'case') {
-          await this.caseModel.update(
-              { _id: item._id },
-              { index: item.index, col_id: item.col_id }
-          );
+          const updateData = { index: item.index, parent_id: item.parent_id};
+          if (item.col_id !== undefined) updateData.col_id = item.col_id;
+          if (item.group_id !== undefined) updateData.group_id = item.group_id;
+
+          await this.caseModel.update({ _id: item.id }, updateData);
         }
       }
 
@@ -820,6 +926,7 @@ class interfaceColController extends baseController {
       ctx.body = yapi.commons.resReturn(null, 500, err.message);
     }
   }
+
 
   /**
    * 删除一个接口集
