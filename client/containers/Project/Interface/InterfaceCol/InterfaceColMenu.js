@@ -18,25 +18,42 @@ import { arrayChangeIndex } from '../../../../common.js';
 import _ from 'underscore'
 
 const TreeNode = Tree.TreeNode;
-const FormItem = Form.Item;
+// const FormItem = Form.Item;
 const confirm = Modal.confirm;
 const headHeight = 240; // menu顶部到网页顶部部分的高度
 
 import './InterfaceColMenu.scss';
 
 const ColModalForm = Form.create()(props => {
-  const { visible, onCancel, onCreate, form, title, isSubDir } = props;
+  const { visible, onCancel, onCreate, form, modalType, isSubDir } = props;
   const { getFieldDecorator } = form;
+
+  const title = isSubDir
+      ? '子目录'
+      : modalType === 'group'
+          ? '循环组'
+          : '集合';
+
   return (
-    <Modal visible={visible} title={title} onCancel={onCancel} onOk={onCreate}>
+    <Modal visible={visible} title={`添加${title}`} onCancel={onCancel} onOk={onCreate}>
       <Form layout="vertical">
-        <FormItem label={isSubDir ? "子目录名" : "集合名"}>
+        <Form.Item label={title + '名'}>
           {getFieldDecorator('colName', {
-              rules: [{ required: true, message: isSubDir ? '请输入子目录命名！' : '请输入集合命名！' }]
+              rules: [{ required: true, message: `请输入${title}名称！` }]
             })(<Input />)}
-        </FormItem>
-        {!isSubDir && (
-          <FormItem label="简介">{getFieldDecorator('colDesc')(<Input type="textarea" />)}</FormItem>
+        </Form.Item>
+
+        {modalType !== 'group' && !isSubDir && (
+          <Form.Item label="简介">{getFieldDecorator('colDesc')(<Input.TextArea />)}</Form.Item>
+          )}
+
+        {modalType === 'group' && (
+          <Form.Item label="循环次数">
+            {getFieldDecorator('repeatCount', {
+                  initialValue: 1,
+                  rules: [{ required: true, message: '请输入循环次数' }]
+                })(<Input type="number" min={1} />)}
+          </Form.Item>
           )}
       </Form>
     </Modal>
@@ -159,8 +176,8 @@ export default class InterfaceColMenu extends Component {
   };
 
   addorEditCol = async () => {
-    const { colName: name, colDesc: desc } = this.form.getFieldsValue();
-    const { colModalType, editColId: col_id, parentColId } = this.state;
+    const { colName: name, colDesc: desc, repeatCount } = this.form.getFieldsValue();
+    const { colModalType, editColId: col_id, parentColId, modalType } = this.state;
     const project_id = this.props.match.params.id;
     let res = {};
 
@@ -170,10 +187,16 @@ export default class InterfaceColMenu extends Component {
         desc: desc || '',
         project_id,
         parent_id: parentColId || 0,
-        type: 'folder'
+        type: modalType, // folder 或 group
+        repeatCount: modalType === 'group' ? repeatCount : undefined
       });
     } else if (colModalType === 'edit') {
-      res = await axios.post('/api/col/up_col', { name, desc, col_id });
+      res = await axios.post('/api/col/up_col', {
+        name,
+        desc,
+        col_id,
+        repeatCount: modalType === 'group' ? repeatCount : undefined
+      });
     }
 
     if (!res.data.errcode) {
@@ -188,8 +211,8 @@ export default class InterfaceColMenu extends Component {
     }
   };
 
+
   onExpand = keys => {
-    console.log('onExpand', keys);
     this.setState({ expands: keys });
   };
 
@@ -349,22 +372,40 @@ export default class InterfaceColMenu extends Component {
 
   showColModal = (type, col, isSubDir = false, parentColId = null) => {
     const editCol =
-        type === 'edit' ? { colName: col.name, colDesc: col.desc } : { colName: '', colDesc: '' };
+        type === 'edit' ? { colName: col.name, colDesc: col.desc, repeatCount: col.repeatCount || 1 } : { colName: '', colDesc: '', repeatCount: 1 };
     this.setState({
       colModalVisible: true,
       colModalType: type || 'add',
       editColId: col && col._id,
       parentColId,
-      isSubDir
+      isSubDir,
+      modalType: 'folder' // 普通子目录/集合
     });
     this.form.setFieldsValue(editCol);
   };
+
+  showGroupModal = (type, col, isSubDir = false, parentColId = null) => {
+    const editGroup =
+        type === 'edit' ? { colName: col.name, repeatCount: col.repeatCount || 1 } : { colName: '', repeatCount: 1 };
+    this.setState({
+      colModalVisible: true,
+      colModalType: type || 'add',
+      editColId: col && col._id,
+      parentColId,
+      isSubDir,
+      modalType: 'group' // 循环组
+    });
+    this.form.setFieldsValue(editGroup);
+  };
+
 
   saveFormRef = form => {
     this.form = form;
   };
 
   selectInterface = (importInterIds, selectedProject) => {
+    console.log('importInterIds:', importInterIds);
+    console.log('selectedProject:', selectedProject);
     this.setState({ importInterIds, selectedProject });
   };
 
@@ -405,7 +446,7 @@ export default class InterfaceColMenu extends Component {
   };
 
   onDrop = async e => {
-    const { interfaceColList } = this.props;
+    const { interfaceColList, setColData } = this.props;
     const dragNode = e.dragNode.props.dataRef;
     const dropNode = e.node.props.dataRef;
 
@@ -415,18 +456,17 @@ export default class InterfaceColMenu extends Component {
     // 1️⃣ 计算目标父节点
     let targetParentId;
     if (!e.dropToGap) {
-      targetParentId = (dropNode.type === 'folder' || dropNode.type === 'group') ? dropNode._id : dropNode.parent_id;
+      targetParentId = (dropNode.type === 'folder' || dropNode.type === 'group')
+          ? dropNode._id
+          : dropNode.parent_id;
     } else {
-      if (dropNode.type === 'folder') targetParentId = dropNode._id;
-      else if (dropNode.type === 'group' || dropNode.type === 'case') targetParentId = dropNode.parent_id;
-      else targetParentId = 0;
+      targetParentId = (dropNode.type === 'folder') ? dropNode._id : dropNode.parent_id || 0;
     }
 
     // 2️⃣ 校验规则
     if (dragNode.type === 'case' && targetParentId === 0) {
       return message.error('接口不能直接移动到根目录');
     }
-
     if (dragNode.type === 'group') {
       const parentNode = interfaceColList.find(n => n._id === targetParentId);
       if (!parentNode || parentNode.type !== 'folder') {
@@ -436,7 +476,10 @@ export default class InterfaceColMenu extends Component {
 
     console.log('targetParentId', targetParentId);
 
-    // 3️⃣ 获取源文件夹和目标文件夹 siblings 并按 index 排序
+    // 3️⃣ 判断是否跨文件夹
+    const isCrossFolder = dragNode.parent_id !== targetParentId;
+
+    // 4️⃣ 获取源文件夹和目标文件夹 siblings 并按 index 排序
     const originSiblings = interfaceColList
         .filter(n => n.parent_id === dragNode.parent_id)
         .sort((a, b) => a.index - b.index);
@@ -445,47 +488,65 @@ export default class InterfaceColMenu extends Component {
         .filter(n => n.parent_id === targetParentId)
         .sort((a, b) => a.index - b.index);
 
-    // 4️⃣ 删除源目录节点
-    const dragIndexInOrigin = originSiblings.findIndex(n => n._id === dragNode._id);
-    originSiblings.splice(dragIndexInOrigin, 1);
-    originSiblings.forEach((n, idx) => (n.index = idx));
-
-    // 5️⃣ 计算插入目标目录的 index
-    let insertIndex;
-    if (!e.dropToGap) {
-      // 放在内部 → 插到最后
-      insertIndex = targetSiblings.length;
-    } else {
-      const dropIndex = targetSiblings.findIndex(n => n._id === dropNode._id);
-      insertIndex = dropIndex + (e.dropPosition > 0 ? 1 : 0);
-    }
-
-    // 6️⃣ 插入拖拽节点并更新 parent_id, col_id, group_id
+    // 5️⃣ 创建 dragNode 副本并更新信息
+    const dragNodeCopy = { ...dragNode };
     if (dropNode.type === 'folder') {
-      // 放到 folder 下
-      dragNode.parent_id = targetParentId;
-      dragNode.col_id = dropNode._id;
-      dragNode.group_id = null;
+      dragNodeCopy.parent_id = targetParentId;
+      dragNodeCopy.col_id = dropNode._id;
+      dragNodeCopy.group_id = null;
     } else if (dropNode.type === 'group') {
-      // 放到 group 下
-      dragNode.parent_id = targetParentId;
-      dragNode.col_id = dropNode.col_id;
-      dragNode.group_id = dropNode._id;
+      dragNodeCopy.parent_id = targetParentId;
+      dragNodeCopy.col_id = dropNode.col_id;
+      dragNodeCopy.group_id = dropNode._id;
     } else {
-      // 放到 case 或其他同级
-      dragNode.parent_id = targetParentId;
-      dragNode.col_id = targetParentId; // folder id
-      dragNode.group_id = dropNode.type === 'group' ? dropNode._id : null;
+      dragNodeCopy.parent_id = targetParentId;
+      dragNodeCopy.col_id = targetParentId; // folder id
+      dragNodeCopy.group_id = dropNode.type === 'group' ? dropNode._id : null;
     }
 
-    targetSiblings.splice(insertIndex, 0, dragNode);
-    targetSiblings.forEach((n, idx) => (n.index = idx));
+    // 6️⃣ 插入并更新 index
+    if (isCrossFolder) {
+      // 跨文件夹：删除源 siblings 并更新 index
+      const dragIndexInOrigin = originSiblings.findIndex(n => n._id === dragNode._id);
+      if (dragIndexInOrigin > -1) originSiblings.splice(dragIndexInOrigin, 1);
+      originSiblings.forEach((n, idx) => n.index = idx);
+
+      // 更新目标 siblings
+      let insertIndex;
+      if (!e.dropToGap) {
+        insertIndex = targetSiblings.length;
+      } else {
+        const dropIndex = targetSiblings.findIndex(n => n._id === dropNode._id);
+        insertIndex = dropIndex + (e.dropPosition > 0 ? 1 : 0);
+      }
+      targetSiblings.splice(insertIndex, 0, dragNodeCopy);
+      targetSiblings.forEach((n, idx) => n.index = idx);
+    } else {
+      // 同级拖拽：只在 originSiblings 移动
+      const dragIndex = originSiblings.findIndex(n => n._id === dragNode._id);
+      originSiblings.splice(dragIndex, 1);
+
+      let insertIndex;
+      if (!e.dropToGap) {
+        insertIndex = originSiblings.length;
+      } else {
+        const dropIndex = originSiblings.findIndex(n => n._id === dropNode._id);
+        insertIndex = dropIndex + (e.dropPosition > 0 ? 1 : 0);
+      }
+
+      originSiblings.splice(insertIndex, 0, dragNodeCopy);
+      originSiblings.forEach((n, idx) => n.index = idx);
+    }
 
     console.log('originSiblings after move', originSiblings);
     console.log('targetSiblings after move', targetSiblings);
 
-    // 7️⃣合并需要更新的节点（源 + 目标）
-    const updates = [...originSiblings, ...targetSiblings].map(n => ({
+    // 7️⃣ 合并更新列表并去重
+    const allNodes = isCrossFolder ? [...originSiblings, ...targetSiblings] : [...originSiblings];
+    const uniqueMap = new Map();
+    allNodes.forEach(n => uniqueMap.set(n._id, n));
+
+    const updates = Array.from(uniqueMap.values()).map(n => ({
       id: n._id,
       index: n.index,
       type: n.type,
@@ -496,16 +557,19 @@ export default class InterfaceColMenu extends Component {
 
     console.log('更新列表', updates);
 
+    // 8️⃣ 调用后端更新
     try {
       await axios.post('/api/col/up_index', { list: updates });
       message.success('顺序更新成功');
-      this.getList();
-      this.props.setColData({ isRander: true });
 
-      // 8️⃣ 拖拽后自动展开目标父节点，同时保留原有展开状态
-      this.setState(prev => ({
-        expands: [...new Set([...prev.expands.map(k => k.toString()), targetParentId.toString()])]
-      }));
+      // 9️⃣ 保持跨文件夹目标文件夹展开
+      if (isCrossFolder) {
+        setColData({ isRander: true, keepExpandedFolderId: targetParentId, isCrossFolder });
+      } else {
+        setColData({ isRander: true });
+      }
+
+      this.getList(); // 刷新列表
     } catch (err) {
       console.error('拖拽更新失败', err);
       message.error('顺序更新失败');
@@ -593,14 +657,26 @@ export default class InterfaceColMenu extends Component {
           </Tooltip>
           <Tooltip title="添加子目录">
             <Icon
-                  type="folder-add"
-                  className="interface-delete-icon"
-                  onClick={e => {
-                    e.stopPropagation();
-                    this.showColModal('add', null, true, col._id);
-                  }}
-              />
+                type="folder-add"
+                className="interface-delete-icon"
+                onClick={e => {
+                  e.stopPropagation();
+                  this.showColModal('add', null, true, col._id);
+                }}
+            />
           </Tooltip>
+
+          <Tooltip title="添加循环组">
+            <Icon
+                type="sync"
+                className="interface-delete-icon"
+                onClick={e => {
+                  e.stopPropagation();
+                  this.showGroupModal('add', null, true, col._id);
+                }}
+            />
+          </Tooltip>
+
           <Tooltip title="克隆集合">
             <Icon
                   type="copy"
@@ -742,7 +818,7 @@ export default class InterfaceColMenu extends Component {
                 expandedKeys={currentKes.expands}
                 selectedKeys={currentKes.selects}
                 onSelect={this.onSelect}
-                autoExpandParent
+                autoExpandParent={false}
                 draggable
                 onExpand={this.onExpand}
                 onDrop={this.onDrop}
@@ -755,6 +831,7 @@ export default class InterfaceColMenu extends Component {
               type={colModalType}
               visible={colModalVisible}
               isSubDir={isSubDir}
+              modalType={this.state.modalType}
               onCancel={() => {
                 this.setState({
                   colModalVisible: false,
