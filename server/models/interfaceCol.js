@@ -16,6 +16,7 @@ class interfaceCol extends baseModel {
       type: { type: String, required: true , default: 'folder' },
       add_time: Number,
       up_time: Number,
+      repeatCount: Number,
       index: { type: Number, default: 0 },
       test_report: { type: String, default: '{}' },
       stopFail: {
@@ -112,7 +113,7 @@ class interfaceCol extends baseModel {
   newList(project_id) {
     return this.model
         .find({ project_id })
-        .select('name uid project_id desc add_time up_time index parent_id type')
+        .select('name uid project_id desc add_time up_time index parent_id type repeatCount')
         .lean() // 返回普通对象
         .exec();
   }

@@ -493,11 +493,6 @@ let routerConfig = {
       method: 'post'
     },
     {
-      action: 'list',
-      path: 'list',
-      method: 'get'
-    },
-    {
       action: 'delCol',
       path: 'del_col',
       method: 'get'

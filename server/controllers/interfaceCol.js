@@ -85,7 +85,8 @@ class interfaceColController extends baseController {
         project_id: 'number',
         desc: 'string',
         parent_id: 'number',
-        type: 'string'     // folder | group
+        type: 'string',     // folder | group
+        repeatCount: 'number'
       });
 
       if (!params.project_id) {
@@ -99,16 +100,12 @@ class interfaceColController extends baseController {
       if (!['folder', 'group'].includes(params.type)) {
         return ctx.body = yapi.commons.resReturn(null, 400, 'type 必须为 folder 或 group');
       }
-
       // ===== 权限检查 =====
       let auth = await this.checkAuth(params.project_id, 'project', 'edit');
       if (!auth) {
         return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));
       }
-
-      // ===== parent_id 统一规范化为数字 =====
       const parentId = Number(params.parent_id) || 0;
-
       // ===== group 必须挂载 folder 下 =====
       if (params.type === 'group') {
         if (parentId === 0) {
@@ -120,15 +117,18 @@ class interfaceColController extends baseController {
           return ctx.body = yapi.commons.resReturn(null, 400, 'group 的 parent 必须是 folder');
         }
       }
+      // ===== repeatCount 仅 group 使用 =====
+      let repeatCount = 0;
+      if (params.type === 'group') {
+        repeatCount = Number(params.repeatCount) || 0;
+        if (repeatCount < 0) {
+          return ctx.body = yapi.commons.resReturn(null, 400, 'repeatCount 不能为负数');
+        }
+      }
 
-      // =====================================
-      //         index = maxIndex + 1
-      // =====================================
-      console.log("params.parentId", parentId , params.project_id);
+      // =============index================
       const maxColIndex = await this.colModel.getIndexByParentId(params.project_id, parentId);
       const maxCaseIndex = await this.caseModel.getMaxIndexByContainer(parentId, null);
-      console.log("newAddCol--------maxColIndex", maxColIndex);
-      console.log("newAddCol--------maxCaseIndex", maxCaseIndex);
       let index = Math.max(maxColIndex, maxCaseIndex) +1
 
       // ===== 保存数据 =====
@@ -143,6 +143,9 @@ class interfaceColController extends baseController {
         add_time: yapi.commons.time(),
         up_time: yapi.commons.time()
       };
+      if (params.type === 'group') {
+        colData.repeatCount = repeatCount;
+      }
 
       const result = await this.colModel.save(colData);
 
@@ -189,6 +192,7 @@ class interfaceColController extends baseController {
       }
 
       let colData = await this.colModel.get(id);
+      console.log("colData", colData);
       let project = await this.projectModel.getBaseInfo(colData.project_id);
       if (project.project_type === 'private') {
         if ((await this.checkAuth(project._id, 'project', 'view')) !== true) {

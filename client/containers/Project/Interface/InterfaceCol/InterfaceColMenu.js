@@ -35,7 +35,7 @@ const ColModalForm = Form.create()(props => {
           : '集合';
 
   return (
-    <Modal visible={visible} title={`添加${title}`} onCancel={onCancel} onOk={onCreate}>
+    <Modal visible={visible} title={`${title}`} onCancel={onCancel} onOk={onCreate}>
       <Form layout="vertical">
         <Form.Item label={title + '名'}>
           {getFieldDecorator('colName', {
@@ -618,10 +618,14 @@ export default class InterfaceColMenu extends Component {
 
   // 渲染目录标题，保持原来的按钮和样式
   renderColTitle = (col) => {
+    let iconType = 'folder-open';
+    if (col.type === 'group') {
+      iconType = 'sync';   // ← 你的循环组 icon
+    }
     return (
       <div className="menu-title">
         <span>
-          <Icon type="folder-open" style={{ marginRight: 5 }} />
+          <Icon type={iconType} style={{ marginRight: 5 }} />
           <span>{col.name}</span>
           <span style={{ marginLeft: 8, color: '#999', fontSize: '12px' }}>
             ({this.getAllCasesFromColAndChildren(col._id, this.state.list).length})
@@ -637,13 +641,13 @@ export default class InterfaceColMenu extends Component {
           </Tooltip>
           <Tooltip title="编辑集合">
             <Icon
-                  type="edit"
-                  className="interface-delete-icon"
-                  onClick={e => {
-                    e.stopPropagation();
-                    this.showColModal('edit', col);
-                  }}
-              />
+                type="edit"
+                className="interface-delete-icon"
+                onClick={e => {
+                  e.stopPropagation();
+                  this.showColModal('edit', col);
+                }}
+            />
           </Tooltip>
           <Tooltip title="导入接口">
             <Icon
