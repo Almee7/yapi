@@ -496,12 +496,12 @@ export default class InterfaceColMenu extends Component {
       dragNodeCopy.group_id = null;
     } else if (dropNode.type === 'group') {
       dragNodeCopy.parent_id = targetParentId;
-      dragNodeCopy.col_id = dropNode.col_id;
+      dragNodeCopy.col_id = dropNode._id;
       dragNodeCopy.group_id = dropNode._id;
     } else {
       dragNodeCopy.parent_id = targetParentId;
-      dragNodeCopy.col_id = targetParentId; // folder id
-      dragNodeCopy.group_id = dropNode.type === 'group' ? dropNode._id : null;
+      dragNodeCopy.col_id = targetParentId;
+      dragNodeCopy.group_id = dropNode.group_id || null;
     }
 
     // 6️⃣ 插入并更新 index
@@ -538,8 +538,6 @@ export default class InterfaceColMenu extends Component {
       originSiblings.forEach((n, idx) => n.index = idx);
     }
 
-    console.log('originSiblings after move', originSiblings);
-    console.log('targetSiblings after move', targetSiblings);
 
     // 7️⃣ 合并更新列表并去重
     const allNodes = isCrossFolder ? [...originSiblings, ...targetSiblings] : [...originSiblings];
@@ -639,13 +637,17 @@ export default class InterfaceColMenu extends Component {
                   onClick={() => this.showDelColConfirm(col._id)}
               />
           </Tooltip>
-          <Tooltip title="编辑集合">
+          <Tooltip title={col.type === 'group' ? '编辑循环组' : '编辑集合'}>
             <Icon
                 type="edit"
                 className="interface-delete-icon"
                 onClick={e => {
                   e.stopPropagation();
-                  this.showColModal('edit', col);
+                  if (col.type === 'group') {
+                    this.showGroupModal('edit', col);
+                  } else {
+                    this.showColModal('edit', col);
+                  }
                 }}
             />
           </Tooltip>

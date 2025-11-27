@@ -151,6 +151,25 @@ async function clearExpiredCache(maxAge = DEFAULT_MAX_AGE) {
     }
     return true;
 }
+/**
+ * ✅ 清空所有缓存（只删除数据，不删除数据库）
+ */
+async function clearAllCache() {
+    const db = await openDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+
+    // 获取所有 key
+    const keys = await promisifyRequest(store.getAllKeys());
+
+    for (let i = 0; i < keys.length; i++) {
+        store.delete(keys[i]);
+        logDebug('DELETE', keys[i]);
+    }
+
+    logDebug('CLEAR_ALL_DATA', `共删除 ${keys.length} 条`);
+    return true;
+}
 
 
 // CommonJS 导出
@@ -158,5 +177,6 @@ module.exports = {
     setCache,
     getCache,
     deleteCache,
+    clearAllCache,
     clearExpiredCache
 };

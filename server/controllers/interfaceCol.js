@@ -192,7 +192,6 @@ class interfaceColController extends baseController {
       }
 
       let colData = await this.colModel.get(id);
-      console.log("colData", colData);
       let project = await this.projectModel.getBaseInfo(colData.project_id);
       if (project.project_type === 'private') {
         if ((await this.checkAuth(project._id, 'project', 'view')) !== true) {
@@ -910,7 +909,6 @@ class interfaceColController extends baseController {
     try {
       const { list } = ctx.request.body;
       for (let item of list) {
-        console.log("item", item);
         if (item.type === 'folder' || item.type === 'group') {
           await this.colModel.update(
               { _id: item.id },
