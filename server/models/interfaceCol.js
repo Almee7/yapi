@@ -110,6 +110,15 @@ class interfaceCol extends baseModel {
       .exec();
   }
 
+  allColList(col_id, select) {
+    select = select || 'name uid project_id desc add_time up_time index parent_id type repeatCount';
+    const query = Array.isArray(col_id) ? { _id: { $in: col_id } } : { _id: col_id };
+    let dbQuery = this.model.find(query);
+    if (select !== 'all') dbQuery = dbQuery.select(select);
+
+    return dbQuery.lean().exec(); // ✅ 使用 lean() 返回普通对象
+  }
+
   newList(project_id) {
     return this.model
         .find({ project_id })

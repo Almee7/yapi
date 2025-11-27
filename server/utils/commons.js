@@ -602,6 +602,60 @@ function handleParamsValue(params, val) {
     return params
 }
 
+async function flattenCases(colId, allCols, allCases) {
+    const result = [];
+
+    // 找当前 col
+    const col = allCols.find(c => c._id.toString() === colId.toString());
+    if (!col) return result;
+    // 当前是 group，直接返回 group 内 case 按 index 排序
+    if (col.type === 'group') {
+        return allCases
+            .filter(c => c.group_id && c.group_id.toString() === col._id.toString())
+            .sort((a, b) => a.index - b.index);
+    }
+    // 当前 col 下的普通 case（group_id=null）
+    const folderCases = allCases
+        .filter(c => c.col_id.toString() === colId.toString() && (!c.group_id || false))
+        .sort((a, b) => a.index - b.index);
+    // 当前 col 下的 group
+    const childGroups = allCols
+        .filter(c => c.parent_id.toString() === colId.toString() && c.type === 'group')
+        .sort((a, b) => a.index - b.index);
+    // 遍历普通 case，同时插入 group case
+    for (let i = 0; i < folderCases.length; i++) {
+        const c = folderCases[i];
+        result.push(c);
+        // 插入 index <= 当前普通 case index 的 group case
+        for (const g of childGroups) {
+            const groupCases = allCases
+                .filter(gc => gc.group_id && gc.group_id.toString() === g._id.toString())
+                .sort((a, b) => a.index - b.index);
+            // group.index 表示在 folder 中的位置（这里用 index 控制插入顺序）
+            if (g.index === i + 1) {
+                result.push(...groupCases);
+            }
+        }
+    }
+    // 插入剩余 group case（如果 index 大于普通 case 数量）
+    for (const g of childGroups) {
+        const groupCases = allCases
+            .filter(gc => gc.group_id && gc.group_id.toString() === g._id.toString())
+            .sort((a, b) => a.index - b.index);
+        if (!groupCases.every(gc => result.includes(gc))) {
+            result.push(...groupCases);
+        }
+    }
+    // 递归处理 folder 类型子 col
+    const childFolders = allCols
+        .filter(c => c.parent_id.toString() === colId.toString() && c.type === 'folder')
+        .sort((a, b) => a.index - b.index);
+    for (const folder of childFolders) {
+        const subCases = await flattenCases(folder._id, allCols, allCases);
+        result.push(...subCases);
+    }
+    return result;
+}
 exports.handleParamsValue = handleParamsValue;
 
 exports.getCaseList = async function getCaseList(id) {
@@ -612,14 +666,13 @@ exports.getCaseList = async function getCaseList(id) {
 
     // 1️⃣ 获取父 + 子节点的 col_id 列表，顺序已父-子排列
     const colIds = await colInst.getParentId(id);
-
+    // 根据 col_id 列表一次性获取所有 col
+    const allCols = await colInst.allColList(colIds,'all')
     // 2️⃣ 根据 col_id 列表一次性获取所有 case（list 内部已按 index 排序）
     const allCases = await caseInst.newList(colIds, 'all');
 
-    // 3️⃣ 按 colIds 顺序合并 case，保持父-子顺序
-    let resultList = colIds.flatMap(colId =>
-        allCases.filter(item => item.col_id === colId)
-    );
+    // 3️⃣ 获取到排序后的caseList
+    let resultList = await flattenCases(id, allCols, allCases);
 
     // 4️⃣ 批量获取 interface 数据
     const interfaceIds = resultList.map(c => c.interface_id);
@@ -650,7 +703,6 @@ exports.getCaseList = async function getCaseList(id) {
             await caseInst.del(result._id);
             continue;
         }
-
         result.path = projectData.basepath + data.path;
         result.method = data.method;
         result.title = data.title;
