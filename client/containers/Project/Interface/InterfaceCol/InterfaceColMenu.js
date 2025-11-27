@@ -165,6 +165,7 @@ export default class InterfaceColMenu extends Component {
 
   // 构建包含所有子级接口的集合数据
   buildAllColsWithChildren = (list) => {
+    console.log('buildAllColsWithChildren', list);
     return list.map(col => {
       const allCases = this.getAllCasesFromColAndChildren(col._id, list);
       return {
@@ -452,7 +453,7 @@ export default class InterfaceColMenu extends Component {
     console.log('dragNode', dragNode);
     console.log('dropNode', dropNode);
 
-    // 计算目标父节点
+    // 1️⃣ 计算目标父节点
     let targetParentId;
     if (!e.dropToGap) {
       targetParentId = (dropNode.type === 'folder' || dropNode.type === 'group')
@@ -462,7 +463,7 @@ export default class InterfaceColMenu extends Component {
       targetParentId = (dropNode.type === 'folder') ? dropNode._id : dropNode.parent_id || 0;
     }
 
-    // 校验规则
+    // 2️⃣ 校验规则
     if (dragNode.type === 'case' && targetParentId === 0) {
       return message.error('接口不能直接移动到根目录');
     }
@@ -473,10 +474,12 @@ export default class InterfaceColMenu extends Component {
       }
     }
 
-    // 判断是否跨文件夹
+    console.log('targetParentId', targetParentId);
+
+    // 3️⃣ 判断是否跨文件夹
     const isCrossFolder = dragNode.parent_id !== targetParentId;
 
-    // 获取源文件夹和目标文件夹 siblings 并按 index 排序
+    // 4️⃣ 获取源文件夹和目标文件夹 siblings 并按 index 排序
     const originSiblings = interfaceColList
         .filter(n => n.parent_id === dragNode.parent_id)
         .sort((a, b) => a.index - b.index);
@@ -485,7 +488,7 @@ export default class InterfaceColMenu extends Component {
         .filter(n => n.parent_id === targetParentId)
         .sort((a, b) => a.index - b.index);
 
-    // 创建 dragNode 副本并更新信息
+    // 5️⃣ 创建 dragNode 副本并更新信息
     const dragNodeCopy = { ...dragNode };
     if (dropNode.type === 'folder') {
       dragNodeCopy.parent_id = targetParentId;
@@ -493,15 +496,15 @@ export default class InterfaceColMenu extends Component {
       dragNodeCopy.group_id = null;
     } else if (dropNode.type === 'group') {
       dragNodeCopy.parent_id = targetParentId;
-      dragNodeCopy.col_id = dropNode._id;
+      dragNodeCopy.col_id = dropNode.col_id;
       dragNodeCopy.group_id = dropNode._id;
     } else {
       dragNodeCopy.parent_id = targetParentId;
-      dragNodeCopy.col_id = targetParentId;
-      dragNodeCopy.group_id = dropNode.group_id || null;
+      dragNodeCopy.col_id = targetParentId; // folder id
+      dragNodeCopy.group_id = dropNode.type === 'group' ? dropNode._id : null;
     }
 
-    // 插入并更新 index
+    // 6️⃣ 插入并更新 index
     if (isCrossFolder) {
       // 跨文件夹：删除源 siblings 并更新 index
       const dragIndexInOrigin = originSiblings.findIndex(n => n._id === dragNode._id);
@@ -534,6 +537,10 @@ export default class InterfaceColMenu extends Component {
       originSiblings.splice(insertIndex, 0, dragNodeCopy);
       originSiblings.forEach((n, idx) => n.index = idx);
     }
+
+    console.log('originSiblings after move', originSiblings);
+    console.log('targetSiblings after move', targetSiblings);
+
     // 7️⃣ 合并更新列表并去重
     const allNodes = isCrossFolder ? [...originSiblings, ...targetSiblings] : [...originSiblings];
     const uniqueMap = new Map();
@@ -547,6 +554,9 @@ export default class InterfaceColMenu extends Component {
       col_id: n.col_id,
       group_id: n.group_id || null
     }));
+
+    console.log('更新列表', updates);
+
     // 8️⃣ 调用后端更新
     try {
       await axios.post('/api/col/up_index', { list: updates });

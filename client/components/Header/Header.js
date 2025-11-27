@@ -12,7 +12,6 @@ const { Header } = Layout;
 import LogoSVG from '../LogoSVG/index.js';
 import Breadcrumb from '../Breadcrumb/Breadcrumb.js';
 import GuideBtns from '../GuideBtns/GuideBtns.js';
-import cacheDB from '../../cacheDB.js';
 const plugin = require('client/plugin.js');
 
 let HeaderMenu = {
@@ -111,24 +110,6 @@ const ToolUser = props => {
       <li className="toolbar-li item-search">
         <Srch groupList={props.groupList} />
       </li>
-      <li className="toolbar-li">
-        <Tooltip placement="bottom" title={'清空缓存'}>
-          <a
-            onClick={async () => {
-              try {
-                 // 按你项目路径调整
-                await cacheDB.clearAllCache();
-                message.success('缓存已清空');
-              } catch (err) {
-                console.error(err);
-                message.error('清空失败');
-              }
-            }}
-        >
-            <Icon type="delete" style={{ fontSize: 16, color: '#f5222d' }} />
-          </a>
-        </Tooltip>
-      </li>  
       <Popover
         overlayClassName="popover-index"
         content={<GuideBtns />}
