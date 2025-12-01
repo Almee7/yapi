@@ -224,7 +224,6 @@ export default class Run extends Component {
     if (!this.checkInterfaceData(data)) {
       return null;
     }
-
     //获取缓存数据
     const cachedData = await cacheDB.getCache(data._id);
 
@@ -270,6 +269,7 @@ export default class Run extends Component {
         {}
       )
     }
+
     this.setState(
       {
         ...this.state,
