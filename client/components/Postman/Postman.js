@@ -168,7 +168,8 @@ export default class Run extends Component {
       autoPreviewHTML: true,
       // selectedIds:[],
       ...this.props.data,
-      pre_request_script:''
+      pre_request_script:'',
+      req_body_form: []
     }
   }
   get testResponseBodyIsHTML() {
@@ -400,7 +401,7 @@ export default class Run extends Component {
       loading: true
     });
 
-    let options = handleParams(this.state, this.handleValue),
+    let options = await handleParams(this.state, this.handleValue),
         result;
 
     // 新增：WebSocket 测试分支
@@ -551,56 +552,81 @@ export default class Run extends Component {
   changeBody = async (v, index = 0, key = 'value') => {
     let bodyForm = deepCopyJson(this.state.req_body_form);
 
+    if (!bodyForm[index]) {
+      bodyForm[index] = {
+        name: 'file',
+        type: 'file',
+        enable: true,
+        value: null,
+        required: "1"
+      };
+    }
+
     if (key === 'value') {
       bodyForm[index].enable = !!v;
 
       if (v instanceof File) {
-        // 1) 转 Base64
-        const base64 = await this.fileToBase64(v);
-
-        // 2) 存 meta + base64
-        bodyForm[index].value = {
-          __isFile: true,
-          name: v.name,
-          type: v.type,
-          size: v.size,
-          base64: base64
-        };
-
-        console.log("最终存储:", bodyForm[index].value);
+        bodyForm[index].value = v;
+        bodyForm[index].type = 'file';
       } else {
         bodyForm[index].value = v;
       }
+    } else if (key === 'enable') {
+      bodyForm[index].enable = v;
     }
 
-    // 更新 state
     this.setState({ req_body_form: bodyForm });
 
-    // 发送 JSON
+    // --- 异步 Base64 函数 ---
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // --- 处理所有 file 转 base64 ---
+    const req_body_form = await Promise.all(
+        bodyForm.map(async item => {
+          if (item.value instanceof File) {
+            const base64 = await fileToBase64(item.value);
+            return {
+              ...item,
+              value: {
+                name: item.value.name,
+                lastModified: item.value.lastModified,
+                webkitRelativePath: item.value.webkitRelativePath,
+                size: item.value.size,
+                type: item.value.type,
+                content: base64,
+                __isFile: true
+              }
+            };
+          }
+          return item;
+        })
+    );
+
     const requestData = {
       id: this.state._id,
-      req_body_form: bodyForm
+      req_body_form
     };
+
+    console.log('发送的 requestData:', requestData);
 
     try {
       const res = await axios.post('/api/col/up_case', requestData);
-      console.log("保存成功:", res.data);
+      if (res.data.errcode === 0) {
+        console.log('用例更新成功');
+      } else {
+        console.error('用例更新失败：', res.data.errmsg);
+      }
     } catch (err) {
-      console.error("保存失败:", err);
+      console.error('接口请求失败', err);
     }
   };
-
-// File → Base64 工具函数
-  fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
-
 
   // 模态框的相关操作
   showModal = (val, index, type) => {
@@ -1030,7 +1056,7 @@ export default class Run extends Component {
             {HTTP_METHOD[method].request_body &&
               req_body_type === 'form' && (
                 <div>
-                  {req_body_form.map((item, index) => {
+                  {(Array.isArray(req_body_form) ? req_body_form : []).map((item, index) => {
                     return (
                       <div key={index} className="key-value-wrap">
                         {/* <Tooltip
@@ -1040,52 +1066,51 @@ export default class Run extends Component {
                           <Input disabled value={item.name} className="key" />
                         </Tooltip> */}
                         <ParamsNameComponent
-                          example={item.example}
-                          desc={item.desc}
-                          name={item.name}
-                        />
-                        &nbsp;
+                              example={item.example}
+                              desc={item.desc}
+                              name={item.name}
+                          />
+                          &nbsp;
                         {item.required == 1 ? (
                           <Checkbox className="params-enable" checked={true} disabled />
-                        ) : (
-                          <Checkbox
-                            className="params-enable"
-                            checked={item.enable}
-                            onChange={e => this.changeBody(e.target.checked, index, 'enable')}
-                          />
-                        )}
+                          ) : (
+                            <Checkbox
+                                  className="params-enable"
+                                  checked={item.enable}
+                                  onChange={e => this.changeBody(e.target.checked, index, 'enable')}
+                              />
+                          )}
                         <span className="eq-symbol">=</span>
                         {item.type === 'file' ? (
                           <div>
                             <Input
-                                  type="file"
-                                  id={'file_' + index}
-                                  onChange={e => this.changeBody(e.target.files[0], index, 'value')}
-                                  multiple
-                                  className="value"
-                              />
+                                    type="file"
+                                    id={'file_' + index}
+                                    onChange={e => this.changeBody(e.target.files[0], index, 'value')}
+                                    multiple
+                                    className="value"
+                                />
                             {item.value && (
-                              <div style={{ marginTop: 4, fontSize: 14, color: '#555' }}>
-                                已选择文件: {item.value.name} ({(item.value.size / 1024).toFixed(2)} KB)
-                              </div>
-                              )}
+                            <div style={{ marginTop: 4, fontSize: 14, color: '#555' }}>
+                              已选择文件: {item.value.name} ({(item.value.size / 1024).toFixed(2)} KB)
+                            </div>
+                                )}
                           </div>
-                        ) : (
-                          <Input
-                                value={item.value}
-                                className="value"
-                                onChange={e => this.changeBody(e.target.value, index)}
-                                placeholder="参数值"
-                                id={`req_body_form_${index}`}
-                                addonAfter={
-                                  <Icon
-                                      type="edit"
-                                      onClick={() => this.showModal(item.value, index, 'req_body_form')}
-                                  />
-                                }
-                            />
-                        )}
-
+                          ) : (
+                            <Input
+                                  value={item.value}
+                                  className="value"
+                                  onChange={e => this.changeBody(e.target.value, index)}
+                                  placeholder="参数值"
+                                  id={`req_body_form_${index}`}
+                                  addonAfter={
+                                    <Icon
+                                        type="edit"
+                                        onClick={() => this.showModal(item.value, index, 'req_body_form')}
+                                    />
+                                  }
+                              />
+                          )}
                       </div>
                     );
                   })}
@@ -1102,7 +1127,13 @@ export default class Run extends Component {
             {HTTP_METHOD[method].request_body &&
               req_body_type === 'file' && (
                 <div>
-                  <Input type="file" id="single-file" />
+                  <Input
+                      type="file"
+                      id="single"
+                      onChange={e => this.changeBody(e.target.files, "single", 'value')}
+                      multiple
+                      className="value"
+                  />
                 </div>
               )}
           </Panel>
