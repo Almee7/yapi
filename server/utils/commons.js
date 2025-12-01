@@ -716,6 +716,10 @@ exports.getCaseList = async function getCaseList(id) {
     // 8️⃣ 返回结果
     const ctxBody = yapi.commons.resReturn(resultList);
     ctxBody.colData = colData;
+    const groups = allCols.filter(item => item.type === 'group');
+    if (groups.length > 0) {
+        ctxBody.groupDate = groups;
+    }
     return ctxBody;
 };
 

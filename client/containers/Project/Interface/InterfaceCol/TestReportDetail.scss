@@ -1,0 +1,50 @@
+.test-report-detail {
+  padding: 24px;
+  background: #f0f2f5;
+  min-height: calc(100vh - 200px);
+
+  .report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    background: #fff;
+    padding: 24px;
+    border-radius: 4px;
+
+    h2 {
+      margin: 0 0 8px 0;
+      font-size: 24px;
+      font-weight: 600;
+    }
+  }
+
+  .summary-card {
+    margin-bottom: 24px;
+
+    .summary-item {
+      text-align: center;
+
+      .summary-label {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 8px;
+      }
+
+      .summary-value {
+        font-size: 16px;
+        font-weight: 500;
+        color: #333;
+      }
+    }
+  }
+
+  .test-cases-section {
+    h3 {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #333;
+    }
+  }
+}

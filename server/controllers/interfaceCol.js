@@ -513,9 +513,7 @@ class interfaceColController extends baseController {
           });
         });
       }
-
       this.projectModel.up(params.project_id, { up_time: new Date().getTime() }).then();
-
       ctx.body = yapi.commons.resReturn('ok');
     } catch (e) {
       ctx.body = yapi.commons.resReturn(null, 402, e.message);
@@ -551,64 +549,152 @@ class interfaceColController extends baseController {
         return (ctx.body = yapi.commons.resReturn(null, 400, '克隆的接口集id不能为空'));
       }
 
-      let oldColCaselistData = await this.caseModel.list(col_id, 'all');
-
-      oldColCaselistData = oldColCaselistData.sort((a, b) => {
-        return a.index - b.index;
-      });
-
-      const newCaseList = [];
-      const oldCaseObj = {};
-      let obj = {};
-
-      const handleTypeParams = (data, name) => {
-        let res = data[name];
-        const type = Object.prototype.toString.call(res);
-        if (type === '[object Array]' && res.length) {
-          res = JSON.stringify(res);
-          try {
-            res = JSON.parse(handleReplaceStr(res));
-          } catch (e) {
-            console.log('e ->', e);
-          }
-        } else if (type === '[object String]' && data[name]) {
-          res = handleReplaceStr(res);
-        }
-        return res;
-      };
-
-      const handleReplaceStr = str => {
-        if (str.indexOf('$') !== -1) {
-          str = str.replace(/\$\.([0-9]+)\./g, function(match, p1) {
-            p1 = p1.toString();
-            return `$.${newCaseList[oldCaseObj[p1]]}.` || '';
-          });
-        }
-        return str;
-      };
-
-      // 处理数据里面的$id;
-      const handleParams = data => {
-        data.col_id = new_col_id;
-        delete data._id;
-        delete data.add_time;
-        delete data.up_time;
-        delete data.__v;
-        data.req_body_other = handleTypeParams(data, 'req_body_other');
-        data.req_query = handleTypeParams(data, 'req_query');
-        data.req_params = handleTypeParams(data, 'req_params');
-        data.req_body_form = handleTypeParams(data, 'req_body_form');
-        return data;
-      };
-
-      for (let i = 0; i < oldColCaselistData.length; i++) {
-        obj = oldColCaselistData[i].toObject();
-        // 将被克隆的id和位置绑定
-        oldCaseObj[obj._id] = i;
-        let caseData = handleParams(obj);
-        let newCase = await this.caseModel.save(caseData);
-        newCaseList.push(newCase._id);
+      // 获取原集合信息
+      const oldCol = await this.colModel.get(col_id);
+      if (!oldCol) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '原集合不存在'));
       }
+
+      // 递归克隆函数
+      const cloneRecursive = async (sourceColId, targetParentId, colIdMap, groupIdMap) => {
+        // 1. 获取源集合下的所有直接子文件夹和组（type='folder' 或 'group'）
+        const childCols = await this.colModel.model
+          .find({ parent_id: sourceColId })
+          .lean()
+          .exec();
+
+        // 2. 克隆所有子文件夹和组
+        for (let childCol of childCols) {
+          const oldChildId = childCol._id;
+          const newChildData = {
+            name: childCol.name,
+            project_id: project_id,
+            parent_id: targetParentId,
+            type: childCol.type,
+            index: childCol.index,
+            desc: childCol.desc,
+            uid: this.getUid(),
+            add_time: yapi.commons.time(),
+            up_time: yapi.commons.time()
+          };
+
+          // 如果是 group，保留 repeatCount
+          if (childCol.type === 'group' && childCol.repeatCount) {
+            newChildData.repeatCount = childCol.repeatCount;
+          }
+
+          // 保存新的子集合/组
+          const newChild = await this.colModel.save(newChildData);
+          const newChildId = newChild._id;
+
+          // 记录映射关系
+          if (childCol.type === 'folder') {
+            colIdMap[oldChildId] = newChildId;
+          } else if (childCol.type === 'group') {
+            groupIdMap[oldChildId] = newChildId;
+          }
+
+          // 3. 递归克隆子文件夹/组的内容
+          await cloneRecursive(oldChildId, newChildId, colIdMap, groupIdMap);
+
+          // 4. 克隆当前子集合/组下的所有 cases
+          await cloneCasesForCol(oldChildId, newChildId, groupIdMap);
+        }
+      };
+
+      // 克隆指定集合下的所有用例
+      const cloneCasesForCol = async (sourceColId, targetColId, groupIdMap) => {
+        // 获取原集合下的所有用例（只要 col_id 匹配且 parent_id 直接指向该集合/组）
+        let oldCases = await this.caseModel.model
+          .find({ col_id: sourceColId, parent_id: sourceColId })
+          .sort({ index: 1 })
+          .lean()
+          .exec();
+
+        const newCaseList = [];
+        const oldCaseObj = {};
+
+        const handleTypeParams = (data, name) => {
+          let res = data[name];
+          const type = Object.prototype.toString.call(res);
+          if (type === '[object Array]' && res.length) {
+            res = JSON.stringify(res);
+            try {
+              res = JSON.parse(handleReplaceStr(res));
+            } catch (e) {
+              console.log('handleTypeParams error ->', e);
+            }
+          } else if (type === '[object String]' && data[name]) {
+            res = handleReplaceStr(res);
+          }
+          return res;
+        };
+
+        const handleReplaceStr = str => {
+          if (str.indexOf('$') !== -1) {
+            str = str.replace(/\$\.([0-9]+)\./g, function(match, p1) {
+              p1 = p1.toString();
+              return `$.${newCaseList[oldCaseObj[p1]]}.` || '';
+            });
+          }
+          return str;
+        };
+
+        // 克隆每个用例
+        for (let i = 0; i < oldCases.length; i++) {
+          let oldCase = oldCases[i];
+          oldCaseObj[oldCase._id] = i;
+
+          let newCaseData = {
+            casename: oldCase.casename,
+            uid: this.getUid(),
+            col_id: targetColId,
+            index: oldCase.index,
+            project_id: project_id,
+            interface_id: oldCase.interface_id,
+            add_time: yapi.commons.time(),
+            up_time: yapi.commons.time(),
+            case_env: oldCase.case_env,
+            req_params: oldCase.req_params,
+            req_headers: oldCase.req_headers,
+            req_query: handleTypeParams(oldCase, 'req_query'),
+            req_body_form: handleTypeParams(oldCase, 'req_body_form'),
+            req_body_other: handleTypeParams(oldCase, 'req_body_other'),
+            test_res_body: oldCase.test_res_body,
+            test_status: oldCase.test_status,
+            test_res_header: oldCase.test_res_header,
+            mock_verify: oldCase.mock_verify,
+            enable_script: oldCase.enable_script,
+            enable_async: oldCase.enable_async,
+            test_script: oldCase.test_script,
+            pre_request_script: oldCase.pre_request_script
+          };
+
+          // 处理 parent_id 和 group_id
+          if (oldCase.group_id) {
+            // 如果用例属于某个 group，映射到新的 group_id
+            newCaseData.group_id = groupIdMap[oldCase.group_id] || null;
+            newCaseData.parent_id = newCaseData.group_id;
+          } else {
+            // 直接在集合下
+            newCaseData.group_id = null;
+            newCaseData.parent_id = targetColId;
+          }
+
+          let newCase = await this.caseModel.save(newCaseData);
+          newCaseList.push(newCase._id);
+        }
+      };
+
+      // 开始克隆流程
+      const colIdMap = {}; // folder 映射
+      const groupIdMap = {}; // group 映射
+
+      // 1. 递归克隆所有子文件夹和组
+      await cloneRecursive(col_id, new_col_id, colIdMap, groupIdMap);
+
+      // 2. 克隆顶层集合的用例
+      await cloneCasesForCol(col_id, new_col_id, groupIdMap);
 
       this.projectModel.up(params.project_id, { up_time: new Date().getTime() }).then();
       ctx.body = yapi.commons.resReturn('ok');

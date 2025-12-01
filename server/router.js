@@ -13,6 +13,7 @@ const openController = require('./controllers/open.js');
 const { createAction } = require('./utils/commons.js');
 const wsTestController = require('./controllers/wsTest');
 const fileController = require("./controllers/files");
+const testReportController = require('./controllers/testReport');
 
 const router = koaRouter();
 
@@ -60,6 +61,10 @@ let INTERFACE_CONFIG = {
   files: {
     prefix: '/files/',
     controller: fileController
+  },
+  testReport: {
+    prefix: '/test_report/',
+    controller: testReportController
   }
 };
 
@@ -640,6 +645,28 @@ let routerConfig = {
       action: 'deleteFile',
       path: 'deleteFile',
       method: 'post'
+    }
+  ],
+  testReport: [
+    {
+      action: 'list',
+      path: 'list',
+      method: 'get'
+    },
+    {
+      action: 'get',
+      path: 'get',
+      method: 'get'
+    },
+    {
+      action: 'save',
+      path: 'save',
+      method: 'post'
+    },
+    {
+      action: 'del',
+      path: 'del',
+      method: 'get'
     }
   ]
 };

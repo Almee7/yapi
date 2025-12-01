@@ -128,6 +128,7 @@ class InterfaceColContent extends Component {
       download: false,
       currColEnvObj: {},
       collapseKey: '1',
+      groupDate:{},
       commonSettingModalVisible: false,
       expandedRows: [], // 存储已展开的行ID
       commonSetting: {
@@ -160,6 +161,7 @@ class InterfaceColContent extends Component {
     if (result.payload.data.errcode === 0) {
       this.reports = handleReport(result.payload.data.colData.test_report);
       this.setState({
+        groupDate: result.payload.data.groupDate,
         commonSetting:{
           ...this.state.commonSetting,
           ...result.payload.data.colData
@@ -248,9 +250,83 @@ class InterfaceColContent extends Component {
     this.setState({ rows: newRows });
   };
 
+
+  // 保存测试报告到数据库
+  saveTestReport = async (startTime, endTime) => {
+    const reports = this.reports;
+    
+    // 统计总数、成功数、失败数
+    let total = 0;
+    let success = 0;
+    let failed = 0;
+    
+    Object.values(reports).forEach(report => {
+      total++;
+      if (report.code === 0) {
+        success++;
+      } else {
+        failed++;
+      }
+    });
+    
+    // 获取当前集合信息
+    const colData = this.props.interfaceColList.find(col => col._id === this.props.currColId);
+    console.log('colData:', colData);
+    const col_name = colData ? colData.name : '未知集合';
+    
+    // 获取环境名称 - 修复环境获取逻辑
+    const envNames = [];
+    const currColEnvObj = this.state.currColEnvObj;
+    // 遍历每个项目的环境配置
+    Object.keys(currColEnvObj).forEach(projectId => {
+      const envId = currColEnvObj[projectId];
+      if (envId) {
+        // 查找对应项目的环境列表
+        const projectEnv = this.props.envList.find(env => env._id == projectId);
+        if (projectEnv && projectEnv.env) {
+          // 在环境列表中查找选中的环境
+          const selectedEnv = projectEnv.env.find(e => e.name === envId);
+          if (selectedEnv) {
+            envNames.push(selectedEnv.name);
+          }
+        }
+      }
+    });
+
+    const env_name = envNames.length > 0 ? envNames.join(', ') : '默认环境';
+    
+    // 计算总执行时间
+    const run_time = ((endTime - startTime) / 1000).toFixed(2) + 's';
+    
+    try {
+      await axios.post('/api/test_report/save', {
+        col_id: this.props.currColId,
+        col_name,
+        project_id: this.props.match.params.id,
+        env_name,
+        total,
+        success,
+        failed,
+        run_time,
+        test_result: reports
+      });
+    } catch (e) {
+      console.error('保存测试报告失败', e);
+    }
+  };
+
+  // 查看报告记录列表
+  viewReportList = () => {
+    const projectId = this.props.match.params.id;
+    const colId = this.props.currColId;
+    this.props.history.push(`/project/${projectId}/interface/col/${colId}/report-list`);
+  };
+
   //开始测试入口
   executeTests = async () => {
     // 点击取消
+    console.log("this.state",this.state);
+    console.log("this.props",this.props);
     console.log("开始测试时的集合参数:是否失败停止", this.state.commonSetting.stopFail);
     if (this.state.loading) {
       this.setState({ loading: false });
@@ -265,6 +341,9 @@ class InterfaceColContent extends Component {
       message.warning("请先选择用例");
       return;
     }
+    console.log("开始测试时的集合参数", this.state)
+    // 记录开始时间
+    const startTime = Date.now();
 
     // 开始测试前清空状态
     this.setState({
@@ -277,12 +356,55 @@ class InterfaceColContent extends Component {
     const rows_w = {};
     const asyncTasks = []; // 存放异步 case 的 Promise
 
-    for (let i = 0; i < this.state.rows.length; i++) {
+    // 处理分组循环执行逻辑
+    let executionRows = [];
+    const groupData = this.state.groupData; // 从 this.state.groupData 获取分组数据
+    
+    if (groupData && groupData._id && groupData.repeatCount > 0) {
+      // 有分组数据，需要循环执行
+      const groupId = groupData._id;
+      const repeatCount = groupData.repeatCount;
+      
+      // 找到所有属于该组的用例
+      const groupRows = this.state.rows.filter(row => 
+        row.group_id === groupId && selectedIds.includes(row._id)
+      );
+      
+      // 非组内的用例
+      const nonGroupRows = this.state.rows.filter(row => 
+        row.group_id !== groupId && selectedIds.includes(row._id)
+      );
+      
+      // 按照循环次数展开组内用例
+      for (let i = 0; i < repeatCount; i++) {
+        groupRows.forEach(row => {
+          if (i === 0) {
+            // 第一次使用原始 ID
+            executionRows.push({ ...row, repeatIndex: 0 });
+          } else {
+            // 后续次数使用带后缀的 ID
+            executionRows.push({ 
+              ...row, 
+              _id: `${row._id}-${i}`,
+              repeatIndex: i,
+              originalId: row._id // 保存原始 ID
+            });
+          }
+        });
+      }
+      
+      // 将非组内用例添加到执行列表
+      executionRows = [...executionRows, ...nonGroupRows];
+    } else {
+      // 没有分组数据，按正常流程执行
+      executionRows = this.state.rows.filter(row => selectedIds.includes(row._id));
+    }
+
+    // 执行测试用例
+    for (let i = 0; i < executionRows.length; i++) {
       if (!this.state.loading) break; // 已取消
 
-      const curRow = this.state.rows[i];
-      if (!selectedIds.includes(curRow._id)) continue;
-
+      const curRow = executionRows[i];
       rows_w[curRow._id] = curRow;
 
       const envItem = _.find(this.props.envList, item => item._id === curRow.project_id);
@@ -294,18 +416,22 @@ class InterfaceColContent extends Component {
         after_script: this.props.currProject.after_script,
         test_status: 'loading'
       };
+      
       // 更新 UI 状态
-      this.setState(prev => {
-        const newRows = [...prev.rows];
-        newRows[i] = curitem;
-        return { rows: newRows };
-      });
+      const originalIndex = this.state.rows.findIndex(r => r._id === (curRow.originalId || curRow._id));
+      if (originalIndex !== -1) {
+        this.setState(prev => {
+          const newRows = [...prev.rows];
+          newRows[originalIndex] = curitem;
+          return { rows: newRows };
+        });
+      }
 
       // 根据 enable_async 决定是否 await
       if (curitem.enable_async) {
-        asyncTasks.push(this.runCase(curitem, i)); // 异步收集 Promise
+        asyncTasks.push(this.runCase(curitem, originalIndex)); // 异步收集 Promise
       } else {
-        await this.runCase(curitem, i); // 同步阻塞
+        await this.runCase(curitem, originalIndex); // 同步阻塞
       }
       let reportsId = curitem._id;
       let resultCode = this.reports[reportsId] ? this.reports[reportsId].code : undefined;
@@ -316,12 +442,18 @@ class InterfaceColContent extends Component {
       await Promise.all(asyncTasks);
     }
 
+    // 记录结束时间
+    const endTime = Date.now();
+
     // 全部接口执行完再上传报告
     if (this.state.loading) {
       await axios.post('/api/col/up_col', {
         col_id: this.props.currColId,
         test_report: JSON.stringify(this.reports)
       });
+      
+      // 保存测试报告到数据库，传入开始和结束时间
+      await this.saveTestReport(startTime, endTime);
     }
 
     this.setState({ loading: false });
@@ -331,10 +463,14 @@ class InterfaceColContent extends Component {
 
   // 统一用例执行方法
   runCase = async (curitem, index) => {
+    console.log("runCase", curitem)
     let result, status = 'error';
     // 创建 cancelToken
     let source = axios.CancelToken.source();
     this.cancelTokens[curitem._id] = source;
+
+    // 记录开始时间
+    const caseStartTime = Date.now();
 
     try {
       if (curitem.method === 'WS') {
@@ -367,10 +503,19 @@ class InterfaceColContent extends Component {
       }
     }
 
+    // 记录结束时间并计算执行时间
+    const caseEndTime = Date.now();
+    const executionTime = (caseEndTime - caseStartTime) + 'ms';
+
     delete this.cancelTokens[curitem._id];
 
-    // 更新 reports / records
-    this.reports[curitem._id] = result;
+    // 更新 reports / records，添加执行时间和用例名称
+    this.reports[curitem._id] = {
+      ...result,
+      casename: curitem.casename, // 添加用例名称
+      name: curitem.casename, // 兼容两种字段名
+      executionTime // 添加执行时间
+    };
     this.records[curitem._id] = {
       status: result.status,
       params: result.params,
@@ -1359,53 +1504,70 @@ class InterfaceColContent extends Component {
           <Col span={9}>
             {this.state.hasPlugin ? (
               <div
-                      style={{
-                        float: 'right',
-                        paddingTop: '8px'
-                      }}
-                  >
+                    style={{
+                      float: 'right',
+                      paddingTop: '8px'
+                    }}
+                >
                 {this.props.curProjectRole !== 'guest' && (
-                <Tooltip title="在 YApi 服务端跑自动化测试，测试环境不能为私有网络，请确保 YApi 服务器可以访问到自动化测试环境domain">
-                  <Button
+                  <div style={{ display: 'inline-block' }}>
+                    <Tooltip title="查看测试报告历史记录">
+                      <Button
+                              style={{
+                                marginRight: '8px'
+                              }}
+                              onClick={this.viewReportList}
+                          >
+                        报告记录
+                      </Button>
+                    </Tooltip>
+                    <Tooltip title="在 YApi 服务端跑自动化测试，测试环境不能为私有网络，请确保 YApi 服务器可以访问到自动化测试环境domain">
+                      <Button
                               style={{
                                 marginRight: '8px'
                               }}
                               onClick={this.autoTests}
                           >
-                    服务端测试
-                  </Button>
-                </Tooltip>
-                    )}
-                <Button onClick={this.openCommonSetting} style={{
-                      marginRight: '8px'
-                    }} >通用规则配置</Button>
-                    &nbsp;
+                        服务端测试
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  )}
                 <Button
-                        type="primary"
-                        onClick={this.executeTests}      // 原来的方法
-                        disabled={!hasPlugin}            // 根据条件禁用
-                        style={{ marginLeft: 10 }}       // 样式
-                        icon={loading ? 'loading' : ''} // 图标，loading 时显示加载
-                    >
-                  {/*根据 loading 状态切换*/}
+                      onClick={this.openCommonSetting}
+                      style={{
+                        marginRight: '8px'
+                      }}
+                  >
+                  通用规则配置
+                </Button>
+                  &nbsp;
+                <Button
+                      type="primary"
+                      onClick={this.executeTests}
+                      disabled={!hasPlugin}
+                      style={{ marginLeft: 10 }}
+                      icon={loading ? 'loading' : ''}
+                  >
                   {loading ? '取消' : '开始测试'}
                 </Button>
               </div>
-              ) : (
-                <Tooltip title="请安装 cross-request Chrome 插件">
-                  <Button
-                        disabled
-                        type="primary"
-                        style={{
-                          float: 'right',
-                          marginTop: '8px'
-                        }}
-                    >
-                    开始测试
-                  </Button>
-                </Tooltip>
-              )}
+            ) : (
+              <Tooltip title="请安装 cross-request Chrome 插件">
+                <Button
+                      disabled
+                      type="primary"
+                      style={{
+                        float: 'right',
+                        marginTop: '8px'
+                      }}
+                  >
+                  开始测试
+                </Button>
+              </Tooltip>
+            )}
           </Col>
+
         </Row>
 
         <div className="component-label-wrapper">

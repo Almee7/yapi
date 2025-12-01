@@ -101,6 +101,7 @@
     "yapi-plugin-qsso": "^1.1.0"
   },
   "devDependencies": {
+    "@babel/preset-react": "^7.28.5",
     "antd": "3.2.2",
     "anujs": "^1.2.6",
     "assets-webpack-plugin": "^3.5.1",

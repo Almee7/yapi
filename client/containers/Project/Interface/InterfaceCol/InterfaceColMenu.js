@@ -308,7 +308,8 @@ export default class InterfaceColMenu extends Component {
     const add_case_list_res = await axios.post('/api/col/clone_case_list', {
       new_col_id,
       col_id,
-      project_id
+      project_id,
+      parent_id
     });
     this._copyInterfaceSign = false;
 

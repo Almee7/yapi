@@ -1,0 +1,17 @@
+.test-report-list {
+  padding: 24px;
+  background: #fff;
+
+  .report-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+
+    h2 {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 600;
+    }
+  }
+}

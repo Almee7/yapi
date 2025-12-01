@@ -14,6 +14,8 @@ import InterfaceContent from './InterfaceList/InterfaceContent.js';
 import InterfaceColMenu from './InterfaceCol/InterfaceColMenu.js';
 import InterfaceColContent from './InterfaceCol/InterfaceColContent.js';
 import InterfaceCaseContent from './InterfaceCol/InterfaceCaseContent.js';
+import TestReportList from './InterfaceCol/TestReportList.js';
+import TestReportDetail from './InterfaceCol/TestReportDetail.js';
 import { getProject } from '../../../reducer/modules/project';
 import { setColData } from '../../../reducer/modules/interfaceCol.js';
 const contentRouter = {
@@ -32,6 +34,12 @@ const InterfaceRoute = props => {
       C = InterfaceList;
     }
   } else if (props.match.params.action === 'col') {
+    // 检查是否是 report-list 或 report 路由
+    if (props.match.params.actionId === 'report-list' || 
+        (props.match.params.actionId && props.match.params.actionId.indexOf('report/') === 0)) {
+      // 这里由下面的 Switch 处理
+      return null;
+    }
     C = InterfaceColContent;
   } else if (props.match.params.action === 'case') {
     C = InterfaceCaseContent;
@@ -127,6 +135,8 @@ class Interface extends Component {
           >
             <div className="right-content">
               <Switch>
+                <Route exact path="/project/:id/interface/col/:actionId/report-list" component={TestReportList} />
+                <Route exact path="/project/:id/interface/col/:actionId/report/:reportId" component={TestReportDetail} />
                 <Route exact path="/project/:id/interface/:action" component={InterfaceRoute} />
                 <Route {...contentRouter} component={InterfaceRoute} />
               </Switch>
