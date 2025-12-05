@@ -718,7 +718,7 @@ exports.getCaseList = async function getCaseList(id) {
     ctxBody.colData = colData;
     const groups = allCols.filter(item => item.type === 'group');
     if (groups.length > 0) {
-        ctxBody.groupDate = groups;
+        ctxBody.groupData = groups;
     }
     return ctxBody;
 };
@@ -785,23 +785,35 @@ exports.runCaseScript = async function runCaseScript(params, colId, interfaceId)
                 }
             }
         }
+        let hasGlobalScript = false;
+        let hasCaseScript = false;
+                
         if (colData.checkScript.enable) {
             let globalScript = colData.checkScript.content;
             // script 是断言
             if (globalScript) {
+                hasGlobalScript = true;
                 logs.push('执行全局断言脚本：' + globalScript)
                 result = await yapi.commons.sandbox(context, globalScript);
                 result.vars = context.vars;
             }
         }
-
+                
         let script = params.scriptArr;
         // script 是断言
         if (params.scripts.enable) {
             script = params.scripts.content;
+            hasCaseScript = true;
             logs.push('执行脚本:' + script)
             result = await yapi.commons.sandbox(context, script);
             result.vars = context.vars;
+        }
+                
+        // 如果既没有全局脚本也没有用例脚本，则添加无脚本标识
+        if (!hasGlobalScript && !hasCaseScript) {
+            logs.push('无脚本');
+            // 返回特殊的错误码表示无脚本
+            return yapi.commons.resReturn(result, 2, '无脚本');
         }
         result.logs = logs;
         return yapi.commons.resReturn(result);

@@ -320,6 +320,7 @@ async function sandboxByBrowser(context = {}, script) {
 
   // 确保 context.vars 初始化
   context.vars = context.vars || {};
+  console.log('context.vars:', context.vars)
 
   // 1) 提取 sql（仅第一个）
   const parsed = extractSqlOnly(script);
@@ -356,6 +357,7 @@ async function sandboxByBrowser(context = {}, script) {
   // 5) 合并最终执行脚本：先注入 SQL 返回的 vars，再执行原脚本（已移除 sql）
   //    选择将 varsFromSql 放在最前面，保证后续脚本能直接使用这些 vars
   const finalScript = [varsFromSqlScript, scriptWithoutSql].filter(Boolean).join('\n');
+  console.log('--- 最终执行脚本 ---\n', finalScript)
 
   // 6) 执行（保持原有行为：注入 context.vars => 执行 finalScript）
   const beginScript = `var vars = context.vars;\n`;
@@ -394,6 +396,8 @@ ${finalScript}
  * @param {*} pre_request_script
  */
 async function crossRequest(defaultOptions, preScript, afterScript, pre_request_script,commonContext = {}) {
+  console.log(preScript)
+  console.log(pre_request_script)
   let options = {
     ...defaultOptions
   }
@@ -451,84 +455,76 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
     axios: axios
   });
 
-  if (!isEmptyString(pre_request_script)) {
-    // 1. 执行 pre_request_script
-    context = await sandbox(context, pre_request_script);
+  async function runScript(script, updateUrlHeader = false) {
+    if (!isEmptyString(script)) {
+      context = await sandbox(context, script);
 
-    // 2. 替换 requestBody 中的 {{xxx}} 占位符
+      if (updateUrlHeader) {
+        options.url = defaultOptions.url = URL.format({
+          protocol: urlObj.protocol,
+          host: urlObj.host,
+          query: context.query,
+          pathname: context.pathname
+        });
+
+        options.headers = defaultOptions.headers = context.requestHeader;
+      }
+    }
+
+    // 变量替换永远执行
     if (context.requestBody) {
       context.requestBody = replaceWithEnv(context.requestBody, context.vars);
     }
 
-    // 3. 更新请求体 data
-    defaultOptions.data = options.data = context.requestBody;
+    options.data = defaultOptions.data = context.requestBody;
   }
 
-  if (!isEmptyString(preScript)) {
-    // 1. 执行前置脚本
-    context = await sandbox(context, preScript);
+  // ==== 先执行 pre_request_script（不影响 URL/header）====
+  await runScript(pre_request_script, false);
 
-    // 2. 替换 requestBody 中的 {{xxx}} 占位符
-    if (context.requestBody) {
-      context.requestBody = replaceWithEnv(context.requestBody, context.vars);
-    }
-
-    // 3. 更新 URL（如果 query 或 pathname 被前置脚本修改）
-    defaultOptions.url = options.url = URL.format({
-      protocol: urlObj.protocol,
-      host: urlObj.host,
-      query: context.query,
-      pathname: context.pathname
-    });
-
-    // 4. 更新 headers
-    defaultOptions.headers = options.headers = context.requestHeader;
-
-    // 5. 更新请求体 data
-    defaultOptions.data = options.data = context.requestBody;
-  }
+  // ==== 再执行 preScript（可能会修改 URL/header）====
+  await runScript(preScript, true);
 
   let data;
 
-
-    if (isNode) {
-      data = await httpRequestByNode(options);
-      data.req = options;
-    } else {
-      data = await new Promise((resolve, reject) => {
-        options.error = options.success = function (res, header, data) {
-          let message = '';
-          if (res && typeof res === 'string') {
-            res = json_parse(data.res.body);
-            data.res.body = res;
-          }
-          if (!isNode) message = '请求异常，请检查 chrome network 错误信息... https://juejin.im/post/5c888a3e5188257dee0322af 通过该链接查看教程"）';
-          if (isNaN(data.res.status)) {
-            reject({
-              body: res || message,
-              header,
-              message
-            });
-          }
-          resolve(data);
-        };
-
-        window.crossRequest(options);
-      });
-    }
-    if (afterScript) {
-      context.responseData = data.res.body;
-      context.responseHeader = data.res.header;
-      context.responseStatus = data.res.status;
-      context.runTime = data.runTime;
-      context = await sandbox(context, afterScript);
-      data.res.body = context.responseData;
-      data.res.header = context.responseHeader;
-      data.res.status = context.responseStatus;
-      data.runTime = context.runTime;
-    }
-    return data;
+  if (isNode) {
+    data = await httpRequestByNode(options);
+    data.req = options;
+  } else {
+    data = await new Promise((resolve, reject) => {
+      options.error = options.success = function (res, header, data) {
+        let message = '';
+        if (res && typeof res === 'string') {
+          res = json_parse(data.res.body);
+          data.res.body = res;
+        }
+        if (!isNode) message = '请求异常，请检查 chrome network 错误信息... https://juejin.im/post/5c888a3e5188257dee0322af 通过该链接查看教程"）';
+        if (isNaN(data.res.status)) {
+          reject({
+            body: res || message,
+            header,
+            message
+          });
+        }
+        resolve(data);
+      };
+      console.log("发送请求前的数据",options)
+      window.crossRequest(options);
+    });
   }
+  if (afterScript) {
+    context.responseData = data.res.body;
+    context.responseHeader = data.res.header;
+    context.responseStatus = data.res.status;
+    context.runTime = data.runTime;
+    context = await sandbox(context, afterScript);
+    data.res.body = context.responseData;
+    data.res.header = context.responseHeader;
+    data.res.status = context.responseStatus;
+    data.runTime = context.runTime;
+  }
+  return data;
+}
 
 
 function NewFile(fileData) {

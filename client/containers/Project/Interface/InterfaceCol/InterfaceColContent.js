@@ -128,7 +128,7 @@ class InterfaceColContent extends Component {
       download: false,
       currColEnvObj: {},
       collapseKey: '1',
-      groupDate:{},
+      groupData:{},
       commonSettingModalVisible: false,
       expandedRows: [], // 存储已展开的行ID
       commonSetting: {
@@ -151,7 +151,7 @@ class InterfaceColContent extends Component {
     this.onMoveRow = this.onMoveRow.bind(this);
   }
 
-  async handleColIdChange(newColId){
+  handleColIdChange = async (newColId) => {
     this.props.setColData({
       currColId: +newColId,
       isShowCol: true,
@@ -161,7 +161,7 @@ class InterfaceColContent extends Component {
     if (result.payload.data.errcode === 0) {
       this.reports = handleReport(result.payload.data.colData.test_report);
       this.setState({
-        groupDate: result.payload.data.groupDate,
+        groupData: result.payload.data.groupData,
         commonSetting:{
           ...this.state.commonSetting,
           ...result.payload.data.colData
@@ -252,7 +252,7 @@ class InterfaceColContent extends Component {
 
 
   // 保存测试报告到数据库
-  saveTestReport = async (startTime, endTime) => {
+  saveTestReport = async (startTime, endTime, executionOrder) => {
     const reports = this.reports;
     
     // 统计总数、成功数、失败数
@@ -298,6 +298,12 @@ class InterfaceColContent extends Component {
     // 计算总执行时间
     const run_time = ((endTime - startTime) / 1000).toFixed(2) + 's';
     
+    // 按照执行顺序构建有序的测试结果数组
+    const orderedTestResults = executionOrder.map(id => ({
+      id,
+      ...reports[id]
+    })).filter(item => item.code !== undefined); // 过滤掉没有结果的用例
+    
     try {
       await axios.post('/api/test_report/save', {
         col_id: this.props.currColId,
@@ -308,7 +314,7 @@ class InterfaceColContent extends Component {
         success,
         failed,
         run_time,
-        test_result: reports
+        test_result: orderedTestResults // 保存为有序数组
       });
     } catch (e) {
       console.error('保存测试报告失败', e);
@@ -325,9 +331,6 @@ class InterfaceColContent extends Component {
   //开始测试入口
   executeTests = async () => {
     // 点击取消
-    console.log("this.state",this.state);
-    console.log("this.props",this.props);
-    console.log("开始测试时的集合参数:是否失败停止", this.state.commonSetting.stopFail);
     if (this.state.loading) {
       this.setState({ loading: false });
       Object.values(this.cancelTokens).forEach(source => {
@@ -337,6 +340,7 @@ class InterfaceColContent extends Component {
       return;
     }
     const selectedIds = this.state.selectedIds;
+    console.log('selectedIds:', selectedIds);
     if (!selectedIds.length) {
       message.warning("请先选择用例");
       return;
@@ -355,57 +359,95 @@ class InterfaceColContent extends Component {
 
     const rows_w = {};
     const asyncTasks = []; // 存放异步 case 的 Promise
+    const executionOrder = []; // 记录执行顺序
 
     // 处理分组循环执行逻辑
     let executionRows = [];
     const groupData = this.state.groupData; // 从 this.state.groupData 获取分组数据
+
+    // 检查是否有循环组
+    const hasLoopGroups = Array.isArray(groupData) && groupData.length > 0 && groupData.some(group => group.repeatCount >= 1);
+
     
-    if (groupData && groupData._id && groupData.repeatCount > 0) {
-      // 有分组数据，需要循环执行
-      const groupId = groupData._id;
-      const repeatCount = groupData.repeatCount;
+    if (hasLoopGroups) {
+      // 有循环组数据，需要循环执行
+      const loopGroups = groupData.filter(group => group.repeatCount >= 1);
+      // 创建循环组映射：group_id -> repeatCount
+      const loopGroupMap = {};
+      loopGroups.forEach(group => {
+        loopGroupMap[group._id] = group.repeatCount;
+      });
       
-      // 找到所有属于该组的用例
-      const groupRows = this.state.rows.filter(row => 
-        row.group_id === groupId && selectedIds.includes(row._id)
-      );
-      
-      // 非组内的用例
-      const nonGroupRows = this.state.rows.filter(row => 
-        row.group_id !== groupId && selectedIds.includes(row._id)
-      );
-      
-      // 按照循环次数展开组内用例
-      for (let i = 0; i < repeatCount; i++) {
-        groupRows.forEach(row => {
-          if (i === 0) {
-            // 第一次使用原始 ID
-            executionRows.push({ ...row, repeatIndex: 0 });
-          } else {
-            // 后续次数使用带后缀的 ID
-            executionRows.push({ 
-              ...row, 
-              _id: `${row._id}-${i}`,
-              repeatIndex: i,
-              originalId: row._id // 保存原始 ID
-            });
+      // 收集循环组中的所有用例，并按group_id和index分组
+      const loopGroupCases = {};
+      this.state.rows.forEach(row => {
+        if (row.group_id && loopGroupMap[row.group_id]) {
+          if (!loopGroupCases[row.group_id]) {
+            loopGroupCases[row.group_id] = [];
           }
-        });
-      }
+          loopGroupCases[row.group_id].push(row);
+        }
+      });
       
-      // 将非组内用例添加到执行列表
-      executionRows = [...executionRows, ...nonGroupRows];
+      // 确保循环组内的用例按index排序
+      Object.keys(loopGroupCases).forEach(groupId => {
+        loopGroupCases[groupId].sort((a, b) => a.index - b.index);
+      });
+      
+      // 按照原始顺序处理用例
+      for (let i = 0; i < this.state.rows.length; i++) {
+        const row = this.state.rows[i];
+        
+        // 只处理选中的用例
+        if (!selectedIds.includes(row._id)) {
+          continue;
+        }
+        
+        // 检查该用例是否属于循环组
+        const repeatCount = loopGroupMap[row.group_id];
+        
+        if (typeof repeatCount !== 'undefined' && repeatCount >= 1) {
+          // 属于循环组，检查是否是该组的第一个用例
+          const groupCases = loopGroupCases[row.group_id] || [];
+          const isFirstInGroup = groupCases.length > 0 && groupCases[0]._id === row._id;
+          
+          if (isFirstInGroup) {
+            // 是循环组的第一个用例，展开整个组
+            for (let loopIndex = 0; loopIndex < repeatCount; loopIndex++) {
+              groupCases.forEach(caseRow => {
+                if (loopIndex === 0) {
+                  // 第一次循环使用原始ID
+                  executionRows.push({ ...caseRow, repeatIndex: 0 });
+                } else {
+                  // 后续循环使用带后缀的ID
+                  executionRows.push({ 
+                    ...caseRow, 
+                    _id: `${caseRow._id}-${loopIndex}`,
+                    repeatIndex: loopIndex,
+                    originalId: caseRow._id
+                  });
+                }
+              });
+            }
+          }
+          // 如果不是第一个用例，在第一次循环时已经被处理过了，所以跳过
+        } else {
+          // 不属于循环组，直接添加
+          executionRows.push({ ...row });
+        }
+      }
     } else {
-      // 没有分组数据，按正常流程执行
+      // 没有循环组数据，按正常流程执行
       executionRows = this.state.rows.filter(row => selectedIds.includes(row._id));
     }
-
     // 执行测试用例
     for (let i = 0; i < executionRows.length; i++) {
       if (!this.state.loading) break; // 已取消
 
       const curRow = executionRows[i];
       rows_w[curRow._id] = curRow;
+      // 记录执行顺序
+      executionOrder.push(curRow._id);
 
       const envItem = _.find(this.props.envList, item => item._id === curRow.project_id);
 
@@ -422,7 +464,7 @@ class InterfaceColContent extends Component {
       if (originalIndex !== -1) {
         this.setState(prev => {
           const newRows = [...prev.rows];
-          newRows[originalIndex] = curitem;
+          newRows[originalIndex] = { ...curitem, test_status: curitem.test_status };
           return { rows: newRows };
         });
       }
@@ -451,9 +493,8 @@ class InterfaceColContent extends Component {
         col_id: this.props.currColId,
         test_report: JSON.stringify(this.reports)
       });
-      
-      // 保存测试报告到数据库，传入开始和结束时间
-      await this.saveTestReport(startTime, endTime);
+      // 保存测试报告到数据库，传入开始和结束时间以及执行顺序
+      await this.saveTestReport(startTime, endTime, executionOrder);
     }
 
     this.setState({ loading: false });
@@ -713,10 +754,21 @@ class InterfaceColContent extends Component {
       content: interfaceData.test_script
     };
     // ✅ 判断是否启用测试脚本
-    // if (!interfaceData.enable_script) {
-    //   validRes.push({ message: 2 });
-    //   return
-    // }
+    // 检查用例脚本是否启用
+    if (!interfaceData.enable_script && (!interfaceData.test_script || interfaceData.test_script.trim() === '')) {
+      // 还需要检查全局脚本
+      const hasGlobalScript = this.state.commonSetting && 
+                             this.state.commonSetting.checkScript && 
+                             this.state.commonSetting.checkScript.enable && 
+                             this.state.commonSetting.checkScript.content && 
+                             this.state.commonSetting.checkScript.content.trim() !== '';
+      
+      // 如果既没有启用的用例脚本也没有启用的全局脚本，则标记为无脚本
+      if (!hasGlobalScript) {
+        validRes.push({ message: 2 });
+        return;
+      }
+    }
     try {
       let test = await axios.post('/api/col/run_script', {
         response: response,
@@ -743,7 +795,8 @@ class InterfaceColContent extends Component {
   // val 请求体的每个值 替换值
   handleValue = (val, global) => {
     let globalValue = ArrayToObject(global);
-    let context = Object.assign({}, { global: globalValue }, this.records);
+    // 确保 scriptVars 和 records 都被包含在上下文中
+    let context = Object.assign({}, { global: globalValue, vars: scriptVars }, this.records);
     return handleParamsValue(val, context);
   };
 

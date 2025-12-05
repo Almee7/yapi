@@ -27,7 +27,7 @@ export default class TestReportDetail extends Component {
   state = {
     loading: true,
     report: null,
-    testResult: {}
+    testResult: [] // 改为数组以保持顺序
   };
 
   componentDidMount() {
@@ -44,11 +44,23 @@ export default class TestReportDetail extends Component {
 
       if (res.data.errcode === 0) {
         const report = res.data.data;
-        let testResult = {};
+        let testResult = [];
         try {
-          testResult = typeof report.test_result === 'string' 
+          const parsedResult = typeof report.test_result === 'string' 
             ? JSON.parse(report.test_result) 
             : report.test_result;
+          
+          // 判断是数组还是对象
+          if (Array.isArray(parsedResult)) {
+            // 已经是数组，直接使用
+            testResult = parsedResult;
+          } else {
+            // 是对象，转换为数组（为了向后兼容）
+            testResult = Object.keys(parsedResult).map(key => ({
+              id: key,
+              ...parsedResult[key]
+            }));
+          }
         } catch (e) {
           console.error('解析测试结果失败', e);
         }
@@ -72,8 +84,8 @@ export default class TestReportDetail extends Component {
     this.props.history.goBack();
   };
 
-  renderTestCaseResult = (caseId, result) => {
-    console.log('caseId', caseId,result)
+  renderTestCaseResult = (result, index) => {
+    console.log('result', index, result)
     if (!result) return null;
 
     const getStatusColor = code => {
@@ -90,7 +102,7 @@ export default class TestReportDetail extends Component {
 
     return (
       <Card 
-        key={caseId} 
+        key={result.id || index} 
         size="small" 
         style={{ marginBottom: 16 }}
         title={
@@ -274,9 +286,9 @@ export default class TestReportDetail extends Component {
 
         <div className="test-cases-section">
           <h3>测试用例详情</h3>
-          {Object.keys(testResult).length > 0 ? (
-            Object.keys(testResult).map(caseId => 
-              this.renderTestCaseResult(caseId, testResult[caseId])
+          {testResult && testResult.length > 0 ? (
+            testResult.map((result, index) => 
+              this.renderTestCaseResult(result, index)
             )
           ) : (
             <Card>

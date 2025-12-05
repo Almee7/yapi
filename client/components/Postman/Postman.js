@@ -368,6 +368,7 @@ export default class Run extends Component {
   }
 
   handleValue(val, global) {
+    console.log('handleValue', val, global)
     let globalValue = ArrayToObject(global);
     return handleParamsValue(val, {
       global: globalValue
