@@ -232,7 +232,7 @@ class interfaceColController extends baseController {
       // 通过col_id 找到 caseList
       let projectList = await this.caseModel.list(id, 'project_id');
       if (!projectList || projectList.length === 0) {
-        let col_id = await  this.colModel.getParentId(id)
+        let col_id = await this.colModel.getParentId(id)
         projectList = await this.caseModel.list(col_id, 'project_id');
 
       }
@@ -294,10 +294,10 @@ class interfaceColController extends baseController {
       for (let index = 0; index < resultList.length; index++) {
         let result = resultList[index].toObject();
         let item = {},
-          body,
-          query,
-          bodyParams,
-          pathParams;
+            body,
+            query,
+            bodyParams,
+            pathParams;
         let data = await this.interfaceModel.get(result.interface_id);
         if (!data) {
           await this.caseModel.del(result._id);
@@ -396,7 +396,7 @@ class interfaceColController extends baseController {
         startIndex = await this.caseModel.getMaxIndexByContainer(params.col_id, params.group_id) + 1;
       } else {
         // 文件夹下：既考虑 col(type=folder/group) 又考虑 case(group_id=null
-        const maxColIndex = await this.colModel.getIndexByParentId(params.project_id,params.col_id);
+        const maxColIndex = await this.colModel.getIndexByParentId(params.project_id, params.col_id);
         const maxCaseIndex = await this.caseModel.getMaxIndexByContainer(params.col_id, null);
         startIndex = Math.max(maxColIndex, maxCaseIndex) + 1;
       }
@@ -422,7 +422,7 @@ class interfaceColController extends baseController {
           typeid: params.project_id
         });
       });
-      this.projectModel.up(params.project_id, { up_time: new Date().getTime() }).then();
+      this.projectModel.up(params.project_id, {up_time: new Date().getTime()}).then();
 
       ctx.body = yapi.commons.resReturn(result);
     } catch (e) {
@@ -458,7 +458,7 @@ class interfaceColController extends baseController {
         startIndex = await this.caseModel.getMaxIndexByContainer(params.col_id, params.group_id) + 1;
       } else {
         // 文件夹下：既考虑 col(type=folder/group) 又考虑 case(group_id=null
-        const maxColIndex = await this.colModel.getIndexByParentId(params.project_id,params.col_id);
+        const maxColIndex = await this.colModel.getIndexByParentId(params.project_id, params.col_id);
         const maxCaseIndex = await this.caseModel.getMaxIndexByContainer(params.col_id, null);
         startIndex = Math.max(maxColIndex, maxCaseIndex) + 1;
       }
@@ -473,7 +473,7 @@ class interfaceColController extends baseController {
           project_id: params.project_id,
           col_id: params.col_id,
           group_id: params.group_id || null,
-          parent_id:  params.group_id || params.col_id,
+          parent_id: params.group_id || params.col_id,
           interface_id: params.interface_list[i],
           casename: interfaceData.title
         };
@@ -513,7 +513,7 @@ class interfaceColController extends baseController {
           });
         });
       }
-      this.projectModel.up(params.project_id, { up_time: new Date().getTime() }).then();
+      this.projectModel.up(params.project_id, {up_time: new Date().getTime()}).then();
       ctx.body = yapi.commons.resReturn('ok');
     } catch (e) {
       ctx.body = yapi.commons.resReturn(null, 402, e.message);
@@ -529,7 +529,7 @@ class interfaceColController extends baseController {
         new_col_id: 'number'
       });
 
-      const { project_id, col_id, new_col_id } = params;
+      const {project_id, col_id, new_col_id} = params;
 
       if (!project_id) {
         return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
@@ -559,9 +559,9 @@ class interfaceColController extends baseController {
       const cloneRecursive = async (sourceColId, targetParentId, colIdMap, groupIdMap) => {
         // 1. 获取源集合下的所有直接子文件夹和组（type='folder' 或 'group'）
         const childCols = await this.colModel.model
-          .find({ parent_id: sourceColId })
-          .lean()
-          .exec();
+            .find({parent_id: sourceColId})
+            .lean()
+            .exec();
 
         // 2. 克隆所有子文件夹和组
         for (let childCol of childCols) {
@@ -606,10 +606,10 @@ class interfaceColController extends baseController {
       const cloneCasesForCol = async (sourceColId, targetColId, groupIdMap) => {
         // 获取原集合下的所有用例（只要 col_id 匹配且 parent_id 直接指向该集合/组）
         let oldCases = await this.caseModel.model
-          .find({ col_id: sourceColId, parent_id: sourceColId })
-          .sort({ index: 1 })
-          .lean()
-          .exec();
+            .find({col_id: sourceColId, parent_id: sourceColId})
+            .sort({index: 1})
+            .lean()
+            .exec();
 
         const newCaseList = [];
         const oldCaseObj = {};
@@ -632,7 +632,7 @@ class interfaceColController extends baseController {
 
         const handleReplaceStr = str => {
           if (str.indexOf('$') !== -1) {
-            str = str.replace(/\$\.([0-9]+)\./g, function(match, p1) {
+            str = str.replace(/\$\.([0-9]+)\./g, function (match, p1) {
               p1 = p1.toString();
               return `$.${newCaseList[oldCaseObj[p1]]}.` || '';
             });
@@ -696,7 +696,7 @@ class interfaceColController extends baseController {
       // 2. 克隆顶层集合的用例
       await cloneCasesForCol(col_id, new_col_id, groupIdMap);
 
-      this.projectModel.up(params.project_id, { up_time: new Date().getTime() }).then();
+      this.projectModel.up(params.project_id, {up_time: new Date().getTime()}).then();
       ctx.body = yapi.commons.resReturn('ok');
     } catch (e) {
       ctx.body = yapi.commons.resReturn(null, 402, e.message);
@@ -761,9 +761,9 @@ class interfaceColController extends baseController {
       this.colModel.get(caseData.col_id).then(col => {
         yapi.commons.saveLog({
           content: `<a href="/user/profile/${this.getUid()}">${username}</a> 在接口集 <a href="/project/${
-            caseData.project_id
+              caseData.project_id
           }/interface/col/${caseData.col_id}">${col.name}</a> 更新了测试用例 <a href="/project/${
-            caseData.project_id
+              caseData.project_id
           }/interface/case/${params.id}">${params.casename || caseData.casename}</a>`,
           type: 'project',
           uid: this.getUid(),
@@ -772,7 +772,7 @@ class interfaceColController extends baseController {
         });
       });
 
-      this.projectModel.up(caseData.project_id, { up_time: new Date().getTime() }).then();
+      this.projectModel.up(caseData.project_id, {up_time: new Date().getTime()}).then();
 
       ctx.body = yapi.commons.resReturn(result);
     } catch (e) {
@@ -813,8 +813,8 @@ class interfaceColController extends baseController {
       result.res_body = data.res_body;
       result.res_body_type = data.res_body_type;
       result.req_body_form = yapi.commons.handleParamsValue(
-        data.req_body_form,
-        result.req_body_form
+          data.req_body_form,
+          result.req_body_form
       );
       // 处理 file 类型字段，保留 base64 等信息
       result.req_body_form = result.req_body_form.map((field) => {
@@ -875,7 +875,7 @@ class interfaceColController extends baseController {
       let username = this.getUsername();
       yapi.commons.saveLog({
         content: `<a href="/user/profile/${this.getUid()}">${username}</a> 更新了测试集合 <a href="/project/${
-          colData.project_id
+            colData.project_id
         }/interface/col/${id}">${colData.name}</a> 的信息`,
         type: 'project',
         uid: this.getUid(),
@@ -909,10 +909,10 @@ class interfaceColController extends baseController {
       params.forEach(item => {
         if (item.id) {
           this.caseModel.upCaseIndex(item.id, item.index).then(
-            // res => {},
-            err => {
-              yapi.commons.log(err.message, 'error');
-            }
+              // res => {},
+              err => {
+                yapi.commons.log(err.message, 'error');
+              }
           );
         }
       });
@@ -943,10 +943,10 @@ class interfaceColController extends baseController {
       params.forEach(item => {
         if (item.id) {
           this.colModel.upColIndex(item.id, item.index).then(
-            // res => {},
-            err => {
-              yapi.commons.log(err.message, 'error');
-            }
+              // res => {},
+              err => {
+                yapi.commons.log(err.message, 'error');
+              }
           );
         }
       });
@@ -993,19 +993,19 @@ class interfaceColController extends baseController {
   // }
   async upIndex(ctx) {
     try {
-      const { list } = ctx.request.body;
+      const {list} = ctx.request.body;
       for (let item of list) {
         if (item.type === 'folder' || item.type === 'group') {
           await this.colModel.update(
-              { _id: item.id },
-              { index: item.index, parent_id: item.parent_id }
+              {_id: item.id},
+              {index: item.index, parent_id: item.parent_id}
           );
         } else if (item.type === 'case') {
-          const updateData = { index: item.index, parent_id: item.parent_id};
+          const updateData = {index: item.index, parent_id: item.parent_id};
           if (item.col_id !== undefined) updateData.col_id = item.col_id;
           if (item.group_id !== undefined) updateData.group_id = item.group_id;
 
-          await this.caseModel.update({ _id: item.id }, updateData);
+          await this.caseModel.update({_id: item.id}, updateData);
         }
       }
 
@@ -1047,7 +1047,7 @@ class interfaceColController extends baseController {
       let username = this.getUsername();
       yapi.commons.saveLog({
         content: `<a href="/user/profile/${this.getUid()}">${username}</a> 删除了接口集 ${
-          colData.name
+            colData.name
         } 及其下面的接口`,
         type: 'project',
         uid: this.getUid(),
@@ -1086,7 +1086,7 @@ class interfaceColController extends baseController {
       this.colModel.get(caseData.col_id).then(col => {
         yapi.commons.saveLog({
           content: `<a href="/user/profile/${this.getUid()}">${username}</a> 删除了接口集 <a href="/project/${
-            caseData.project_id
+              caseData.project_id
           }/interface/col/${caseData.col_id}">${col.name}</a> 下的接口 ${caseData.casename}`,
           type: 'project',
           uid: this.getUid(),
@@ -1095,7 +1095,7 @@ class interfaceColController extends baseController {
         });
       });
 
-      this.projectModel.up(caseData.project_id, { up_time: new Date().getTime() }).then();
+      this.projectModel.up(caseData.project_id, {up_time: new Date().getTime()}).then();
       return (ctx.body = yapi.commons.resReturn(result));
     } catch (e) {
       yapi.commons.resReturn(null, 400, e.message);
@@ -1110,7 +1110,7 @@ class interfaceColController extends baseController {
   // 数组去重
   unique(array, compare) {
     let hash = {};
-    let arr = array.reduce(function(item, next) {
+    let arr = array.reduce(function (item, next) {
       hash[next[compare]] ? '' : (hash[next[compare]] = true && item.push(next));
       // console.log('item',item.project_id)
       return item;
@@ -1146,7 +1146,7 @@ class interfaceColController extends baseController {
           return '';
         }
       });
-      return { ...item, query: replacedQuery };
+      return {...item, query: replacedQuery};
     });
 
     try {
@@ -1156,7 +1156,7 @@ class interfaceColController extends baseController {
       // ✅ 数据映射
       const finalResult = replacedAsserts.map((item, index) => {
         const rows = rawResult[index] || [];
-        const { varsName = [], fields = [] } = item;
+        const {varsName = [], fields = []} = item;
 
         return rows.map(row => {
           const mapped = {};
@@ -1174,8 +1174,6 @@ class interfaceColController extends baseController {
       ctx.body = yapi.commons.resReturn(null, 500, err.message);
     }
   }
-
-
 }
 
 module.exports = interfaceColController;

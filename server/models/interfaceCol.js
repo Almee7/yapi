@@ -88,6 +88,11 @@ class interfaceCol extends baseModel {
       map.get(pid).push(item);
     }
 
+    // 对每个父节点下的子节点按 index 排序
+    for (const children of map.values()) {
+      children.sort((a, b) => a.index - b.index);
+    }
+
     const resultIds = [];
 
     function traverse(id) {
@@ -115,7 +120,7 @@ class interfaceCol extends baseModel {
     const query = Array.isArray(col_id) ? { _id: { $in: col_id } } : { _id: col_id };
     let dbQuery = this.model.find(query);
     if (select !== 'all') dbQuery = dbQuery.select(select);
-
+    
     return dbQuery.lean().exec(); // ✅ 使用 lean() 返回普通对象
   }
 

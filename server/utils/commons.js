@@ -616,7 +616,7 @@ async function flattenCases(colId, allCols, allCases) {
     }
     // 当前 col 下的普通 case（group_id=null）
     const folderCases = allCases
-        .filter(c => c.col_id.toString() === colId.toString() && (!c.group_id || false))
+        .filter(c => c.col_id.toString() === colId.toString() && !c.group_id)
         .sort((a, b) => a.index - b.index);
     // 当前 col 下的 group
     const childGroups = allCols
@@ -659,6 +659,11 @@ async function flattenCases(colId, allCols, allCases) {
 exports.handleParamsValue = handleParamsValue;
 
 exports.getCaseList = async function getCaseList(id) {
+    // 添加参数验证
+    if (!id) {
+        throw new Error('Collection ID is required');
+    }
+    
     const caseInst = yapi.getInst(interfaceCaseModel);
     const colInst = yapi.getInst(interfaceColModel);
     const projectInst = yapi.getInst(projectModel);
@@ -670,29 +675,37 @@ exports.getCaseList = async function getCaseList(id) {
     const allCols = await colInst.allColList(colIds,'all')
     // 2️⃣ 根据 col_id 列表一次性获取所有 case（list 内部已按 index 排序）
     const allCases = await caseInst.newList(colIds, 'all');
-
     // 3️⃣ 获取到排序后的caseList
     let resultList = await flattenCases(id, allCols, allCases);
-
     // 4️⃣ 批量获取 interface 数据
-    const interfaceIds = resultList.map(c => c.interface_id);
+    const interfaceIds = resultList.map(c => c.interface_id).filter(id => id != null);
     const interfaceList = await interfaceInst.getByIds(interfaceIds);
 
     // 5️⃣ 批量获取 project 数据
-    const projectIds = [...new Set(interfaceList.map(i => i.project_id))];
+    const projectIds = [...new Set(interfaceList.map(i => i.project_id))].filter(id => id != null);
     const projectList = await projectInst.getBaseInfoByIds(projectIds);
 
     // 6️⃣ 建立 Map 便于快速查找
     const interfaceMap = new Map();
-    interfaceList.forEach(i => interfaceMap.set(i._id.toString(), i));
+    interfaceList.forEach(i => {
+        if (i && i._id) {
+            interfaceMap.set(i._id.toString(), i);
+        }
+    });
 
     const projectMap = new Map();
-    projectList.forEach(p => projectMap.set(p._id.toString(), p));
+    projectList.forEach(p => {
+        if (p && p._id) {
+            projectMap.set(p._id.toString(), p);
+        }
+    });
 
     // 7️⃣ 遍历每个 case，组合接口和项目路径
     const colData = await colInst.get(id);
     for (let i = 0; i < resultList.length; i++) {
         const result = resultList[i];
+        if (!result.interface_id) continue;
+        
         const data = interfaceMap.get(result.interface_id.toString());
         if (!data) {
             await caseInst.del(result._id);

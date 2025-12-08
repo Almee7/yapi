@@ -165,7 +165,6 @@ export default class InterfaceColMenu extends Component {
 
   // 构建包含所有子级接口的集合数据
   buildAllColsWithChildren = (list) => {
-    console.log('buildAllColsWithChildren', list);
     return list.map(col => {
       const allCases = this.getAllCasesFromColAndChildren(col._id, list);
       return {
@@ -616,19 +615,20 @@ export default class InterfaceColMenu extends Component {
   };
 
   // 渲染目录标题，保持原来的按钮和样式
-  renderColTitle = (col) => {
-    let iconType = 'folder-open';
-    if (col.type === 'group') {
-      iconType = 'sync';   // ← 你的循环组 icon
-    }
+  renderColTitle = col => {
     return (
       <div className="menu-title">
-        <span>
-          <Icon type={iconType} style={{ marginRight: 5 }} />
-          <span>{col.name}</span>
-          <span style={{ marginLeft: 8, color: '#999', fontSize: '12px' }}>
-            ({this.getAllCasesFromColAndChildren(col._id, this.state.list).length})
-          </span>
+        {col.type === 'group' ? (
+          <Icon type="sync" style={{ marginRight: 6, color: '#00a854' }} />
+        ) : (
+          <Icon type="folder-open" style={{ marginRight: 6 }} />
+        )}
+        <span className={col.type === 'group' ? 'group-title' : ''}>{col.name}</span>
+        {col.type === 'group' && (
+          <span className="group-repeat-count">[{col.repeatCount || 1}]</span>
+        )}
+        <span style={{ marginLeft: 8, color: '#999', fontSize: '12px' }}>
+          ({this.getAllCasesFromColAndChildren(col._id, this.state.list).length})
         </span>
         <div className="btns">
           <Tooltip title="删除集合">
@@ -715,7 +715,7 @@ export default class InterfaceColMenu extends Component {
                   title={interfaceCase.casename}
               >
                 <span className="casename">{interfaceCase.casename}</span>
-                <span className="caseId">{interfaceCase._id}</span>
+                <span className="caseId" style={{ marginLeft: 'auto' }}>{interfaceCase._id}</span>
 
                 <div className="btns">
                   <Tooltip title="删除用例">
@@ -848,7 +848,6 @@ export default class InterfaceColMenu extends Component {
               }}
               onCreate={this.addorEditCol}
           />
-
         <Modal
               title="导入接口到集合"
               visible={importInterVisible}

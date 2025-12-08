@@ -15,10 +15,21 @@
   }
   .menu-title {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-start;
+    align-items: center;
     overflow: hidden;
     .casename {
       overflow: hidden;
+      flex-grow: 1;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+    .caseId {
+      margin-left: auto;
+      color: #999;
+      font-size: 12px;
+      padding: 0 8px;
+      flex-shrink: 0;
     }
     .case-delete-icon {
       margin-left: 5px;
@@ -26,6 +37,7 @@
     }
     .btns {
       display: none;
+      margin-left: auto;
     }
   }
   .menu-title:hover {
@@ -183,4 +195,19 @@
 .tree-wrapper {
   min-height: 500px;
   overflow-y: scroll;
+}
+
+.reference-title {
+  color: #ffbf00;
+  font-style: italic;
+}
+
+.reference-tag {
+  color: #ffbf00;
+  font-size: 12px;
+  margin-left: 5px;
+}
+
+.group-title {
+  color: #00a854;
 }

@@ -320,7 +320,6 @@ async function sandboxByBrowser(context = {}, script) {
 
   // 确保 context.vars 初始化
   context.vars = context.vars || {};
-  console.log('context.vars:', context.vars)
 
   // 1) 提取 sql（仅第一个）
   const parsed = extractSqlOnly(script);
@@ -396,8 +395,6 @@ ${finalScript}
  * @param {*} pre_request_script
  */
 async function crossRequest(defaultOptions, preScript, afterScript, pre_request_script,commonContext = {}) {
-  console.log(preScript)
-  console.log(pre_request_script)
   let options = {
     ...defaultOptions
   }
