@@ -15,7 +15,7 @@ import ImportInterface from './ImportInterface';
 import { Input, Icon, Button, Modal, message, Tooltip, Tree, Form } from 'antd';
 // eslint-disable-next-line no-unused-vars
 import { arrayChangeIndex } from '../../../../common.js';
-import _ from 'underscore'
+// import _ from 'underscore'
 
 const TreeNode = Tree.TreeNode;
 // const FormItem = Form.Item;
@@ -92,10 +92,10 @@ export default class InterfaceColMenu extends Component {
     currCaseId: PropTypes.number,
     history: PropTypes.object,
     isRander: PropTypes.bool,
-    router: PropTypes.object,
     currCase: PropTypes.object,
     curProject: PropTypes.object,
-    fetchProjectList: PropTypes.func
+    fetchProjectList: PropTypes.func,
+    location: PropTypes.object
   };
 
   state = {
@@ -112,16 +112,87 @@ export default class InterfaceColMenu extends Component {
     selectedProject: null,
     parentColId: null,
     isSubDir: false,
-    // 新增状态：存储所有集合的完整数据（包括子级接口）
-    allColsWithChildren: []
+    selectedKeys: null
   };
 
   constructor(props) {
     super(props);
   }
 
-  componentWillMount() {
-    this.getList();
+  async componentDidMount() {
+    await this.getList();
+    // Set initial selection based on route
+    const { match, currCase } = this.props;
+    let selectedKeys = [];
+    
+    if (match && match.params) {
+      if (match.params.action === 'case') {
+        if (currCase && currCase._id) {
+          selectedKeys = ['case_' + currCase._id];
+        }
+      } else if (match.params.actionId) {
+        selectedKeys = ['col_' + match.params.actionId];
+      }
+    } else {
+      const firstCol = this.findFirstCol(this.state.list);
+      if (firstCol) {
+        selectedKeys = ['col_' + firstCol._id];
+      }
+    }
+    
+    if (selectedKeys.length > 0) {
+      this.setState({ selectedKeys });
+    }
+    
+    // Listen for case selection events
+    window.addEventListener('caseSelected', this.handleCaseSelected);
+  }
+  
+  componentWillUnmount() {
+    // Clean up event listener
+    window.removeEventListener('caseSelected', this.handleCaseSelected);
+  }
+
+  componentDidUpdate(prevProps) {
+    // If the route has changed, update the selected keys
+    if (prevProps.location !== this.props.location) {
+      // Extract the selected key from the route
+      const { match } = this.props;
+      if (match && match.params) {
+        if (match.params.action === 'case' && match.params.actionId) {
+          this.setState({ selectedKeys: ['case_' + match.params.actionId] });
+        } else if (match.params.actionId) {
+          this.setState({ selectedKeys: ['col_' + match.params.actionId] });
+        }
+      } else {
+        this.setState({ selectedKeys: null });
+      }
+    }
+    
+    // Also check if currCaseId has changed (when navigating from table)
+    // Or if we're on a case route but selectedKeys doesn't match
+    const { match } = this.props;
+    if (match && match.params && match.params.action === 'case' && match.params.actionId) {
+      const expectedSelectedKey = 'case_' + match.params.actionId;
+      if (!this.state.selectedKeys || !this.state.selectedKeys.includes(expectedSelectedKey)) {
+        this.setState({ selectedKeys: [expectedSelectedKey] });
+      }
+    } else if (prevProps.currCaseId !== this.props.currCaseId && this.props.currCaseId) {
+      this.setState({ selectedKeys: ['case_' + this.props.currCaseId] });
+    }
+    
+    // If isRander changes and is true, refresh the list but maintain selection
+    if (prevProps.isRander !== this.props.isRander && this.props.isRander) {
+      // Preserve current selection before refreshing
+      const preservedSelection = this.state.selectedKeys;
+      this.getList().then(() => {
+        // Restore selection after refresh
+        if (preservedSelection) {
+          this.setState({ selectedKeys: preservedSelection });
+        }
+      });
+      this.props.setColData({ isRander: false });
+    }
   }
 
   async getList() {
@@ -215,7 +286,7 @@ export default class InterfaceColMenu extends Component {
     this.setState({ expands: keys });
   };
 
-  onSelect = _.debounce(keys => {
+  onSelect = (keys) => {
     if (keys.length) {
       const type = keys[0].split('_')[0];
       const id = keys[0].split('_')[1];
@@ -235,11 +306,13 @@ export default class InterfaceColMenu extends Component {
         });
         this.props.history.push('/project/' + project_id + '/interface/case/' + id);
       }
+      
+      // Update the selection state to maintain highlight
+      this.setState({
+        selectedKeys: keys
+      });
     }
-    // this.setState({
-    //   expands: null
-    // });
-  }, 500);
+  };
 
   showDelColConfirm = colId => {
     let that = this;
@@ -456,10 +529,10 @@ export default class InterfaceColMenu extends Component {
     // 1️⃣ 计算目标父节点
     let targetParentId;
     if (!e.dropToGap) {
-      targetParentId = (dropNode.type === 'folder' || dropNode.type === 'group')
-          ? dropNode._id
-          : dropNode.parent_id;
+      // 如果不是放在缝隙上，则保持在同一级别（兄弟节点）
+      targetParentId = dropNode.parent_id;
     } else {
+      // 如果是放在缝隙上，则根据目标节点类型决定父节点
       targetParentId = (dropNode.type === 'folder') ? dropNode._id : dropNode.parent_id || 0;
     }
 
@@ -490,18 +563,25 @@ export default class InterfaceColMenu extends Component {
 
     // 5️⃣ 创建 dragNode 副本并更新信息
     const dragNodeCopy = { ...dragNode };
-    if (dropNode.type === 'folder') {
-      dragNodeCopy.parent_id = targetParentId;
-      dragNodeCopy.col_id = dropNode._id;
-      dragNodeCopy.group_id = null;
-    } else if (dropNode.type === 'group') {
-      dragNodeCopy.parent_id = targetParentId;
-      dragNodeCopy.col_id = dropNode._id;
-      dragNodeCopy.group_id = dropNode._id;
+    
+    // 更新父级信息
+    dragNodeCopy.parent_id = targetParentId;
+    
+    if (e.dropToGap) {
+      // 只有在放到缝隙上时才改变父子关系
+      if (dropNode.type === 'folder') {
+        dragNodeCopy.col_id = dropNode._id;
+        dragNodeCopy.group_id = null;
+      } else if (dropNode.type === 'group') {
+        dragNodeCopy.col_id = dropNode._id;
+        dragNodeCopy.group_id = dropNode._id;
+      } else {
+        dragNodeCopy.col_id = targetParentId;
+        dragNodeCopy.group_id = dropNode.group_id || null;
+      }
     } else {
-      dragNodeCopy.parent_id = targetParentId;
-      dragNodeCopy.col_id = targetParentId;
-      dragNodeCopy.group_id = dropNode.group_id || null;
+      // 同级移动保持原有的 col_id 和 group_id
+      // dragNodeCopy.parent_id = targetParentId; (already set above)
     }
 
     // 6️⃣ 插入并更新 index
@@ -514,8 +594,10 @@ export default class InterfaceColMenu extends Component {
       // 更新目标 siblings
       let insertIndex;
       if (!e.dropToGap) {
+        // 如果不是放在缝隙上，则放在目标文件夹的末尾
         insertIndex = targetSiblings.length;
       } else {
+        // 如果是放在缝隙上，则根据位置插入
         const dropIndex = targetSiblings.findIndex(n => n._id === dropNode._id);
         insertIndex = dropIndex + (e.dropPosition > 0 ? 1 : 0);
       }
@@ -528,8 +610,11 @@ export default class InterfaceColMenu extends Component {
 
       let insertIndex;
       if (!e.dropToGap) {
-        insertIndex = originSiblings.length;
+        // 如果不是放在缝隙上，则放在目标节点之后
+        const dropIndex = originSiblings.findIndex(n => n._id === dropNode._id);
+        insertIndex = dropIndex + 1; // 放在目标节点后
       } else {
+        // 如果是放在缝隙上，则根据位置插入
         const dropIndex = originSiblings.findIndex(n => n._id === dropNode._id);
         insertIndex = dropIndex + (e.dropPosition > 0 ? 1 : 0);
       }
@@ -580,6 +665,12 @@ export default class InterfaceColMenu extends Component {
 
   leaveItem = () => {
     this.setState({ delIcon: null });
+  };
+  
+  // Handle case selection event from table
+  handleCaseSelected = (event) => {
+    const caseId = event.detail;
+    this.setState({ selectedKeys: ['case_' + caseId] });
   };
 
   // 递归构建树节点（平铺列表生成，可支持 case 和 folder/group 混排）
@@ -752,39 +843,60 @@ export default class InterfaceColMenu extends Component {
     const currProjectId = this.props.match.params.id;
 
     const defaultExpandedKeys = () => {
-      const { router, currCase, interfaceColList } = this.props;
+      const { match, currCase, interfaceColList } = this.props;
       const rNull = { expands: [], selects: [] };
 
       if (interfaceColList.length === 0) {
         return rNull;
       }
 
-      if (router) {
-        if (router.params.action === 'case') {
-          if (!currCase || !currCase._id) {
-            return rNull;
+      // Use state.selectedKeys if available, otherwise calculate default selection
+      let selects = this.state.selectedKeys || [];
+      
+      // Only calculate default selection if state.selectedKeys is not set
+      if (selects.length === 0) {
+        // Build router-like object from match props
+        const router = {
+          params: {
+            action: match.params.action,
+            actionId: match.params.actionId
           }
-          return {
-            expands: this.state.expands ? this.state.expands : ['col_' + currCase.col_id],
-            selects: ['case_' + currCase._id + '']
-          };
-        } else {
-          let col_id = router.params.actionId;
-          return {
-            expands: this.state.expands ? this.state.expands : ['col_' + col_id],
-            selects: ['col_' + col_id]
-          };
-        }
-      } else {
-        const firstCol = this.findFirstCol(interfaceColList);
-        return {
-          expands: this.state.expands ? this.state.expands : ['col_' + firstCol._id],
-          selects: ['col_' + firstCol._id]
         };
+        
+        if (router) {
+          if (router.params.action === 'case') {
+            if (currCase && currCase._id) {
+              selects = ['case_' + currCase._id];
+            }
+          } else if (router.params.actionId) {
+            selects = ['col_' + router.params.actionId];
+          }
+        } else {
+          const firstCol = this.findFirstCol(interfaceColList);
+          if (firstCol) {
+            selects = ['col_' + firstCol._id];
+          }
+        }
+        
+        // Set the initial selected keys in state if not already set
+        if (!this.state.selectedKeys && selects.length > 0) {
+          setTimeout(() => {
+            this.setState({ selectedKeys: selects });
+          }, 0);
+        }
       }
+
+      return {
+        expands: this.state.expands ? this.state.expands : [],
+        selects: selects
+      };
     };
 
     let currentKes = defaultExpandedKeys();
+    
+    // Use state.selectedKeys if available, otherwise use default
+    const selectedKeys = currentKes.selects;
+    
     // let list = this.props.interfaceColList;
     //
     // if (this.state.filterValue) {
@@ -821,9 +933,8 @@ export default class InterfaceColMenu extends Component {
           <Tree
                 className="col-list-tree"
                 defaultExpandedKeys={currentKes.expands}
-                defaultSelectedKeys={currentKes.selects}
                 expandedKeys={currentKes.expands}
-                selectedKeys={currentKes.selects}
+                selectedKeys={selectedKeys}
                 onSelect={this.onSelect}
                 autoExpandParent={false}
                 draggable

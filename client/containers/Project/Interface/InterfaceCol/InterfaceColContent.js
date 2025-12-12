@@ -1134,7 +1134,14 @@ class InterfaceColContent extends Component {
             (text, { rowData }) => {
               let record = rowData;
               return (
-                <Link to={'/project/' + currProjectId + '/interface/case/' + record._id}>
+                <Link 
+                  to={'/project/' + currProjectId + '/interface/case/' + record._id}
+                  onClick={() => {
+                    // 强制更新左侧菜单的选中状态
+                    const event = new CustomEvent('caseSelected', { detail: record._id });
+                    window.dispatchEvent(event);
+                  }}
+                >
                   {record.casename && record.casename.length > 23
                         ? record.casename.substr(0, 20) + '...'
                         : record.casename}
