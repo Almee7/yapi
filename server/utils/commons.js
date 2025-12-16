@@ -329,33 +329,39 @@ function assertResult(actualResult, params) {
 }
 
 //替换变量
-function replaceVarsInScript(script, vars = {}, global = {}) {
-    if (typeof script !== 'string') return script;
+function replaceVarsInScript(scriptStr, vars = {}, global = {}) {
+    if (!scriptStr || typeof scriptStr !== 'string') return scriptStr;
 
-    const getValue = (key) => {
+    vars = vars || {};
+    global = global || {};
+
+    // 匹配 {{xxx}} 或 {{global.xxx}}
+    const variableRegexp = /\{\{\s*([^}]+?)\s*\}\}/g;
+
+    return scriptStr.replace(variableRegexp, (raw, key) => {
         key = key.trim();
-        return key.startsWith('global.')
-            ? global[key.slice(7)]
-            : vars[key];
-    };
+        let value;
 
-    script = script.replace(/\{\{\{\s*([^}]+?)\s*\}\}\}/g, (_, key) => {
-        const val = getValue(key);
-        if (val == null) return `{{__NOT_FOUND__${key}}}`;
-        return String(val);
-    });
-
-    script = script.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, key) => {
-        const val = getValue(key);
-        if (val == null) return `"{{__NOT_FOUND__${key}}}"`;
-
-        if (typeof val === 'string') {
-            return `"${val}"`;
+        // 判断是 global 变量还是普通 vars
+        if (key.startsWith('global.')) {
+            const realKey = key.slice(7);
+            value = global[realKey];
+        } else {
+            value = vars[key];
         }
-        return String(val);
-    });
 
-    return script;
+        // 找不到值返回标记字符串
+        if (value === undefined || value === null) {
+            return `"{{__NOT_FOUND__${key}}}"`;
+        }
+
+        // 字符串加双引号，其他类型直接返回
+        if (typeof value === 'string') {
+            return `"${value}"`;
+        } else {
+            return value;
+        }
+    });
 }
 /**
  * 沙盒执行 js 代码
