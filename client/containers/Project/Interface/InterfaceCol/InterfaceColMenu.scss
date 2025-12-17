@@ -1,54 +1,118 @@
 .col-list-tree {
   line-height: 25px;
+
   .ant-tree-node-content-wrapper {
     width: calc(100% - 28px);
   }
-  .opts-icon,
-  .case-delete-icon {
-    line-height: 25px;
-    width: 30px;
-    font-weight: bold;
-  }
-  .opts-icon:hover,
-  .case-delete-icon:hover {
-    color: #2395f1;
-  }
+
+  /* ===== 行标题 ===== */
   .menu-title {
     display: flex;
-    justify-content: flex-start;
     align-items: center;
+    width: 100%;
     overflow: hidden;
-    .casename {
-      overflow: hidden;
-      flex-grow: 1;
-      white-space: nowrap;
-      text-overflow: ellipsis;
-    }
-    .caseId {
-      margin-left: auto;
-      color: #999;
-      font-size: 12px;
-      padding: 0 8px;
-      flex-shrink: 0;
-    }
-    .case-delete-icon {
-      margin-left: 5px;
-      display: none;
-    }
-    .btns {
-      display: none;
-      margin-left: auto;
+    /* 确保子元素正确对齐 */
+    flex-direction: row;
+  }
+
+  /* 名称超出省略（如果你有这个 class） */
+  .casename {
+    overflow: hidden;
+    flex-grow: 1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  /* 接口数量 */
+  .case-count {
+    margin-left: 8px;
+    color: #999;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+
+  /* ===== 右侧 ··· 按钮 ===== */
+  
+  /* 自定义横向省略号图标 */
+  .horizontal-ellipsis {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    position: relative;
+    margin-left: auto;
+    cursor: pointer;
+    opacity: 0;             /* 默认隐藏 */
+    transition: opacity 0.15s;
+  }
+  
+  .horizontal-ellipsis::before,
+  .horizontal-ellipsis::after,
+  .horizontal-ellipsis span {
+    content: '';
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background-color: #999;
+    border-radius: 50%;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  
+  .horizontal-ellipsis::before {
+    left: 0;
+  }
+  
+  .horizontal-ellipsis span {
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  
+  .horizontal-ellipsis::after {
+    right: 0;
+  }
+  
+  .horizontal-ellipsis:hover::before,
+  .horizontal-ellipsis:hover::after,
+  .horizontal-ellipsis:hover span {
+    background-color: #2395f1;
+  }
+  
+  /* hover 行时才显示 ··· */
+  .menu-title:hover {
+    .horizontal-ellipsis {
+      opacity: 1;
     }
   }
-  .menu-title:hover {
-    .case-delete-icon {
-      display: block;
-    }
-    .btns {
-      display: block;
-    }
+
+  /* 移除我们自定义的旋转样式，让项目中已有的通用样式生效 */
+
+  .opts-icon:hover {
+    color: #2395f1;
   }
 }
+
+/* ===== 其余原有样式保持不变 ===== */
+
+.group-title {
+  color: #00a854;
+}
+
+.reference-title {
+  color: #ffbf00;
+  font-style: italic;
+}
+
+.reference-tag {
+  color: #ffbf00;
+  font-size: 12px;
+  margin-left: 5px;
+}
+
+.tree-wrapper {
+  min-height: 500px;
+  overflow-y: scroll;
+}
+
 
 .container {
   display: block;
@@ -67,8 +131,6 @@
 .container div {
   cursor: move;
   cursor: grab;
-  cursor: -moz-grab;
-  cursor: -webkit-grab;
   margin-bottom: 10px;
 }
 .container div:last-child {
@@ -76,8 +138,6 @@
 }
 .gu-mirror {
   cursor: grabbing;
-  cursor: -moz-grabbing;
-  cursor: -webkit-grabbing;
 }
 .container .ex-moved {
   background-color: #e74c3c;
@@ -211,3 +271,5 @@
 .group-title {
   color: #00a854;
 }
+
+

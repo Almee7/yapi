@@ -55,7 +55,13 @@ class interfaceCol extends baseModel {
           type: Boolean,
           default: false
         }
+      },
+      // 添加间隔时间字段
+      intervalTime: {
+        type: Number,
+        default: 0
       }
+
     };
   }
 

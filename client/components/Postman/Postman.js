@@ -391,6 +391,23 @@ export default class Run extends Component {
     });
   };
 
+  // 格式化 JSON 数据
+  handleFormatJson = () => {
+    try {
+      const rawData = this.state.req_body_other;
+      if (rawData) {
+        // 如果是有效的 JSON 字符串，则格式化它
+        const formatted = JSON.stringify(JSON.parse(rawData), null, 2);
+        this.setState({
+          req_body_other: formatted
+        });
+      }
+    } catch (e) {
+      // 如果解析失败，保持原样
+      console.warn('JSON 格式化失败:', e.message);
+    }
+  };
+
   reqRealInterface = async () => {
     if (this.state.loading === true) {
       this.setState({
@@ -1034,6 +1051,13 @@ export default class Run extends Component {
                     {'  '}
                     <Icon type="question-circle-o" />
                   </Tooltip>
+                  {/* 格式化按钮 */}
+                  <Button
+                    onClick={this.handleFormatJson}
+                    style={{ marginLeft: 10 }}
+                  >
+                    格式化
+                  </Button>
                   {/*<Button*/}
                   {/*    disabled={!hasPlugin}*/}
                   {/*    onClick={this.faethData}*/}

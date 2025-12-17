@@ -640,6 +640,23 @@ class interfaceColController extends baseController {
           return str;
         };
 
+        // 添加一个新的函数来处理 header 中的 $ 替换
+        const handleHeadersReplace = headers => {
+          if (!headers || !Array.isArray(headers)) return headers;
+          
+          return headers.map(header => {
+            // 深拷贝 header 对象
+            const newHeader = { ...header };
+            
+            // 检查 value 字段是否包含 $
+            if (newHeader.value && typeof newHeader.value === 'string' && newHeader.value.indexOf('$') !== -1) {
+              newHeader.value = handleReplaceStr(newHeader.value);
+            }
+            
+            return newHeader;
+          });
+        };
+
         // 克隆每个用例
         for (let i = 0; i < oldCases.length; i++) {
           let oldCase = oldCases[i];
@@ -656,7 +673,7 @@ class interfaceColController extends baseController {
             up_time: yapi.commons.time(),
             case_env: oldCase.case_env,
             req_params: oldCase.req_params,
-            req_headers: oldCase.req_headers,
+            req_headers: handleHeadersReplace(oldCase.req_headers),
             req_query: handleTypeParams(oldCase, 'req_query'),
             req_body_form: handleTypeParams(oldCase, 'req_body_form'),
             req_body_other: handleTypeParams(oldCase, 'req_body_other'),

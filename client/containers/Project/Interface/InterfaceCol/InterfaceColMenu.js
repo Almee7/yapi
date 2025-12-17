@@ -12,7 +12,8 @@ import {
 import { fetchProjectList } from '../../../../reducer/modules/project';
 import axios from 'axios';
 import ImportInterface from './ImportInterface';
-import { Input, Icon, Button, Modal, message, Tooltip, Tree, Form } from 'antd';
+import { Input, Icon, Button, Modal, message, Tooltip, Tree, Form ,Dropdown,Menu} from 'antd';
+
 // eslint-disable-next-line no-unused-vars
 import { arrayChangeIndex } from '../../../../common.js';
 // import _ from 'underscore'
@@ -23,6 +24,7 @@ const confirm = Modal.confirm;
 const headHeight = 240; // menu顶部到网页顶部部分的高度
 
 import './InterfaceColMenu.scss';
+import '../interface.scss';  // 引入接口模块的通用样式，包括 .anticon-ellipsis 的旋转样式
 
 const ColModalForm = Form.create()(props => {
   const { visible, onCancel, onCreate, form, modalType, isSubDir } = props;
@@ -706,86 +708,187 @@ export default class InterfaceColMenu extends Component {
   };
 
   // 渲染目录标题，保持原来的按钮和样式
+  // renderColTitle = col => {
+  //   return (
+  //     <div className="menu-title">
+  //       {col.type === 'group' ? (
+  //         <Icon type="sync" style={{ marginRight: 6, color: '#00a854' }} />
+  //       ) : (
+  //         <Icon type="folder-open" style={{ marginRight: 6 }} />
+  //       )}
+  //       <span className={col.type === 'group' ? 'group-title' : ''}>{col.name}</span>
+  //       {col.type === 'group' && (
+  //         <span className="group-repeat-count">[{col.repeatCount || 1}]</span>
+  //       )}
+  //       <span style={{ marginLeft: 8, color: '#999', fontSize: '12px' }}>
+  //         ({this.getAllCasesFromColAndChildren(col._id, this.state.list).length})
+  //       </span>
+  //       <div className="btns">
+  //         <Tooltip title="删除集合">
+  //           <Icon
+  //                 type="delete"
+  //                 className="interface-delete-icon"
+  //                 onClick={() => this.showDelColConfirm(col._id)}
+  //             />
+  //         </Tooltip>
+  //         <Tooltip title={col.type === 'group' ? '编辑循环组' : '编辑集合'}>
+  //           <Icon
+  //               type="edit"
+  //               className="interface-delete-icon"
+  //               onClick={e => {
+  //                 e.stopPropagation();
+  //                 if (col.type === 'group') {
+  //                   this.showGroupModal('edit', col);
+  //                 } else {
+  //                   this.showColModal('edit', col);
+  //                 }
+  //               }}
+  //           />
+  //         </Tooltip>
+  //         <Tooltip title="导入接口">
+  //           <Icon
+  //                 type="plus"
+  //                 className="interface-delete-icon"
+  //                 onClick={e => {
+  //                   e.stopPropagation();
+  //                   this.showImportInterfaceModal(col._id);
+  //                 }}
+  //             />
+  //         </Tooltip>
+  //         <Tooltip title="添加子目录">
+  //           <Icon
+  //               type="folder-add"
+  //               className="interface-delete-icon"
+  //               onClick={e => {
+  //                 e.stopPropagation();
+  //                 this.showColModal('add', null, true, col._id);
+  //               }}
+  //           />
+  //         </Tooltip>
+  //
+  //         <Tooltip title="添加循环组">
+  //           <Icon
+  //               type="sync"
+  //               className="interface-delete-icon"
+  //               onClick={e => {
+  //                 e.stopPropagation();
+  //                 this.showGroupModal('add', null, true, col._id);
+  //               }}
+  //           />
+  //         </Tooltip>
+  //
+  //         <Tooltip title="克隆集合">
+  //           <Icon
+  //                 type="copy"
+  //                 className="interface-delete-icon"
+  //                 onClick={e => {
+  //                   e.stopPropagation();
+  //                   this.copyInterface(col);
+  //                 }}
+  //             />
+  //         </Tooltip>
+  //       </div>
+  //     </div>
+  //   );
+  // };
   renderColTitle = col => {
+    const menu = (
+      <Menu
+            onClick={({ key, domEvent }) => {
+              domEvent.stopPropagation();
+
+              switch (key) {
+                case 'delete':
+                  this.showDelColConfirm(col._id);
+                  break;
+                case 'edit':
+                  col.type === 'group'
+                      ? this.showGroupModal('edit', col)
+                      : this.showColModal('edit', col);
+                  break;
+                case 'import':
+                  this.showImportInterfaceModal(col._id);
+                  break;
+                case 'add-child':
+                  this.showColModal('add', null, true, col._id);
+                  break;
+                case 'add-group':
+                  this.showGroupModal('add', null, true, col._id);
+                  break;
+                case 'copy':
+                  this.copyInterface(col);
+                  break;
+                default:
+                  break;
+              }
+            }}
+        >
+        <Menu.Item key="edit">
+          <Icon type="edit" />
+          {col.type === 'group' ? '编辑循环组' : '编辑集合'}
+        </Menu.Item>
+
+        <Menu.Item key="import">
+          <Icon type="plus" />
+          导入接口
+        </Menu.Item>
+
+        <Menu.Item key="add-child">
+          <Icon type="folder-add" />
+          添加子目录
+        </Menu.Item>
+
+        <Menu.Item key="add-group">
+          <Icon type="sync" />
+          添加循环组
+        </Menu.Item>
+
+        <Menu.Item key="copy">
+          <Icon type="copy" />
+          克隆集合
+        </Menu.Item>
+
+        <Menu.Divider />
+
+        <Menu.Item key="delete" danger>
+          <Icon type="delete" />
+          删除集合
+        </Menu.Item>
+      </Menu>
+    );
+
     return (
       <div className="menu-title">
         {col.type === 'group' ? (
           <Icon type="sync" style={{ marginRight: 6, color: '#00a854' }} />
-        ) : (
-          <Icon type="folder-open" style={{ marginRight: 6 }} />
-        )}
-        <span className={col.type === 'group' ? 'group-title' : ''}>{col.name}</span>
+          ) : (
+            <Icon type="folder-open" style={{ marginRight: 6 }} />
+          )}
+
+        <span className={col.type === 'group' ? 'group-title' : ''}>
+          {col.name}
+        </span>
+
         {col.type === 'group' && (
-          <span className="group-repeat-count">[{col.repeatCount || 1}]</span>
-        )}
-        <span style={{ marginLeft: 8, color: '#999', fontSize: '12px' }}>
+          <span className="group-repeat-count">
+            [{col.repeatCount || 1}]
+          </span>
+          )}
+
+        <span style={{ marginLeft: 8, color: '#999', fontSize: 12 }}>
           ({this.getAllCasesFromColAndChildren(col._id, this.state.list).length})
         </span>
-        <div className="btns">
-          <Tooltip title="删除集合">
-            <Icon
-                  type="delete"
-                  className="interface-delete-icon"
-                  onClick={() => this.showDelColConfirm(col._id)}
-              />
-          </Tooltip>
-          <Tooltip title={col.type === 'group' ? '编辑循环组' : '编辑集合'}>
-            <Icon
-                type="edit"
-                className="interface-delete-icon"
-                onClick={e => {
-                  e.stopPropagation();
-                  if (col.type === 'group') {
-                    this.showGroupModal('edit', col);
-                  } else {
-                    this.showColModal('edit', col);
-                  }
-                }}
-            />
-          </Tooltip>
-          <Tooltip title="导入接口">
-            <Icon
-                  type="plus"
-                  className="interface-delete-icon"
-                  onClick={e => {
-                    e.stopPropagation();
-                    this.showImportInterfaceModal(col._id);
-                  }}
-              />
-          </Tooltip>
-          <Tooltip title="添加子目录">
-            <Icon
-                type="folder-add"
-                className="interface-delete-icon"
-                onClick={e => {
-                  e.stopPropagation();
-                  this.showColModal('add', null, true, col._id);
-                }}
-            />
-          </Tooltip>
 
-          <Tooltip title="添加循环组">
-            <Icon
-                type="sync"
-                className="interface-delete-icon"
-                onClick={e => {
-                  e.stopPropagation();
-                  this.showGroupModal('add', null, true, col._id);
-                }}
-            />
-          </Tooltip>
+        {/* 右侧更多按钮 */}
+        <Dropdown overlay={menu} trigger={['click']}>
+          <div 
+            className="horizontal-ellipsis"
+            onClick={e => e.stopPropagation()}
+          >
+            <span></span>
+          </div>
+        </Dropdown>
 
-          <Tooltip title="克隆集合">
-            <Icon
-                  type="copy"
-                  className="interface-delete-icon"
-                  onClick={e => {
-                    e.stopPropagation();
-                    this.copyInterface(col);
-                  }}
-              />
-          </Tooltip>
-        </div>
       </div>
     );
   };
@@ -893,7 +996,6 @@ export default class InterfaceColMenu extends Component {
     };
 
     let currentKes = defaultExpandedKeys();
-    
     // Use state.selectedKeys if available, otherwise use default
     const selectedKeys = currentKes.selects;
     

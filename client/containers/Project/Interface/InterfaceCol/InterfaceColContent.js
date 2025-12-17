@@ -355,6 +355,10 @@ class InterfaceColContent extends Component {
       rows: this.state.rows.map(row => ({ ...row, loading: '' }))
     });
     this.reports = {};
+    
+    // 清空变量存储，确保每次测试都是全新的开始
+    scriptVars = {};
+    
     await Promise.resolve(); // 让 React 立即渲染按钮状态
 
     const rows_w = {};
@@ -474,6 +478,11 @@ class InterfaceColContent extends Component {
         asyncTasks.push(this.runCase(curitem, originalIndex)); // 异步收集 Promise
       } else {
         await this.runCase(curitem, originalIndex); // 同步阻塞
+        
+        // 添加步骤间隔时间延迟（除了最后一个用例）
+        if (this.state.commonSetting.intervalTime > 0 && i < executionRows.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, this.state.commonSetting.intervalTime));
+        }
       }
       let reportsId = curitem._id;
       let resultCode = this.reports[reportsId] ? this.reports[reportsId].code : undefined;
@@ -1473,6 +1482,36 @@ class InterfaceColContent extends Component {
                     }
                   })
                 }} checked={this.state.commonSetting.stopFail}  checkedChildren="开" unCheckedChildren="关" />
+              </Col>
+            </Row>
+
+            {/* 添加间隔时间设置 */}
+            <Row className="setting-item">
+              <Col className="col-item" span="4">
+                <label>步骤间隔时间:&nbsp;
+                  <Tooltip title="每个测试步骤执行完成后等待的时间（毫秒），0表示不等待">
+                    <Icon type="question-circle-o" style={{ width: '10px' }} />
+                  </Tooltip>
+                </label>
+              </Col>
+              <Col className="col-item" span="18">
+                <Input
+                  type="number"
+                  min="0"
+                  value={this.state.commonSetting.intervalTime || 0}
+                  onChange={e => {
+                    let value = parseInt(e.target.value) || 0;
+                    let {commonSetting} = this.state;
+                    this.setState({
+                      commonSetting: {
+                        ...commonSetting,
+                        intervalTime: value
+                      }
+                    });
+                  }}
+                  addonAfter="毫秒"
+                  style={{ width: '120px' }}
+                />
               </Col>
             </Row>
 
