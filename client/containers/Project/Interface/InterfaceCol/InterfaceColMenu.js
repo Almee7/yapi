@@ -295,11 +295,16 @@ export default class InterfaceColMenu extends Component {
       const project_id = this.props.match.params.id;
 
       if (type === 'folder' || type === 'group' ) {
+        // Ensure allColsWithChildren exists before trying to use find
+        const currColWithChildren = this.state.allColsWithChildren
+          ? this.state.allColsWithChildren.find(col => col._id === id)
+          : null;
+
         this.props.setColData({
           isRander: false,
           // 设置当前选中的集合ID和所有子级接口
-          currColId: id,
-          currColWithChildren: this.state.allColsWithChildren.find(col => col._id === id)
+          currColId: +id,  // Convert string to number
+          currColWithChildren
         });
         this.props.history.push('/project/' + project_id + '/interface/col/' + id);
       } else {
@@ -708,89 +713,6 @@ export default class InterfaceColMenu extends Component {
   };
 
   // 渲染目录标题，保持原来的按钮和样式
-  // renderColTitle = col => {
-  //   return (
-  //     <div className="menu-title">
-  //       {col.type === 'group' ? (
-  //         <Icon type="sync" style={{ marginRight: 6, color: '#00a854' }} />
-  //       ) : (
-  //         <Icon type="folder-open" style={{ marginRight: 6 }} />
-  //       )}
-  //       <span className={col.type === 'group' ? 'group-title' : ''}>{col.name}</span>
-  //       {col.type === 'group' && (
-  //         <span className="group-repeat-count">[{col.repeatCount || 1}]</span>
-  //       )}
-  //       <span style={{ marginLeft: 8, color: '#999', fontSize: '12px' }}>
-  //         ({this.getAllCasesFromColAndChildren(col._id, this.state.list).length})
-  //       </span>
-  //       <div className="btns">
-  //         <Tooltip title="删除集合">
-  //           <Icon
-  //                 type="delete"
-  //                 className="interface-delete-icon"
-  //                 onClick={() => this.showDelColConfirm(col._id)}
-  //             />
-  //         </Tooltip>
-  //         <Tooltip title={col.type === 'group' ? '编辑循环组' : '编辑集合'}>
-  //           <Icon
-  //               type="edit"
-  //               className="interface-delete-icon"
-  //               onClick={e => {
-  //                 e.stopPropagation();
-  //                 if (col.type === 'group') {
-  //                   this.showGroupModal('edit', col);
-  //                 } else {
-  //                   this.showColModal('edit', col);
-  //                 }
-  //               }}
-  //           />
-  //         </Tooltip>
-  //         <Tooltip title="导入接口">
-  //           <Icon
-  //                 type="plus"
-  //                 className="interface-delete-icon"
-  //                 onClick={e => {
-  //                   e.stopPropagation();
-  //                   this.showImportInterfaceModal(col._id);
-  //                 }}
-  //             />
-  //         </Tooltip>
-  //         <Tooltip title="添加子目录">
-  //           <Icon
-  //               type="folder-add"
-  //               className="interface-delete-icon"
-  //               onClick={e => {
-  //                 e.stopPropagation();
-  //                 this.showColModal('add', null, true, col._id);
-  //               }}
-  //           />
-  //         </Tooltip>
-  //
-  //         <Tooltip title="添加循环组">
-  //           <Icon
-  //               type="sync"
-  //               className="interface-delete-icon"
-  //               onClick={e => {
-  //                 e.stopPropagation();
-  //                 this.showGroupModal('add', null, true, col._id);
-  //               }}
-  //           />
-  //         </Tooltip>
-  //
-  //         <Tooltip title="克隆集合">
-  //           <Icon
-  //                 type="copy"
-  //                 className="interface-delete-icon"
-  //                 onClick={e => {
-  //                   e.stopPropagation();
-  //                   this.copyInterface(col);
-  //                 }}
-  //             />
-  //         </Tooltip>
-  //       </div>
-  //     </div>
-  //   );
-  // };
   renderColTitle = col => {
     const menu = (
       <Menu
@@ -865,7 +787,10 @@ export default class InterfaceColMenu extends Component {
             <Icon type="folder-open" style={{ marginRight: 6 }} />
           )}
 
-        <span className={col.type === 'group' ? 'group-title' : ''}>
+        <span 
+          className={col.type === 'group' ? 'group-title col-name' : 'col-name'}
+          title={col.name}
+        >
           {col.name}
         </span>
 
@@ -876,7 +801,7 @@ export default class InterfaceColMenu extends Component {
           )}
 
         <span style={{ marginLeft: 8, color: '#999', fontSize: 12 }}>
-          ({this.getAllCasesFromColAndChildren(col._id, this.state.list).length})
+          ({this.getAllCasesFromColAndChildren(col._id, this.props.interfaceColList).length})
         </span>
 
         {/* 右侧更多按钮 */}
@@ -1031,7 +956,7 @@ export default class InterfaceColMenu extends Component {
             </Button>
           </Tooltip>
         </div>
-        <div className="tree-wrapper" style={{ maxHeight: `calc(100% - ${headHeight}px)` }}>
+        <div className="tree-wrapper" style={{ height: 'calc(100vh - ' + headHeight + 'px)', overflowY: 'auto' }}>
           <Tree
                 className="col-list-tree"
                 defaultExpandedKeys={currentKes.expands}

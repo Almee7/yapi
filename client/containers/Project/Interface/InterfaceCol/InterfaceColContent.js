@@ -83,7 +83,7 @@ function handleReport(json) {
 )
 @withRouter
 @DragDropContext(HTML5Backend)
-class InterfaceColContent extends Component {
+export default class InterfaceColContent extends Component {
   static propTypes = {
     match: PropTypes.object,
     interfaceColList: PropTypes.array,
@@ -750,6 +750,7 @@ class InterfaceColContent extends Component {
   //response, validRes
   // 断言测试
   handleScriptTest = async (interfaceData, response, validRes, requestParams, scriptVars) => {
+    console.log('11111111111111111', response)
 
     let env = interfaceData.case_env
     const getGlobalMap = (envs, envName) => {
@@ -1580,7 +1581,7 @@ class InterfaceColContent extends Component {
                     margin: '8px 20px 16px 0px'
                   }}
               >
-              测试集合 <a
+              测试集合&nbsp;<a
                   target="_blank"
                   rel="noopener noreferrer"
                   href="https://hellosean1025.github.io/yapi/documents/case.html"
@@ -1673,26 +1674,42 @@ class InterfaceColContent extends Component {
           <Label onChange={val => this.handleChangeInterfaceCol(val, col_name)} desc={col_desc} />
         </div>
 
-        <Table.Provider
-              components={components}
-              columns={resolvedColumns}
-              style={{
-                width: '100%',
-                borderCollapse: 'collapse'
-              }}
-          >
-          <Table.Header
-                className="interface-col-table-header"
-                headerRows={resolve.headerRows({ columns })}
-            />
+        {/* 修改表格容器，添加固定高度和内部滚动 */}
+        <div className="table-container" style={{ 
+          height: 'calc(100vh - 220px)', 
+          overflow: 'auto',
+          border: '1px solid #e8e8e8',
+          borderRadius: '4px'
+        }}>
+          <style>{`
+            .interface-col-table-body tr:nth-child(even) {
+              background-color: #f5f5f5;
+            }
+            .interface-col-table-body tr:nth-child(odd) {
+              background-color: #ffffff;
+            }
+          `}</style>
+          <Table.Provider
+                components={components}
+                columns={resolvedColumns}
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse'
+                }}
+            >
+            <Table.Header
+                  className="interface-col-table-header"
+                  headerRows={resolve.headerRows({ columns })}
+              />
+            <Table.Body
+                  className="interface-col-table-body"
+                  rows={resolvedRows}
+                  rowKey="_id"
+                  onRow={this.onRow}
+              />
+          </Table.Provider>
+        </div>
 
-          <Table.Body
-                className="interface-col-table-body"
-                rows={resolvedRows}
-                rowKey="_id"
-                onRow={this.onRow}
-            />
-        </Table.Provider>
         <Modal
               title="测试报告"
               width="900px"
@@ -1844,4 +1861,4 @@ class InterfaceColContent extends Component {
   }
 }
 
-export default InterfaceColContent;
+// export default InterfaceColContent;
