@@ -295,11 +295,12 @@ export default class InterfaceColMenu extends Component {
       const project_id = this.props.match.params.id;
 
       if (type === 'folder' || type === 'group' ) {
+        const allColsWithChildren = this.state.allColsWithChildren || [];
         this.props.setColData({
           isRander: false,
           // 设置当前选中的集合ID和所有子级接口
           currColId: id,
-          currColWithChildren: this.state.allColsWithChildren.find(col => col._id === id)
+          currColWithChildren: allColsWithChildren.find(col => col._id === id)
         });
         this.props.history.push('/project/' + project_id + '/interface/col/' + id);
       } else {
@@ -876,7 +877,7 @@ export default class InterfaceColMenu extends Component {
           )}
 
         <span style={{ marginLeft: 8, color: '#999', fontSize: 12 }}>
-          ({this.getAllCasesFromColAndChildren(col._id, this.state.list).length})
+          ({this.getAllCasesFromColAndChildren(col._id, this.props.interfaceColList).length})
         </span>
 
         {/* 右侧更多按钮 */}

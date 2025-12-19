@@ -603,57 +603,110 @@ function handleParamsValue(params, val) {
 }
 
 async function flattenCases(colId, allCols, allCases) {
+    // 使用 Map 提高查找效率
+    const colsMap = new Map(allCols.map(c => [c._id.toString(), c]));
+    const casesByColId = new Map();
+    const casesByGroupId = new Map();
+    
+    // 预处理 cases，按 col_id 和 group_id 分组
+    allCases.forEach(c => {
+        // 按 col_id 分组
+        const colIdKey = c.col_id ? c.col_id.toString() : undefined;
+        if (colIdKey) {
+            if (!casesByColId.has(colIdKey)) {
+                casesByColId.set(colIdKey, []);
+            }
+            casesByColId.get(colIdKey).push(c);
+        }
+        
+        // 按 group_id 分组
+        const groupIdKey = c.group_id ? c.group_id.toString() : undefined;
+        if (groupIdKey) {
+            if (!casesByGroupId.has(groupIdKey)) {
+                casesByGroupId.set(groupIdKey, []);
+            }
+            casesByGroupId.get(groupIdKey).push(c);
+        }
+    });
+
     const result = [];
 
     // 找当前 col
-    const col = allCols.find(c => c._id.toString() === colId.toString());
+    const col = colsMap.get(colId.toString());
     if (!col) return result;
+    
     // 当前是 group，直接返回 group 内 case 按 index 排序
     if (col.type === 'group') {
-        return allCases
-            .filter(c => c.group_id && c.group_id.toString() === col._id.toString())
-            .sort((a, b) => a.index - b.index);
+        const groupCases = casesByGroupId.get(col._id.toString()) || [];
+        // 预先排序以避免重复排序
+        return groupCases.slice().sort((a, b) => a.index - b.index);
     }
+    
     // 当前 col 下的普通 case（group_id=null）
-    const folderCases = allCases
-        .filter(c => c.col_id.toString() === colId.toString() && !c.group_id)
+    const folderCases = (casesByColId.get(colId.toString()) || [])
+        .filter(c => !c.group_id)
+        .slice() // 创建副本避免修改原数组
         .sort((a, b) => a.index - b.index);
-    // 当前 col 下的 group
+        
+    // 当前 col 下的 group，按 index 排序
     const childGroups = allCols
-        .filter(c => c.parent_id.toString() === colId.toString() && c.type === 'group')
+        .filter(c => c.parent_id && c.parent_id.toString() === colId.toString() && c.type === 'group')
+        .slice() // 创建副本避免修改原数组
         .sort((a, b) => a.index - b.index);
+        
+    // 预先排序所有 group cases 以避免重复排序
+    const sortedGroupCasesMap = new Map();
+    childGroups.forEach(g => {
+        const groupCases = casesByGroupId.get(g._id.toString()) || [];
+        sortedGroupCasesMap.set(g._id.toString(), groupCases.slice().sort((a, b) => a.index - b.index));
+    });
+
     // 遍历普通 case，同时插入 group case
     for (let i = 0; i < folderCases.length; i++) {
         const c = folderCases[i];
         result.push(c);
+        
         // 插入 index <= 当前普通 case index 的 group case
         for (const g of childGroups) {
-            const groupCases = allCases
-                .filter(gc => gc.group_id && gc.group_id.toString() === g._id.toString())
-                .sort((a, b) => a.index - b.index);
+            const sortedGroupCases = sortedGroupCasesMap.get(g._id.toString()) || [];
+            
             // group.index 表示在 folder 中的位置（这里用 index 控制插入顺序）
             if (g.index === i + 1) {
-                result.push(...groupCases);
+                result.push(...sortedGroupCases);
             }
         }
     }
+    
     // 插入剩余 group case（如果 index 大于普通 case 数量）
+    const addedGroupCases = new Set();
     for (const g of childGroups) {
-        const groupCases = allCases
-            .filter(gc => gc.group_id && gc.group_id.toString() === g._id.toString())
-            .sort((a, b) => a.index - b.index);
-        if (!groupCases.every(gc => result.includes(gc))) {
-            result.push(...groupCases);
+        const sortedGroupCases = sortedGroupCasesMap.get(g._id.toString()) || [];
+        
+        // 检查是否有未添加的 case
+        let hasUnaddedCase = false;
+        for (const gc of sortedGroupCases) {
+            if (!addedGroupCases.has(gc._id)) {
+                hasUnaddedCase = true;
+                addedGroupCases.add(gc._id);
+            }
+        }
+        
+        if (hasUnaddedCase) {
+            result.push(...sortedGroupCases);
         }
     }
+    
     // 递归处理 folder 类型子 col
     const childFolders = allCols
-        .filter(c => c.parent_id.toString() === colId.toString() && c.type === 'folder')
+        .filter(c => c.parent_id && c.parent_id.toString() === colId.toString() && c.type === 'folder')
+        .slice() // 创建副本避免修改原数组
         .sort((a, b) => a.index - b.index);
+        
     for (const folder of childFolders) {
         const subCases = await flattenCases(folder._id, allCols, allCases);
         result.push(...subCases);
     }
+    
     return result;
 }
 exports.handleParamsValue = handleParamsValue;
@@ -669,21 +722,51 @@ exports.getCaseList = async function getCaseList(id) {
     const projectInst = yapi.getInst(projectModel);
     const interfaceInst = yapi.getInst(interfaceModel);
 
-    // 1️⃣ 获取父 + 子节点的 col_id 列表，顺序已父-子排列
-    const colIds = await colInst.getParentId(id);
-    // 根据 col_id 列表一次性获取所有 col
-    const allCols = await colInst.allColList(colIds,'all')
-    // 2️⃣ 根据 col_id 列表一次性获取所有 case（list 内部已按 index 排序）
-    const allCases = await caseInst.newList(colIds, 'all');
+    // 1️⃣ 并行执行数据库查询以提高性能
+    const [colIds, colData] = await Promise.all([
+        colInst.getParentId(id),
+        colInst.get(id)
+    ]);
+    
+    // 如果没有 colIds，直接返回空结果
+    if (!colIds || colIds.length === 0) {
+        return yapi.commons.resReturn([]);
+    }
+    
+    // 2️⃣ 并行获取所有 col 和 case 数据
+    const [allCols, allCases] = await Promise.all([
+        colInst.allColList(colIds,'all'),
+        caseInst.newList(colIds, 'all')
+    ]);
+
     // 3️⃣ 获取到排序后的caseList
     let resultList = await flattenCases(id, allCols, allCases);
-    // 4️⃣ 批量获取 interface 数据
+    
+    // 如果没有结果，直接返回
+    if (resultList.length === 0) {
+        const ctxBody = yapi.commons.resReturn(resultList);
+        ctxBody.colData = colData;
+        const groups = allCols.filter(item => item.type === 'group');
+        if (groups.length > 0) {
+            ctxBody.groupData = groups;
+        }
+        return ctxBody;
+    }
+    
+    // 4️⃣ 提取需要的 IDs
     const interfaceIds = resultList.map(c => c.interface_id).filter(id => id != null);
-    const interfaceList = await interfaceInst.getByIds(interfaceIds);
-
-    // 5️⃣ 批量获取 project 数据
-    const projectIds = [...new Set(interfaceList.map(i => i.project_id))].filter(id => id != null);
-    const projectList = await projectInst.getBaseInfoByIds(projectIds);
+    
+    // 5️⃣ 并行获取 interface 和 project 数据
+    let interfaceList = [];
+    let projectList = [];
+    
+    if (interfaceIds.length > 0) {
+        interfaceList = await interfaceInst.getByIds(interfaceIds);
+        const projectIds = [...new Set(interfaceList.map(i => i.project_id))].filter(id => id != null);
+        if (projectIds.length > 0) {
+            projectList = await projectInst.getBaseInfoByIds(projectIds);
+        }
+    }
 
     // 6️⃣ 建立 Map 便于快速查找
     const interfaceMap = new Map();
@@ -700,20 +783,20 @@ exports.getCaseList = async function getCaseList(id) {
         }
     });
 
-    // 7️⃣ 遍历每个 case，组合接口和项目路径
-    const colData = await colInst.get(id);
+    // 7️⃣ 遍历每个 case，组合接口和项目路径 (使用 for 循环优化)
+    const casesToDelete = [];
     for (let i = 0; i < resultList.length; i++) {
         const result = resultList[i];
         if (!result.interface_id) continue;
         
         const data = interfaceMap.get(result.interface_id.toString());
         if (!data) {
-            await caseInst.del(result._id);
+            casesToDelete.push(result._id);
             continue;
         }
         const projectData = projectMap.get(data.project_id.toString());
         if (!projectData) {
-            await caseInst.del(result._id);
+            casesToDelete.push(result._id);
             continue;
         }
         result.path = projectData.basepath + data.path;
@@ -726,6 +809,13 @@ exports.getCaseList = async function getCaseList(id) {
         result.req_query = handleParamsValue(data.req_query, result.req_query)
         result.req_params = handleParamsValue(data.req_params, result.req_params)
     }
+    
+    // 批量删除无效的 cases
+    if (casesToDelete.length > 0) {
+        // 使用 Mongoose 的 deleteMany 方法进行批量删除
+        await caseInst.model.deleteMany({ _id: { $in: casesToDelete } });
+    }
+    
     // 8️⃣ 返回结果
     const ctxBody = yapi.commons.resReturn(resultList);
     ctxBody.colData = colData;

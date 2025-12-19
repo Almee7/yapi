@@ -85,29 +85,37 @@ class interfaceCol extends baseModel {
   }
 
   async getParentId(col_id) {
-    const allData = await this.model.find({}).lean().exec();
-
-    const map = new Map();
-    for (const item of allData) {
-      const pid = item.parent_id != null ? Number(item.parent_id) : null;
-      if (!map.has(pid)) map.set(pid, []);
-      map.get(pid).push(item);
-    }
-
-    // 对每个父节点下的子节点按 index 排序
-    for (const children of map.values()) {
-      children.sort((a, b) => a.index - b.index);
-    }
-
+    // 使用递归方式获取完整的父子层级关系
+    const visited = new Set();
     const resultIds = [];
-
-    function traverse(id) {
-      resultIds.push(Number(id)); // 父
-      const children = map.get(Number(id)) || [];
-      for (const child of children) traverse(child._id); // 按顺序遍历子节点
+    
+    // 获取指定ID的记录
+    const targetCol = await this.model.findOne({ _id: col_id }).lean().exec();
+    if (!targetCol) {
+      return [col_id];
     }
-
-    traverse(col_id);
+    
+    // 添加自身ID
+    resultIds.push(Number(col_id));
+    visited.add(Number(col_id));
+    
+    // 递归获取所有子节点
+    const getChildren = async (parentId) => {
+      const children = await this.model.find({ parent_id: parentId }).lean().exec();
+      for (const child of children) {
+        const childId = Number(child._id);
+        if (!visited.has(childId)) {
+          visited.add(childId);
+          resultIds.push(childId);
+          // 递归获取子节点的子节点
+          await getChildren(childId);
+        }
+      }
+    };
+    
+    // 获取所有子节点
+    await getChildren(col_id);
+    
     return resultIds;
   }
 
