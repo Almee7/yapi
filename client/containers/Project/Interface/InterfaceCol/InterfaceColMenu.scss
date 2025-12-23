@@ -15,6 +15,14 @@
     flex-direction: row;
   }
 
+  /* 目录名称超出省略 */
+  .col-name {
+    overflow: hidden;
+    flex-grow: 1;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
   /* 名称超出省略（如果你有这个 class） */
   .casename {
     overflow: hidden;
@@ -271,5 +279,3 @@
 .group-title {
   color: #00a854;
 }
-
-

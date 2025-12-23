@@ -109,6 +109,8 @@ function handleFilter(str, match, context) {
 }
 
 function handleParamsValue(val, context = {}) {
+  console.log('11111111111111111111', context);
+  console.log('22222222222222222222', val);
   const variableRegexp = /\{\{\s*([^}]+?)\s*\}\}/g;
   if (!val || typeof val !== 'string') return val;
   val = val.trim();

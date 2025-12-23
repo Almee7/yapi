@@ -866,7 +866,10 @@ export default class InterfaceColMenu extends Component {
             <Icon type="folder-open" style={{ marginRight: 6 }} />
           )}
 
-        <span className={col.type === 'group' ? 'group-title' : ''}>
+        <span
+          className={col.type === 'group' ? 'group-title col-name' : 'col-name'}
+          title={col.name}
+        >
           {col.name}
         </span>
 
@@ -1032,7 +1035,7 @@ export default class InterfaceColMenu extends Component {
             </Button>
           </Tooltip>
         </div>
-        <div className="tree-wrapper" style={{ maxHeight: `calc(100% - ${headHeight}px)` }}>
+        <div className="tree-wrapper" style={{ height: 'calc(100vh - ' + headHeight + 'px)', overflowY: 'auto' }}>
           <Tree
                 className="col-list-tree"
                 defaultExpandedKeys={currentKes.expands}
