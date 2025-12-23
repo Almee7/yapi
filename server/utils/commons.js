@@ -602,14 +602,20 @@ function handleParamsValue(params, val) {
     return params
 }
 
-async function flattenCases(colId, allCols, allCases) {
+async function flattenCases(colId, allCols, allCases, memo = new Map()) {
+    // 使用记忆化避免重复计算
+    const cacheKey = `${colId}`;
+    if (memo.has(cacheKey)) {
+        return memo.get(cacheKey);
+    }
+    
     // 使用 Map 提高查找效率
     const colsMap = new Map(allCols.map(c => [c._id.toString(), c]));
     const casesByColId = new Map();
     const casesByGroupId = new Map();
     
     // 预处理 cases，按 col_id 和 group_id 分组
-    allCases.forEach(c => {
+    for (const c of allCases) {
         // 按 col_id 分组
         const colIdKey = c.col_id ? c.col_id.toString() : undefined;
         if (colIdKey) {
@@ -627,86 +633,117 @@ async function flattenCases(colId, allCols, allCases) {
             }
             casesByGroupId.get(groupIdKey).push(c);
         }
-    });
+    }
 
     const result = [];
 
     // 找当前 col
     const col = colsMap.get(colId.toString());
-    if (!col) return result;
+    if (!col) {
+        memo.set(cacheKey, result);
+        return result;
+    }
     
     // 当前是 group，直接返回 group 内 case 按 index 排序
     if (col.type === 'group') {
         const groupCases = casesByGroupId.get(col._id.toString()) || [];
         // 预先排序以避免重复排序
-        return groupCases.slice().sort((a, b) => a.index - b.index);
+        const sortedResult = groupCases.slice().sort((a, b) => a.index - b.index);
+        memo.set(cacheKey, sortedResult);
+        return sortedResult;
     }
     
     // 当前 col 下的普通 case（group_id=null）
     const folderCases = (casesByColId.get(colId.toString()) || [])
-        .filter(c => !c.group_id)
-        .slice() // 创建副本避免修改原数组
-        .sort((a, b) => a.index - b.index);
+        .filter(c => !c.group_id);
+    
+    // 对 folderCases 进行原地排序
+    folderCases.sort((a, b) => a.index - b.index);
         
     // 当前 col 下的 group，按 index 排序
-    const childGroups = allCols
-        .filter(c => c.parent_id && c.parent_id.toString() === colId.toString() && c.type === 'group')
-        .slice() // 创建副本避免修改原数组
-        .sort((a, b) => a.index - b.index);
+    const childGroups = [];
+    for (const c of allCols) {
+        if (c.parent_id && c.parent_id.toString() === colId.toString() && c.type === 'group') {
+            childGroups.push(c);
+        }
+    }
+    childGroups.sort((a, b) => a.index - b.index);
         
     // 预先排序所有 group cases 以避免重复排序
     const sortedGroupCasesMap = new Map();
-    childGroups.forEach(g => {
-        const groupCases = casesByGroupId.get(g._id.toString()) || [];
-        sortedGroupCasesMap.set(g._id.toString(), groupCases.slice().sort((a, b) => a.index - b.index));
-    });
-
-    // 遍历普通 case，同时插入 group case
-    for (let i = 0; i < folderCases.length; i++) {
-        const c = folderCases[i];
-        result.push(c);
-        
-        // 插入 index <= 当前普通 case index 的 group case
-        for (const g of childGroups) {
-            const sortedGroupCases = sortedGroupCasesMap.get(g._id.toString()) || [];
-            
-            // group.index 表示在 folder 中的位置（这里用 index 控制插入顺序）
-            if (g.index === i + 1) {
-                result.push(...sortedGroupCases);
-            }
-        }
-    }
-    
-    // 插入剩余 group case（如果 index 大于普通 case 数量）
-    const addedGroupCases = new Set();
     for (const g of childGroups) {
-        const sortedGroupCases = sortedGroupCasesMap.get(g._id.toString()) || [];
-        
-        // 检查是否有未添加的 case
-        let hasUnaddedCase = false;
-        for (const gc of sortedGroupCases) {
-            if (!addedGroupCases.has(gc._id)) {
-                hasUnaddedCase = true;
-                addedGroupCases.add(gc._id);
-            }
+        const groupCases = casesByGroupId.get(g._id.toString()) || [];
+        // 创建副本并排序
+        const sortedCases = [];
+        for (const gc of groupCases) {
+            sortedCases.push(gc);
         }
-        
-        if (hasUnaddedCase) {
-            result.push(...sortedGroupCases);
+        sortedCases.sort((a, b) => a.index - b.index);
+        sortedGroupCasesMap.set(g._id.toString(), sortedCases);
+    }
+
+    // 构建一个完整的排序算法，考虑容器层级关系
+    // 首先获取当前容器的所有直接子元素（包括 case、group 和 folder），按 index 排序
+    
+    // 收集当前容器的所有子元素
+    const directChildren = [];
+    
+    // 添加当前容器的普通 case
+    for (const c of folderCases) {
+        directChildren.push({
+            type: 'case',
+            index: c.index,
+            element: c
+        });
+    }
+    
+    // 添加当前容器的 groups
+    for (const g of childGroups) {
+        directChildren.push({
+            type: 'group',
+            index: g.index,
+            element: g
+        });
+    }
+    
+    // 添加当前容器的 folders
+    const childFolders = [];
+    for (const f of allCols) {
+        if (f.parent_id && f.parent_id.toString() === colId.toString() && f.type === 'folder') {
+            childFolders.push(f);
+        }
+    }
+    childFolders.sort((a, b) => a.index - b.index);
+    
+    for (const f of childFolders) {
+        directChildren.push({
+            type: 'folder',
+            index: f.index,
+            element: f
+        });
+    }
+    
+    // 按 index 排序直接子元素
+    directChildren.sort((a, b) => a.index - b.index);
+    
+    // 按排序后的顺序处理每个子元素
+    for (const child of directChildren) {
+        if (child.type === 'case') {
+            // 直接添加 case
+            result.push(child.element);
+        } else if (child.type === 'group') {
+            // 添加 group 内的所有 case
+            const groupCases = sortedGroupCasesMap.get(child.element._id.toString()) || [];
+            result.push(...groupCases);
+        } else if (child.type === 'folder') {
+            // 递归获取 folder 的所有 case，传递 memoization map
+            const subCases = await flattenCases(child.element._id, allCols, allCases, memo);
+            result.push(...subCases);
         }
     }
     
-    // 递归处理 folder 类型子 col
-    const childFolders = allCols
-        .filter(c => c.parent_id && c.parent_id.toString() === colId.toString() && c.type === 'folder')
-        .slice() // 创建副本避免修改原数组
-        .sort((a, b) => a.index - b.index);
-        
-    for (const folder of childFolders) {
-        const subCases = await flattenCases(folder._id, allCols, allCases);
-        result.push(...subCases);
-    }
-    
+    // 缓存结果
+    memo.set(cacheKey, result);
     return result;
 }
 exports.handleParamsValue = handleParamsValue;
@@ -740,7 +777,8 @@ exports.getCaseList = async function getCaseList(id) {
     ]);
 
     // 3️⃣ 获取到排序后的caseList
-    let resultList = await flattenCases(id, allCols, allCases);
+    // 使用共享的 memoization cache 来提高性能
+    let resultList = await flattenCases(id, allCols, allCases, new Map());
     
     // 如果没有结果，直接返回
     if (resultList.length === 0) {
@@ -812,8 +850,7 @@ exports.getCaseList = async function getCaseList(id) {
     
     // 批量删除无效的 cases
     if (casesToDelete.length > 0) {
-        // 使用 Mongoose 的 deleteMany 方法进行批量删除
-        await caseInst.model.deleteMany({ _id: { $in: casesToDelete } });
+        await Promise.all(casesToDelete.map(caseId => caseInst.del(caseId)));
     }
     
     // 8️⃣ 返回结果
