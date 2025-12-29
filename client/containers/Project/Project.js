@@ -12,7 +12,7 @@ import Setting from './Setting/Setting.js';
 import Loading from '../../components/Loading/Loading';
 import ProjectMember from './Setting/ProjectMember/ProjectMember.js';
 import ProjectData from './Setting/ProjectData/ProjectData.js';
-import Websocket from './Websocket/Websocket.js';
+import {WebsocketList as Websocket} from './Websocket/WebsocketList.js';
 
 const plugin = require('client/plugin.js');
 @connect(
@@ -58,6 +58,13 @@ export default class Project extends Component {
     ]);
   }
 
+  /**
+   * Lifecycle method that is invoked when a mounted component receives new props.
+   * If the current project ID does not match the next project ID, it fetches the new
+   * project and its group messages, then sets the breadcrumb navigation.
+   * @param {Object} nextProps - The next set of properties that will be applied to this component.
+   * @return {void}
+   */
   async componentWillReceiveProps(nextProps) {
     const currProjectId = this.props.match.params.id;
     const nextProjectId = nextProps.match.params.id;

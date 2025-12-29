@@ -1,0 +1,130 @@
+.ws-list-page {
+  padding: 20px;
+  background-color: #ffffff;
+  font-family: 'Arial', sans-serif;
+  height: 560px;
+
+  h2 {
+    margin-bottom: 20px;
+    color: #333;
+  }
+
+  /* Excel 表格 */
+  .excel-table {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-collapse: collapse;
+    border: 1px solid #7fbae7;
+
+    .table-header {
+      display: contents;
+
+      .cell {
+        padding: 10px;
+        background-color: #2395f1;
+        color: #fff;
+        font-weight: bold;
+        border: 1px solid #7fbae7;
+
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+    }
+
+    .table-row {
+      display: contents;
+
+      .cell {
+        padding: 10px;
+        border: 1px solid #7fbae7;
+        color: #333;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        &.actions {
+          display: flex;
+          gap: 6px;
+          justify-content: center;
+          align-items: center;
+
+          .text-btn {
+            padding: 4px 10px;
+            font-size: 13px;
+            border-radius: 12px;
+            border: 1px solid;
+            background-color: transparent;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-weight: 500;
+
+            &:hover {
+              opacity: 0.8;
+            }
+          }
+
+          .detail {
+            color: #1677ff;
+            border-color: #1677ff;
+            width: 74px;
+            height: 39px;
+          }
+
+          .delete {
+            color: #e74c3c;
+            border-color: #e74c3c;
+            width: 48px;
+            height: 39px;
+          }
+
+          .connect {
+            color: #27ae60;
+            border-color: #27ae60;
+            width: 48px;
+            height: 39px;
+          }
+
+          .disconnect {
+            color: #e67e22;
+            border-color: #e67e22;
+            width: 48px;
+            height: 39px;
+          }
+        }
+      }
+    }
+
+    .table-row.no-data .cell {
+      border: 1px solid #ccc;
+      padding: 12px;
+      background-color: #fafafa;
+
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .status {
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12px;
+
+      &.connected {
+        background-color: #4caf50;
+        color: #fff;
+      }
+
+      &.disconnected {
+        background-color: #f44336;
+        color: #fff;
+      }
+
+      &.unknown {
+        background-color: #999;
+        color: #fff;
+      }
+    }
+  }
+
+}

@@ -825,34 +825,34 @@ export default class InterfaceColMenu extends Component {
             }}
         >
         <Menu.Item key="edit">
-          <Icon type="edit" />
+          <Icon type="edit" style={{ marginRight: 8 }} />
           {col.type === 'group' ? '编辑循环组' : '编辑集合'}
         </Menu.Item>
 
         <Menu.Item key="import">
-          <Icon type="plus" />
+          <Icon type="plus" style={{ marginRight: 8 }} />
           导入接口
         </Menu.Item>
 
         <Menu.Item key="add-child">
-          <Icon type="folder-add" />
+          <Icon type="folder-add" style={{ marginRight: 8 }} />
           添加子目录
         </Menu.Item>
 
         <Menu.Item key="add-group">
-          <Icon type="sync" />
+          <Icon type="sync" style={{ marginRight: 8 }} />
           添加循环组
         </Menu.Item>
 
         <Menu.Item key="copy">
-          <Icon type="copy" />
+          <Icon type="copy" style={{ marginRight: 8 }} />
           克隆集合
         </Menu.Item>
 
         <Menu.Divider />
 
         <Menu.Item key="delete" danger>
-          <Icon type="delete" />
+          <Icon type="delete" style={{ marginRight: 8 }} />
           删除集合
         </Menu.Item>
       </Menu>

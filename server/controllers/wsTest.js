@@ -67,7 +67,8 @@ class WsTestController extends baseController {
                 if (ws.readyState === WebSocket.OPEN) {
                     const data = { action: "ping", data: {}, seq: seq++ };
                     ws.send(JSON.stringify(data));
-                    WsTestController.broadcastToFrontend(connectionId, { type: "send", message: data });
+                    // ping 消息不广播到前端，避免干扰
+                    // WsTestController.broadcastToFrontend(connectionId, { type: "send", message: JSON.stringify(data) });
 
                     if (pongTimeout) clearTimeout(pongTimeout);
                     pongTimeout = setTimeout(() => {
@@ -81,16 +82,26 @@ class WsTestController extends baseController {
 
         ws.on("message", (msg) => {
             const text = msg.toString();
-            connectionData.messages.push(text);
-
+            
+            // 过滤 ping/pong 消息，不存储到 messages 中
+            let shouldFilter = false;
             try {
                 const parsed = JSON.parse(text);
-                if (parsed && parsed.action === "pong" && pongTimeout) {
-                    clearTimeout(pongTimeout);
+                // 过滤格式: { data: { text: "pong" } } 或 { data: { text: "ping" } }
+                if (parsed && parsed.data && (parsed.data.text === "pong" || parsed.data.text === "ping")) {
+                    shouldFilter = true;
+                    // pong 消息用于清除超时
+                    if (parsed.data.text === "pong" && pongTimeout) {
+                        clearTimeout(pongTimeout);
+                    }
                 }
             } catch (_) { /* ignore */ }
 
-            WsTestController.broadcastToFrontend(connectionId, { type: "message", message: text });
+            // 只有非 ping/pong 消息才存储和广播
+            if (!shouldFilter) {
+                connectionData.messages.push(text);
+                WsTestController.broadcastToFrontend(connectionId, { type: "message", message: text });
+            }
         });
 
         ws.on("close", () => {
@@ -139,12 +150,19 @@ class WsTestController extends baseController {
      * GET /api/ws-test/list
      */
     async list(ctx) {
-        const seenUrls = new Set();
+        const seenKeys = new Set(); // 用于存储 url+cookieId 的组合键
         const list = [];
 
         for (const [id, conn] of wsConnections.entries()) {
-            if (!seenUrls.has(conn.url)) {
-                seenUrls.add(conn.url);
+            // 从 headers中获取cookie，提取cookieId
+            const cookieHeader = conn.headers && conn.headers.cookieId ? conn.headers.cookieId : '';
+            const cookieId = cookieHeader || 'no-cookie';
+            
+            // 组合url和cookieId作为唯一键
+            const uniqueKey = `${conn.url}|${cookieId}`;
+            
+            if (!seenKeys.has(uniqueKey)) {
+                seenKeys.add(uniqueKey);
 
                 list.push({
                     connectionId: id,

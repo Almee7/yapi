@@ -4,9 +4,9 @@
   "timeout": 120000,
   "scriptEnable": true,
   "okrServer": "http://192.168.6.218:3399",
-  "xpaServer": "http://196.168.1.143:8080",
+  "xpaServer": "http://193.168.2.100:30402",
   "db": {
-    "servername": "127.0.0.1",
+    "servername": "192.168.6.128",
     "DATABASE": "yapi",
     "port": 27017,
     "user": "root",
