@@ -207,7 +207,7 @@ return (
             <button 
               className="send-btn" 
               onClick={sendMessage}
-              disabled={!message.trim() || tab.status !== 'connected'}
+              disabled={!message.trim() || tab.status !== 'open'} 
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
