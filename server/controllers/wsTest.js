@@ -12,6 +12,24 @@ class WsTestController extends baseController {
      */
     static frontendWs(ctx) {
         clients.add(ctx.websocket);
+        
+        // 监听前端发来的消息，转发到目标 WebSocket
+        ctx.websocket.on("message", (data) => {
+            try {
+                const { connectionId, message } = JSON.parse(data);
+                const conn = wsConnections.get(connectionId);
+                
+                if (conn && conn.ws && conn.ws.readyState === WebSocket.OPEN) {
+                    // 转发消息到目标 WebSocket
+                    conn.ws.send(message);
+                    // 可选：将发送的消息也存储到消息列表中
+                    // conn.messages.push(`[发送] ${message}`);
+                }
+            } catch (err) {
+                console.error("转发消息失败:", err);
+            }
+        });
+        
         ctx.websocket.on("close", () => clients.delete(ctx.websocket));
     }
 
