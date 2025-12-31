@@ -227,6 +227,7 @@ function evalExpression(expr, context) {
 function replaceWithEnv(obj, env) {
   if (typeof obj === 'string') {
     const templateExpr = /\{\{\s*([^}]+?)\s*\}\}/g;
+    console.log("dsfasdfasdfadsf ")
 
     // 先判断整个字符串是不是单纯 {{ expr }}，是就返回结果的原类型
     if (/^\{\{\s*([^}]+?)\s*\}\}$/.test(obj)) {
