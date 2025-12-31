@@ -3,7 +3,7 @@ const interfaceController = require('./controllers/interface.js');
 const yapi = require('./yapi.js');
 
 const router = koaRouter();
-const { createAction } = require("./utils/commons.js")
+const { createAction} = require("./utils/commons.js")
 
 let pluginsRouterPath = [];
 
