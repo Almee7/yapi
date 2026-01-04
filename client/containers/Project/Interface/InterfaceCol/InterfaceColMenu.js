@@ -483,6 +483,8 @@ export default class InterfaceColMenu extends Component {
       let colId = res.data.data.col_id;
       let projectId=res.data.data.project_id;
       await this.getList();
+      // 刷新当前集合的用例列表
+      await this.props.fetchCaseList(colId);
       this.props.history.push('/project/' + projectId + '/interface/col/' + colId);
       this.setState({
         visible: false
@@ -504,7 +506,15 @@ export default class InterfaceColMenu extends Component {
         const res = await axios.get('/api/col/del_case?caseid=' + caseId);
         if (!res.data.errcode) {
           message.success('删除用例成功');
-          that.getList();
+          await that.getList();
+
+          // 获取被删除用例所属的集合ID,并刷新该集合的用例列表
+
+          const deletedCase = that.props.interfaceColList.find(item => item.type === 'case');
+          if (deletedCase && deletedCase.col_id) {
+            await that.props.fetchCaseList(deletedCase.col_id);
+          }
+
           // 如果删除当前选中 case，切换路由到集合
           if (+caseId === +that.props.currCaseId) {
             that.props.history.push('/project/' + params.id + '/interface/col/');
@@ -574,7 +584,9 @@ export default class InterfaceColMenu extends Component {
     if (!res.data.errcode) {
       this.setState({ importInterVisible: false });
       message.success('导入集合成功');
-      this.getList();
+      await this.getList();
+      // 刷新当前集合的用例列表
+      await this.props.fetchCaseList(importColId);
       this.props.setColData({ isRander: true });
     } else {
       message.error(res.data.errmsg);

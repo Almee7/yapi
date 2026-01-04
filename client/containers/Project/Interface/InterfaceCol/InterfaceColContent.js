@@ -874,9 +874,14 @@ export default class InterfaceColContent extends Component {
   async componentWillReceiveProps(nextProps) {
     let newColId = !isNaN(nextProps.match.params.actionId) ? +nextProps.match.params.actionId : 0;
 
+    // 检测 colId 变化或者 isRander 标志
     if (newColId && ((this.currColId && newColId !== this.currColId) || nextProps.isRander)) {
       this.currColId = newColId;
       this.handleColIdChange(newColId)
+    }
+    // 当 currCaseList 更新时,同步更新表格数据
+    else if (nextProps.currCaseList !== this.props.currCaseList) {
+      this.handleColdata(nextProps.currCaseList, this.state.currColEnvObj);
     }
   }
 
