@@ -74,7 +74,7 @@ export const InsertCodeMap = [
     title: '断言对象 body 不等于 {"code": 0}'
   },
   {
-    code: 'wsLog = await readWS("ws://api-im-pre.jinqidongli.com");\n' +
+    code: 'wsLog = await readWS(connectionId, { count: 5, action: "hello" });\n' +
         'assert.equal(wsLog,xxxx);',
     title: '读取ws日志执行断言'
   },
