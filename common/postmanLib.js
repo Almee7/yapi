@@ -184,6 +184,7 @@ function sandboxByNode(sandbox = {}, script) {
     timeout: 10000
   });
   return sandbox;
+
 }
 
 async function  sandbox(context = {}, script) {
@@ -201,6 +202,7 @@ async function  sandbox(context = {}, script) {
     }
   } else {
     context = sandboxByBrowser(context, script);
+    console.log('sandboxByBrowser', context);
   }
   if (context.promise && typeof context.promise === 'object' && context.promise.then) {
     try {
@@ -214,41 +216,36 @@ async function  sandbox(context = {}, script) {
   return context;
 }
 
-function evalExpression(expr, context) {
-  try {
-    // 创建一个新的函数，并传入 context 对象作为作用域
-    return new Function('env', `with(env) { return ${expr}; }`)(context);
-  } catch (e) {
-    return expr; // 无法解析时原样返回
-  }
-}
-
-
 function replaceWithEnv(obj, env) {
   if (typeof obj === 'string') {
     const templateExpr = /\{\{\s*([^}]+?)\s*\}\}/g;
 
-    // 先判断整个字符串是不是单纯 {{ expr }}，是就返回结果的原类型
-    if (/^\{\{\s*([^}]+?)\s*\}\}$/.test(obj)) {
-      const expr = obj.match(/^\{\{\s*([^}]+?)\s*\}\}$/)[1];
-      const result = evalExpression(expr, env);
-      return result !== undefined ? result : obj;
+    // 整个字符串是单独一个模板
+    const matchWhole = obj.match(/^\{\{\s*([^}]+?)\s*\}\}$/);
+    if (matchWhole) {
+      const key = matchWhole[1];
+      return env.hasOwnProperty(key) ? env[key] : obj; // 保留原类型
     }
 
-    // 否则替换模板字符串，整体是字符串
-    return obj.replace(templateExpr, (_, expr) => {
-      const result = evalExpression(expr, env);
-      return result !== undefined ? result : `{{${expr}}}`;
+    // 字符串中包含模板，全部替换成字符串
+    return obj.replace(templateExpr, (_, key) => {
+      if (env.hasOwnProperty(key)) {
+        const value = env[key];
+        // 拼接时统一转字符串
+        return (value !== null && value !== undefined) ? String(value) : '';
+      }
+      return `{{${key}}}`;
     });
   } else if (Array.isArray(obj)) {
     return obj.map(item => replaceWithEnv(item, env));
-  } else if (typeof obj === 'object' && obj !== null) {
+  } else if (obj && typeof obj === 'object') {
     const result = {};
     for (const k in obj) {
       result[k] = replaceWithEnv(obj[k], env);
     }
     return result;
   } else {
+    // 数字、布尔、null 等原样返回
     return obj;
   }
 }
@@ -387,10 +384,10 @@ ${finalScript}
 
 
 /**
- * 
- * @param {*} defaultOptions 
- * @param {*} preScript 
- * @param {*} afterScript 
+ *
+ * @param {*} defaultOptions
+ * @param {*} preScript
+ * @param {*} afterScript
  * @param {*} commonContext  负责传递一些业务信息，crossRequest 不关注具体传什么，只负责当中间人
  * @param {*} pre_request_script
  */
@@ -455,6 +452,7 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
   async function runScript(script, updateUrlHeader = false) {
     if (!isEmptyString(script)) {
       context = await sandbox(context, script);
+      console.log("context",context)
 
       if (updateUrlHeader) {
         options.url = defaultOptions.url = URL.format({
@@ -481,6 +479,7 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
 
   // ==== 再执行 preScript（可能会修改 URL/header）====
   await runScript(preScript, true);
+  console.log("preScript",preScript)
 
   let data;
 
@@ -541,6 +540,7 @@ function NewFile(fileData) {
   });
 }
 async function handleParams(interfaceData, handleValue, requestParams) {
+  console.log('--- handleValue ---',handleValue)
   let interfaceRunData = Object.assign({}, interfaceData);
 
   function paramsToObjectWithEnable(arr) {
@@ -574,6 +574,7 @@ async function handleParams(interfaceData, handleValue, requestParams) {
   currDomain = handleCurrDomain(env, case_env);
 
   interfaceRunData.req_params = interfaceRunData.req_params || [];
+  console.log('--- interfaceRunData ---',interfaceRunData)
   interfaceRunData.req_params.forEach(item => {
     let val = handleValue(item.value, currDomain.global);
     if (requestParams) {
@@ -644,6 +645,12 @@ async function handleParams(interfaceData, handleValue, requestParams) {
         }
         requestBody = handleJson(reqBody, val => handleValue(val, currDomain.global));
       }
+    } else if (interfaceRunData.req_body_type === 'xml') {
+      console.log("1111111111111112222",typeof interfaceRunData.req_body_other)
+      console.log("interfaceRunData1111111111",interfaceRunData.req_body_other)
+      console.log("currDomain",currDomain.global)
+      requestBody = handleValue(interfaceRunData.req_body_other, currDomain.global);
+      console.log("requestBody11111",requestBody)
     } else {
       requestBody = interfaceRunData.req_body_other;
     }
@@ -716,7 +723,6 @@ async function handleParams(interfaceData, handleValue, requestParams) {
 
   return requestOptions;
 }
-
 
 exports.checkRequestBodyIsRaw = checkRequestBodyIsRaw;
   exports.handleParams = handleParams;

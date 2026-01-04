@@ -109,48 +109,60 @@ function handleFilter(str, match, context) {
 }
 
 function handleParamsValue(val, context = {}) {
-  console.log('11111111111111111111', context);
-  console.log('22222222222222222222', val);
   const variableRegexp = /\{\{\s*([^}]+?)\s*\}\}/g;
   if (!val || typeof val !== 'string') return val;
+
   val = val.trim();
-  // 如果整个值是 @mock 或 $.jsonPath
-  if (val[0] === '@' || val.indexOf('$.') === 0 || val.indexOf('global.') === 0) {
+
+  // 解析 a.b.c 路径
+  function getByPath(path, obj) {
+    const parts = path.split('.');
+    let cur = obj;
+    for (let p of parts) {
+      if (cur == null) return undefined;
+      cur = cur[p];
+    }
+    return cur;
+  }
+
+  // 核心取值规则（重点）
+  function resolveValue(key, ctx) {
+    // 1️⃣ 带路径：vars.id / global.id
+    if (key.includes('.')) {
+      return getByPath(key, ctx);
+    }
+
+    // 2️⃣ 裸变量：id
+    if (ctx[key] !== undefined) return ctx[key];
+    if (ctx.vars && ctx.vars[key] !== undefined) return ctx.vars[key];
+    if (ctx.global && ctx.global[key] !== undefined) return ctx.global[key];
+
+    return undefined;
+  }
+
+  // 特殊指令（保持你原有逻辑）
+  if (
+      val[0] === '@' ||
+      val.indexOf('$.') === 0 ||
+      val.indexOf('global.') === 0
+  ) {
     return handleFilter(val, val, context);
   }
-  // 如果整个值完全被 {{}} 包裹
+
+  // 完整 {{xxx}}
   const fullMatch = val.match(/^\{\{\s*([^\}]+?)\s*\}\}$/);
   if (fullMatch) {
-    return handleFilter(val, fullMatch[1], context);
+    const value = resolveValue(fullMatch[1], context);
+    return value !== undefined && value !== null ? String(value) : '';
   }
-  // 部分替换 {{xxx}} 的情况
+
+  // XML / 普通字符串中的 {{xxx}}
   return val.replace(variableRegexp, (raw, match) => {
-    const result = handleFilter(raw, match, context);
-    // 确保返回字符串
-    return result !== undefined && result !== null ? String(result) : '';
+    const value = resolveValue(match, context);
+    return value !== undefined && value !== null ? String(value) : '';
   });
 }
 
-function StopCollection() {
-  let stopFlag = false; // 私有变量
-
-  return {
-    // 设置终止标志
-    setStopFlag(value) {
-      stopFlag = value;
-    },
-
-    // 获取终止标志
-    getStopFlag() {
-      return stopFlag;
-    },
-
-    // 重置标志位
-    reset() {
-      stopFlag = false;
-    }
-  };
-}
 
 exports.handleJson = handleJson;
 exports.handleParamsValue = handleParamsValue;
@@ -158,7 +170,6 @@ exports.handleParamsValue = handleParamsValue;
 exports.simpleJsonPathParse = simpleJsonPathParse;
 exports.handleMockWord = handleMockWord;
 exports.isEmptyString = isEmptyString
-exports.StopCollection = StopCollection;
 
 // exports.joinPath = (domain, joinPath) => {
 //   let l = domain.length;

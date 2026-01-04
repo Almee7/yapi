@@ -1,4 +1,4 @@
 .tree-wrappper{
-  min-height: 500px;
-  overflow-y: scroll;
+  height: calc(100vh - 284px);
+  overflow-y: auto;
 }

@@ -80,9 +80,6 @@ class Interface extends Component {
 
   constructor(props) {
     super(props);
-    // this.state = {
-    //   curkey: this.props.match.params.action === 'api' ? 'api' : 'colOrCase'
-    // }
   }
 
   onChange = action => {
@@ -92,12 +89,14 @@ class Interface extends Component {
     }
     this.props.history.push('/project/' + params.id + '/interface/' + action);
   };
+  
   async componentWillMount() {
     this.props.setColData({
       isShowCol: true
     });
     // await this.props.fetchInterfaceColList(this.props.match.params.id)
   }
+  
   render() {
     const { action } = this.props.match.params;
     // const activeKey = this.state.curkey;
@@ -111,17 +110,19 @@ class Interface extends Component {
               <Tabs.TabPane tab="接口列表" key="api" />
               <Tabs.TabPane tab="测试集合" key="colOrCase" />
             </Tabs>
-            {activeKey === 'api' ? (
+            {/* 使用条件渲染但保持组件挂载状态 */}
+            <div style={{ display: activeKey === 'api' ? 'block' : 'none' }}>
               <InterfaceMenu
                 router={matchPath(this.props.location.pathname, contentRouter)}
                 projectId={this.props.match.params.id}
               />
-            ) : (
+            </div>
+            <div style={{ display: activeKey === 'colOrCase' ? 'block' : 'none' }}>
               <InterfaceColMenu
                 router={matchPath(this.props.location.pathname, contentRouter)}
                 projectId={this.props.match.params.id}
               />
-            )}
+            </div>
           </div>
         </Sider>
         <Layout>

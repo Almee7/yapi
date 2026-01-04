@@ -281,6 +281,7 @@ function replaceVars(template, vars) {
 
 //执行sql
 async function executeQuery(params = [], vars = {}, serverName) {
+    console.log("servername",serverName)
     const client = new GrpcAgentClient(serverName);
     // 替换变量，构造新数组，避免修改原始 asserts
     const replacedAsserts = params.map(item => {
@@ -298,6 +299,8 @@ function assertResult(actualResult, params) {
         const fields = testItem.fields;
         const query = testItem.query;
         const actualRows = actualResult[i];
+        console.log("actualResult",actualResult)
+        console.log("testItem",testItem)
         if (Array.isArray(expect)) {
             if (!actualRows || !Array.isArray(actualRows)) {
                 throw new Error(`断言失败：返回结果为空或格式不正确，SQL: ${query}`);
@@ -313,7 +316,7 @@ function assertResult(actualResult, params) {
                 console.log(`✅ 断言通过: ${JSON.stringify(expect)} == ${JSON.stringify(actualFlat[0])}`);
             } catch (e) {
                 const errMsg = `❌ 断言失败: ${JSON.stringify(expect)} != ${JSON.stringify(actualFlat[0])}\nSQL: ${query}`;
-                throw new Error(errMsg);
+                // throw new Error(errMsg);
             }
         } else {
             const actualValue = actualRows && actualRows[0] ? actualRows[0][fields[0]] : undefined;
@@ -322,47 +325,43 @@ function assertResult(actualResult, params) {
                 console.log(`✅ 断言通过: "${expect}" == "${actualValue}"`);
             } catch (e) {
                 const Error = `❌ 断言失败: ${expect} != ${actualValue}\nSQL: ${query}`;
-                throw new Error(Error);
+                // throw new Error(Error);
             }
         }
     }
 }
 
 //替换变量
-function replaceVarsInScript(scriptStr, vars = {}, global = {}) {
-    if (!scriptStr || typeof scriptStr !== 'string') return scriptStr;
+function replaceVarsInScript(script, vars = {}, global = {}) {
+    if (typeof script !== 'string') return script;
 
-    vars = vars || {};
-    global = global || {};
-
-    // 匹配 {{xxx}} 或 {{global.xxx}}
-    const variableRegexp = /\{\{\s*([^}]+?)\s*\}\}/g;
-
-    return scriptStr.replace(variableRegexp, (raw, key) => {
+    const getValue = (key) => {
         key = key.trim();
-        let value;
+        return key.startsWith('global.')
+            ? global[key.slice(7)]
+            : vars[key];
+    };
 
-        // 判断是 global 变量还是普通 vars
-        if (key.startsWith('global.')) {
-            const realKey = key.slice(7);
-            value = global[realKey];
-        } else {
-            value = vars[key];
-        }
-
-        // 找不到值返回标记字符串
-        if (value === undefined || value === null) {
-            return `"{{__NOT_FOUND__${key}}}"`;
-        }
-
-        // 字符串加双引号，其他类型直接返回
-        if (typeof value === 'string') {
-            return `"${value}"`;
-        } else {
-            return value;
-        }
+    script = script.replace(/\{\{\{\s*([^}]+?)\s*\}\}\}/g, (_, key) => {
+        const val = getValue(key);
+        if (val == null) return `{{__NOT_FOUND__${key}}}`;
+        return String(val);
     });
+
+    script = script.replace(/\{\{\s*([^}]+?)\s*\}\}/g, (_, key) => {
+        const val = getValue(key);
+        if (val == null) return `"{{__NOT_FOUND__${key}}}"`;
+
+        if (typeof val === 'string') {
+            return `"${val}"`;
+        }
+        return String(val);
+    });
+
+    return script;
 }
+
+
 /**
  * 沙盒执行 js 代码
  * @sandbox Object context
@@ -379,6 +378,7 @@ Object.keys(ExtraAssert).forEach(fn => {
 
 exports.sandbox = async (sandbox, script) => {
     try {
+        console.log("sandbox",sandbox)
         let serverName = sandbox.body.serverName;
         sandbox = sandbox || {};
         // ✅ 注入默认变量

@@ -190,11 +190,17 @@ export default class InterfaceColContent extends Component {
     this._crossRequestInterval = initCrossRequest(hasPlugin => {
       this.setState({ hasPlugin: hasPlugin });
     });
+    
+    // 移除事件监听器相关代码，因为我们将使用 Redux 状态管理
   }
 
   componentWillUnmount() {
     clearInterval(this._crossRequestInterval);
+    
+    // 移除事件监听器相关代码
   }
+  
+  // 移除 handleCaseSelectedFromTable 方法，因为我们不再使用 window 事件
 
   // 更新分类简介
   handleChangeInterfaceCol = (desc, name) => {
@@ -657,6 +663,7 @@ export default class InterfaceColContent extends Component {
 
   handleTest = async interfaceData => {
     let requestParams = {};
+    console.log("interfaceData",interfaceData)
     let options = await handleParams(interfaceData, this.handleValue, requestParams);
     options.vars = scriptVars
     let result = {
@@ -804,6 +811,8 @@ export default class InterfaceColContent extends Component {
   };
   // val 请求体的每个值 替换值
   handleValue = (val, global) => {
+    console.log("val======",val)
+    console.log("global======",global)
     let globalValue = ArrayToObject(global);
     // 确保 scriptVars 和 records 都被包含在上下文中
     let context = Object.assign({}, { global: globalValue, vars: scriptVars }, this.records);
@@ -1148,8 +1157,12 @@ export default class InterfaceColContent extends Component {
                   to={'/project/' + currProjectId + '/interface/case/' + record._id}
                   onClick={() => {
                     // 强制更新左侧菜单的选中状态
-                    const event = new CustomEvent('caseSelected', { detail: record._id });
-                    window.dispatchEvent(event);
+                    console.log("Navigating to case ID:", record._id);
+                    // 更新 Redux 状态，这将触发 InterfaceColMenu 组件的更新
+                    this.props.setColData({
+                      currCaseId: record._id,
+                      isRander: false
+                    });
                   }}
                 >
                   {record.casename && record.casename.length > 23
@@ -1676,7 +1689,7 @@ export default class InterfaceColContent extends Component {
 
         {/* 修改表格容器，添加固定高度和内部滚动 */}
         <div className="table-container" style={{ 
-          height: 'calc(100vh - 220px)', 
+          height: 'calc(100vh - 220px)',
           overflow: 'auto',
           border: '1px solid #e8e8e8',
           borderRadius: '4px'

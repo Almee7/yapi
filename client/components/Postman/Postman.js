@@ -97,6 +97,10 @@ export const InsertCodeMap = [
   {
     code: 'assert.subset([1, 2], [1, 2, 3])',
     title: '断言数组 [1, 2] 是 [1, 2, 3] 的子集'
+  },
+  {
+    code: 'assert.xmlEquals(body,"XPath", 200)',
+    title: '断言XPath等于200'
   }
 ];
 

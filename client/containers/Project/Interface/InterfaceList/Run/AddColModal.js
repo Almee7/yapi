@@ -1,6 +1,6 @@
 import React, { PureComponent as Component } from 'react';
 import { connect } from 'react-redux';
-import { Modal, Collapse, Row, Col, Input, message, Button, Icon } from 'antd';
+import { Modal, Collapse, Row, Col, Input, message, Button, Icon, Tree } from 'antd';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import { withRouter } from 'react-router';
@@ -8,6 +8,7 @@ import { fetchInterfaceColList } from '../../../../../reducer/modules/interfaceC
 
 const { TextArea } = Input;
 const Panel = Collapse.Panel;
+const TreeNode = Tree.TreeNode;
 
 @connect(
   state => ({
@@ -34,7 +35,9 @@ export default class AddColModal extends Component {
     addColName: '',
     addColDesc: '',
     id: 0,
-    caseName: ''
+    caseName: '',
+    expandedKeys: [],
+    autoExpandParent: true
   };
 
   constructor(props) {
@@ -47,7 +50,9 @@ export default class AddColModal extends Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    this.setState({ id: nextProps.interfaceColList[0]._id });
+    this.setState({
+      id: nextProps.interfaceColList[0] ? nextProps.interfaceColList[0]._id : 0
+    });
     this.setState({ caseName: nextProps.caseName });
   }
 
@@ -68,11 +73,51 @@ export default class AddColModal extends Component {
   select = id => {
     this.setState({ id });
   };
+  
+  onExpand = expandedKeys => {
+    this.setState({
+      expandedKeys,
+      autoExpandParent: false
+    });
+  };
+  
+  // 递归构建树形结构的集合列表
+  buildTreeNodes = (data, parentId = 0) => {
+    const items = data.filter(item => 
+      (item.type === 'folder' || item.type === 'group') && 
+      Number(item.parent_id) === Number(parentId)
+    );
+    
+    return items.map(item => {
+      const children = this.buildTreeNodes(data, item._id);
+      
+      return (
+        <TreeNode
+          key={item._id}
+          title={
+            <span
+              onClick={() => this.select(item._id)}
+              className={`col-item ${item._id === this.state.id ? 'selected' : ''}`}
+            >
+              <Icon type="folder-open" style={{ marginRight: 6 }} />
+              <span>{item.name}</span>
+            </span>
+          }
+        >
+          {children.length > 0 ? children : null}
+        </TreeNode>
+      );
+    });
+  };
 
   render() {
     let { interfaceColList = [] } = this.props;
     const ColList = interfaceColList.filter(item => item.type === 'folder' || item.type === 'group');
-    const { id } = this.state;
+    const { id, expandedKeys, autoExpandParent } = this.state;
+    
+    // 构建树形结构的集合列表
+    const treeNodes = this.buildTreeNodes(ColList);
+    
     return (
       <Modal
         className="add-col-modal"
@@ -94,22 +139,19 @@ export default class AddColModal extends Component {
           </Col>
         </Row>
         <p>请选择添加到的集合：</p>
-        <ul className="col-list">
-          {ColList.length ? (
-              ColList.map(col => (
-                <li
-                key={col._id}
-                className={`col-item ${col._id === id ? 'selected' : ''}`}
-                onClick={() => this.select(col._id)}
-              >
-                  <Icon type="folder-open" style={{ marginRight: 6 }} />
-                  {col.name}
-                </li>
-            ))
+        <div className="col-list" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+          {treeNodes.length > 0 ? (
+            <Tree
+              onExpand={this.onExpand}
+              expandedKeys={expandedKeys}
+              autoExpandParent={autoExpandParent}
+            >
+              {treeNodes}
+            </Tree>
           ) : (
             <span>暂无集合，请添加！</span>
           )}
-        </ul>
+        </div>
         <Collapse>
           <Panel header="添加新集合">
             <Row gutter={6} className="modal-input">
