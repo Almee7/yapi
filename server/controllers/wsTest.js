@@ -215,15 +215,49 @@ class WsTestController extends baseController {
         }, 200, "OK", 0);
     }
 
-    static async readws(connectionId) {
+    /**
+     * 读取 WebSocket 消息日志
+     * @param {string} connectionId - 连接ID
+     * @param {object} options - 配置选项
+     * @param {number} options.count - 返回消息条数，默认1（最新一条），0表示全部
+     * @param {string} options.action - 按action类型过滤，如"hello"、"ping"等
+     * @param {number} options.delay - 等待延迟（毫秒），默认2000
+     * @returns {Promise<Array|Object|null>} 返回消息数组或单条消息或null
+     */
+    static async readws(connectionId, options = {}) {
+        const { count = 1, action = null } = options;
+        
         const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-        // 先等待 1 秒
         await wait(2000);
+        
         const conn = wsConnections.get(connectionId);
         if (!conn) return null;
-        const messages = conn.messages || [];
-        // 包装成 Promise，保证 async/await 逻辑能跑
-        return Promise.resolve(messages.length ? messages[messages.length - 1] : null);
+        
+        let messages = conn.messages || [];
+        
+        // 按 action 类型过滤
+        if (action) {
+            messages = messages.filter(msg => {
+                try {
+                    const parsed = JSON.parse(msg);
+                    return parsed.action === action;
+                } catch (e) {
+                    return false;
+                }
+            });
+        }
+        
+        // 根据 count 返回对应数量的消息
+        if (count === 0) {
+            // 返回全部消息
+            return messages;
+        } else if (count === 1) {
+            // 返回最新一条
+            return messages.length > 0 ? messages[messages.length - 1] : null;
+        } else {
+            // 返回最新 N 条
+            return messages.slice(-count);
+        }
     }
 
     /**

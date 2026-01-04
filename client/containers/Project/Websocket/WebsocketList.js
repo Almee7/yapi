@@ -115,6 +115,7 @@ export function WebsocketList() {
               <div className="table-header">
                 <div className="cell">URL</div>
                 <div className="cell">Cookie</div>
+                <div className="cell">connectId</div>
                 <div className="cell">连接状态</div>
                 <div className="cell">操作</div>
               </div>
@@ -143,6 +144,7 @@ export function WebsocketList() {
                           <div className="table-row" key={item.connectionId}>
                             <div className="cell">{url}</div>
                             <div className="cell">{cookieId}</div>
+                            <div className="cell">{item.connectionId}</div>
                             <div className="cell">
                               <span className={`status ${status}`}>{status}</span>
                             </div>

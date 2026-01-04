@@ -390,15 +390,28 @@ exports.sandbox = async (sandbox, script) => {
         sandbox.assert = assert;
         script = replaceVarsInScript(script, sandbox.vars, sandbox.global)
         const context = vm.createContext(sandbox);
-        // 检查是否有 readWS 调用
-        const regex = /readWS\s*\(\s*["']([^"']+)["']\s*\)/;
+        // 检查是否有 readWS 调用，支持多种参数形式
+        // 支持：readWS("connectionId") 或 readWS("connectionId", { count: 5, action: "hello" })
+        const regex = /readWS\s*\(/;
         const match = script.match(regex);
         if (match) {
             const connectionId = context.body && context.body.connectionId;
-            sandbox.readWS = async () => {
-                const msg = await WsTestController.readws(connectionId);
-                sandbox.wsLog = msg;     // 👈 把结果挂到 sandbox
-                return msg;              // 👈 同时返回，脚本里也能接收
+            // 注入 readWS 函数，支持灵活参数
+            sandbox.readWS = async (idOrOptions, options) => {
+                let actualId = connectionId;
+                let actualOptions = {};
+                // 判断第一个参数是否为 connectionId 或配置对象
+                if (typeof idOrOptions === 'string') {
+                    actualId = idOrOptions;  // 显式传入 connectionId
+                    actualOptions = options || {};
+                } else if (typeof idOrOptions === 'object' && idOrOptions !== null) {
+                    // 直接传配置对象，使用 context 中的 connectionId
+                    actualOptions = idOrOptions;
+                }
+                
+                const msg = await WsTestController.readws(actualId, actualOptions);
+                sandbox.wsLog = msg;     // 把结果挂到 sandbox
+                return msg;              // 同时返回，脚本里也能接收
             };
         }
         let wrapped;
@@ -413,7 +426,6 @@ exports.sandbox = async (sandbox, script) => {
         if (Array.isArray(sandbox.sqlAssert) && sandbox.sqlAssert.length > 0) {
             const actualValue = await executeQuery(sandbox.sqlAssert, sandbox.vars, serverName);
             assertResult(actualValue, sandbox.sqlAssert);
-            sandbox.wsLog = null; // 保证有 wsLog 字段
         }
         return sandbox; // 👈 统一一个 return
     } catch (err) {
