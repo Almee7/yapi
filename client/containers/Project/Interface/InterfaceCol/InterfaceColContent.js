@@ -147,17 +147,26 @@ export default class InterfaceColContent extends Component {
       results: []
     };
     this.cancelTokens = {} // 用于取消异步请求
+    this.isComponentMounted = true; // 添加组件挂载状态标识
     this.onRow = this.onRow.bind(this);
     this.onMoveRow = this.onMoveRow.bind(this);
   }
 
   handleColIdChange = async (newColId) => {
+    // 获取当前集合信息以确定是否为 ref 类型
+    const currentCol = this.props.interfaceColList.find(col => col._id === +newColId);
+
+    // 如果是 ref 类型集合，使用其 source_id
+    const targetColId = (currentCol && currentCol.type === 'ref' && currentCol.source_id)
+      ? currentCol.source_id
+      : newColId;
+
     this.props.setColData({
       currColId: +newColId,
       isShowCol: true,
       isRander: false
     });
-    let result = await this.props.fetchCaseList(newColId);
+    let result = await this.props.fetchCaseList(targetColId);
     if (result.payload.data.errcode === 0) {
       this.reports = handleReport(result.payload.data.colData.test_report);
       this.setState({
@@ -169,9 +178,11 @@ export default class InterfaceColContent extends Component {
       })
     }
 
-    await this.props.fetchCaseList(newColId);
-    await this.props.fetchCaseEnvList(newColId);
+    // 注意：这里应该使用 targetColId 而不是重复调用
+    // await this.props.fetchCaseList(targetColId);
+    await this.props.fetchCaseEnvList(targetColId);
     this.changeCollapseClose();
+    // 使用从接口获取的 currCaseList 来更新数据
     this.handleColdata(this.props.currCaseList);
   }
 
@@ -182,7 +193,7 @@ export default class InterfaceColContent extends Component {
     const params = this.props.match.params;
     const { actionId } = params;
     this.currColId = currColId = +actionId || result.payload.data.data[0]._id;
-    // this.props.history.push('/project/' + params.id + '/interface/col/' + currColId);
+    this.props.history.push('/project/' + params.id + '/interface/col/' + currColId);
     if (currColId && currColId != 0) {
       await this.handleColIdChange(currColId)
     }
@@ -190,17 +201,19 @@ export default class InterfaceColContent extends Component {
     this._crossRequestInterval = initCrossRequest(hasPlugin => {
       this.setState({ hasPlugin: hasPlugin });
     });
-    
+
     // 移除事件监听器相关代码，因为我们将使用 Redux 状态管理
   }
 
-  componentWillUnmount() {
-    clearInterval(this._crossRequestInterval);
-    
-    // 移除事件监听器相关代码
-  }
-  
-  // 移除 handleCaseSelectedFromTable 方法，因为我们不再使用 window 事件
+    componentWillUnmount() {
+        clearInterval(this._crossRequestInterval);
+        this.isComponentMounted = false; // 设置组件挂载状态为false
+        // 取消所有未完成的请求
+        Object.values(this.cancelTokens).forEach(source => {
+            source.cancel('组件已卸载');
+        });
+        this.cancelTokens = {};
+    }
 
   // 更新分类简介
   handleChangeInterfaceCol = (desc, name) => {
@@ -331,7 +344,8 @@ export default class InterfaceColContent extends Component {
   viewReportList = () => {
     const projectId = this.props.match.params.id;
     const colId = this.props.currColId;
-    this.props.history.push(`/project/${projectId}/interface/col/${colId}/report-list`);
+    const url = `/project/${projectId}/interface/col/${colId}/report-list?standalone=true`;
+    window.open(url, '_blank');
   };
 
   //开始测试入口
@@ -452,7 +466,7 @@ export default class InterfaceColContent extends Component {
     }
     // 执行测试用例
     for (let i = 0; i < executionRows.length; i++) {
-      if (!this.state.loading) break; // 已取消
+      if (!this.state.loading || !this.isComponentMounted) break; // 已取消或组件已卸载
 
       const curRow = executionRows[i];
       rows_w[curRow._id] = curRow;
@@ -472,11 +486,14 @@ export default class InterfaceColContent extends Component {
       // 更新 UI 状态
       const originalIndex = this.state.rows.findIndex(r => r._id === (curRow.originalId || curRow._id));
       if (originalIndex !== -1) {
-        this.setState(prev => {
-          const newRows = [...prev.rows];
-          newRows[originalIndex] = { ...curitem, test_status: curitem.test_status };
-          return { rows: newRows };
-        });
+        // 检查组件是否仍然挂载
+        if (this.isComponentMounted) {
+          this.setState(prev => {
+            const newRows = [...prev.rows];
+            newRows[originalIndex] = { ...curitem, test_status: curitem.test_status };
+            return { rows: newRows };
+          });
+        }
       }
 
       // 根据 enable_async 决定是否 await
@@ -485,6 +502,11 @@ export default class InterfaceColContent extends Component {
       } else {
         await this.runCase(curitem, originalIndex); // 同步阻塞
         
+        // 检查组件是否仍然挂载
+        if (!this.isComponentMounted) {
+          break; // 组件已卸载，停止执行
+        }
+
         // 添加步骤间隔时间延迟（除了最后一个用例）
         if (this.state.commonSetting.intervalTime > 0 && i < executionRows.length - 1) {
           await new Promise(resolve => setTimeout(resolve, this.state.commonSetting.intervalTime));
@@ -496,11 +518,23 @@ export default class InterfaceColContent extends Component {
     }
     // 等待所有异步 case 完成
     if (asyncTasks.length) {
-      await Promise.all(asyncTasks);
+      // 使用 Promise.allSettled 确保即使有错误也继续执行
+      const results = await Promise.allSettled(asyncTasks);
+      // 检查是否有未处理的错误
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          console.error(`异步任务 ${index} 失败:`, result.reason);
+        }
+      });
     }
 
     // 记录结束时间
     const endTime = Date.now();
+
+    // 检查组件是否仍然挂载
+    if (!this.isComponentMounted) {
+      return;
+    }
 
     // 全部接口执行完再上传报告
     if (this.state.loading) {
@@ -512,7 +546,10 @@ export default class InterfaceColContent extends Component {
       await this.saveTestReport(startTime, endTime, executionOrder);
     }
 
-    this.setState({ loading: false });
+    // 检查组件是否仍然挂载
+    if (this.isComponentMounted) {
+      this.setState({ loading: false });
+    }
     this.cancelTokens = {}; // 清理 cancelTokens
   };
 
@@ -565,6 +602,11 @@ export default class InterfaceColContent extends Component {
 
     delete this.cancelTokens[curitem._id];
 
+    // 检查组件是否仍然挂载
+    if (!this.isComponentMounted) {
+      return;
+    }
+
     // 更新 reports / records，添加执行时间和用例名称
     this.reports[curitem._id] = {
       ...result,
@@ -578,10 +620,13 @@ export default class InterfaceColContent extends Component {
       body: result.res_body
     };
 
-    // 更新 UI 状态
-    const newRows = [...this.state.rows];
-    newRows[index] = { ...curitem, test_status: status };
-    this.setState({ rows: newRows });
+    // 检查组件是否仍然挂载
+    if (this.isComponentMounted) {
+      // 更新 UI 状态
+      const newRows = [...this.state.rows];
+      newRows[index] = { ...curitem, test_status: status };
+      this.setState({ rows: newRows });
+    }
   };
 
 
@@ -663,7 +708,6 @@ export default class InterfaceColContent extends Component {
 
   handleTest = async interfaceData => {
     let requestParams = {};
-    console.log("interfaceData",interfaceData)
     let options = await handleParams(interfaceData, this.handleValue, requestParams);
     options.vars = scriptVars
     let result = {
@@ -757,7 +801,6 @@ export default class InterfaceColContent extends Component {
   //response, validRes
   // 断言测试
   handleScriptTest = async (interfaceData, response, validRes, requestParams, scriptVars) => {
-    console.log('11111111111111111', response)
 
     let env = interfaceData.case_env
     const getGlobalMap = (envs, envName) => {
@@ -811,8 +854,6 @@ export default class InterfaceColContent extends Component {
   };
   // val 请求体的每个值 替换值
   handleValue = (val, global) => {
-    console.log("val======",val)
-    console.log("global======",global)
     let globalValue = ArrayToObject(global);
     // 确保 scriptVars 和 records 都被包含在上下文中
     let context = Object.assign({}, { global: globalValue, vars: scriptVars }, this.records);
@@ -873,9 +914,12 @@ export default class InterfaceColContent extends Component {
 
   async componentWillReceiveProps(nextProps) {
     let newColId = !isNaN(nextProps.match.params.actionId) ? +nextProps.match.params.actionId : 0;
-
+    
+    // 检查是否是case路由
+    const isCaseRoute = nextProps.match.params.action === 'case';
+    
     // 检测 colId 变化或者 isRander 标志
-    if (newColId && ((this.currColId && newColId !== this.currColId) || nextProps.isRander)) {
+    if (!isCaseRoute && newColId && ((this.currColId && newColId !== this.currColId) || nextProps.isRander)) {
       this.currColId = newColId;
       this.handleColIdChange(newColId)
     }
@@ -937,12 +981,22 @@ export default class InterfaceColContent extends Component {
     }
     this.setState({ advVisible: false });
     let currColId = this.currColId;
+
+    // 获取当前集合信息以确定是否为 ref 类型
+    const currentCol = this.props.interfaceColList.find(col => col._id === +currColId);
+
+    // 如果是 ref 类型集合，使用其 source_id
+    const targetColId = (currentCol && currentCol.type === 'ref' && currentCol.source_id)
+      ? currentCol.source_id
+      : currColId;
+
     this.props.setColData({
       currColId: +currColId,
       isShowCol: true,
       isRander: false
     });
-    await this.props.fetchCaseList(currColId);
+    await this.props.fetchCaseList(targetColId);
+    await this.props.fetchCaseEnvList(targetColId);
 
     this.handleColdata(this.props.currCaseList);
   };
@@ -1091,7 +1145,16 @@ export default class InterfaceColContent extends Component {
       let result = await axios.post('/api/col/up_case', params);
       if (result.data.errcode === 0) {
         message.success('修改成功')
-        await this.props.fetchCaseList(colId);
+        // 获取当前集合信息以确定是否为 ref 类型
+        const currentCol = this.props.interfaceColList.find(col => col._id === +colId);
+
+        // 如果是 ref 类型集合，使用其 source_id
+        const targetColId = (currentCol && currentCol.type === 'ref' && currentCol.source_id)
+          ? currentCol.source_id
+          : colId;
+
+        await this.props.fetchCaseList(targetColId);
+        await this.props.fetchCaseEnvList(targetColId);
       } else {
         message.error(result.data.errmsg || '修改失败');
         this.setState({ rows: prevRows });
@@ -1108,7 +1171,6 @@ export default class InterfaceColContent extends Component {
       loading,
       hasPlugin
     } = this.state;
-    const currProjectId = this.props.currProject._id;
     const columns = [
       {
         header: {
@@ -1159,10 +1221,9 @@ export default class InterfaceColContent extends Component {
               let record = rowData;
               return (
                 <Link 
-                  to={'/project/' + currProjectId + '/interface/case/' + record._id}
+                  to={'/project/' + this.props.currProject._id + '/interface/case/' + record._id}
                   onClick={() => {
                     // 强制更新左侧菜单的选中状态
-                    console.log("Navigating to case ID:", record._id);
                     // 更新 Redux 状态，这将触发 InterfaceColMenu 组件的更新
                     this.props.setColData({
                       currCaseId: record._id,
@@ -1320,7 +1381,9 @@ export default class InterfaceColContent extends Component {
               let record = rowData;
               return (
                 <Tooltip title="跳转到对应接口">
-                  <Link to={`/project/${record.project_id}/interface/api/${record.interface_id}`}>
+                  <Link
+                    to={`/project/${record.project_id}/interface/api/${record.interface_id}`}
+                  >
                     {record.path && record.path.length > 23 ? record.path + '...' : record.path}
                   </Link>
                 </Tooltip>
@@ -1693,7 +1756,7 @@ export default class InterfaceColContent extends Component {
         </div>
 
         {/* 修改表格容器，添加固定高度和内部滚动 */}
-        <div className="table-container" style={{ 
+        <div className="table-container" style={{
           height: 'calc(100vh - 220px)',
           overflow: 'auto',
           border: '1px solid #e8e8e8',

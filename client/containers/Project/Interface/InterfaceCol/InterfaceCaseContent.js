@@ -66,46 +66,41 @@ export default class InterfaceCaseContent extends Component {
     super(props);
   }
 
-  getColId(colList, currCaseId) {
-    // let currColId = 0;
-    // colList.forEach(col => {
-    //   col.caseList.forEach(caseItem => {
-    //     if (+caseItem._id === +currCaseId) {
-    //       currColId = col._id;
-    //     }
-    //   });
-    // });
-    return currCaseId;
-  }
+
 
   async componentWillMount() {
-    const result = await this.props.fetchInterfaceColList(this.props.match.params.id);
-    let { currCaseId } = this.props;
     const params = this.props.match.params;
     const { actionId } = params;
-    currCaseId = +actionId || +currCaseId || result.payload.data.data[0].caseList[0]._id;
-    let currColId = this.getColId(result.payload.data.data, currCaseId);
-    // this.props.history.push('/project/' + params.id + '/interface/case/' + currCaseId);
-    await this.props.fetchCaseData(currCaseId);
-    this.props.setColData({ currCaseId: +currCaseId, currColId, isShowCol: false });
-    // 获取当前case 下的环境变量
-    await this.props.getEnv(this.props.currCase.project_id);
-    // await this.getCurrEnv()
-
-    this.setState({ editCasename: this.props.currCase.casename });
+    
+    // 直接从路由参数获取caseId
+    let currCaseId = +actionId;
+    
+    if (currCaseId) {
+      await this.props.fetchCaseData(currCaseId);
+      this.props.setColData({ currCaseId: +currCaseId, isShowCol: false });
+      
+      // 获取当前case 下的环境变量
+      if (this.props.currCase && this.props.currCase.project_id) {
+        await this.props.getEnv(this.props.currCase.project_id);
+      }
+      
+      this.setState({ editCasename: this.props.currCase ? this.props.currCase.casename : '' });
+    }
   }
 
   async componentWillReceiveProps(nextProps) {
     const oldCaseId = this.props.match.params.actionId;
     const newCaseId = nextProps.match.params.actionId;
-    const { interfaceColList } = nextProps;
-    let currColId = this.getColId(interfaceColList, newCaseId);
-    if (oldCaseId !== newCaseId) {
+    
+    if (oldCaseId !== newCaseId && newCaseId) {
       await this.props.fetchCaseData(newCaseId);
-      this.props.setColData({ currCaseId: +newCaseId, currColId, isShowCol: false });
-      await this.props.getEnv(this.props.currCase.project_id);
-      // await this.getCurrEnv()
-      this.setState({ editCasename: this.props.currCase.casename });
+      this.props.setColData({ currCaseId: +newCaseId, isShowCol: false });
+      
+      if (this.props.currCase && this.props.currCase.project_id) {
+        await this.props.getEnv(this.props.currCase.project_id);
+      }
+      
+      this.setState({ editCasename: this.props.currCase ? this.props.currCase.casename : '' });
     }
   }
 

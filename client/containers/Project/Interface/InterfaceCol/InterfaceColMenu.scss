@@ -14,6 +14,23 @@
     /* 确保子元素正确对齐 */
     flex-direction: row;
   }
+  
+  /* 为目录/组项中的图标设置样式，确保它们不会被压缩 */
+  .col-list-tree .menu-title > .anticon {
+    flex-shrink: 0;
+    margin-right: 8px;  // 确保图标和文字之间有明确的间距
+  }
+  
+  /* 标记状态的样式 */
+  .col-list-tree .menu-title.marked,
+  .col-list-tree .menu-title .marked {
+    color: red;
+  }
+  
+  .col-list-tree .menu-title.marked .group-repeat-count,
+  .col-list-tree .menu-title .marked .group-repeat-count {
+    color: red;
+  }
 
   /* 目录名称超出省略 */
   .col-name {
@@ -23,7 +40,17 @@
     text-overflow: ellipsis;
   }
 
-  /* 名称超出省略（如果你有这个 class） */
+  /* 下拉菜单项中图标和文字的间距 */
+  .ant-dropdown-menu-item {
+    display: flex;
+    align-items: center;
+  }
+  
+  .ant-dropdown-menu-item .anticon {
+    margin-right: 8px;
+  }
+  
+  /* 名称超出省略 */
   .casename {
     overflow: hidden;
     flex-grow: 1;
@@ -101,9 +128,6 @@
 
 /* ===== 其余原有样式保持不变 ===== */
 
-.group-title {
-  color: #00a854;
-}
 
 .reference-title {
   color: #ffbf00;
@@ -115,6 +139,7 @@
   font-size: 12px;
   margin-left: 5px;
 }
+
 
 .tree-wrapper {
   min-height: 500px;
@@ -276,6 +301,4 @@
   margin-left: 5px;
 }
 
-.group-title {
-  color: #00a854;
-}
+

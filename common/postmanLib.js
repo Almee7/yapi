@@ -184,7 +184,6 @@ function sandboxByNode(sandbox = {}, script) {
     timeout: 10000
   });
   return sandbox;
-
 }
 
 async function  sandbox(context = {}, script) {
@@ -202,7 +201,6 @@ async function  sandbox(context = {}, script) {
     }
   } else {
     context = sandboxByBrowser(context, script);
-    console.log('sandboxByBrowser', context);
   }
   if (context.promise && typeof context.promise === 'object' && context.promise.then) {
     try {
@@ -249,6 +247,7 @@ function replaceWithEnv(obj, env) {
     return obj;
   }
 }
+
 
 /**
  * 只提取脚本中的第一个 sql = [...] 块并解析成对象数组（支持 JSON 或 JS 表达式）
@@ -350,8 +349,7 @@ async function sandboxByBrowser(context = {}, script) {
     scriptWithoutSql = script.replace(parsed.sqlMatchStr, '').trim();
   }
 
-  // 5) 合并最终执行脚本：先注入 SQL 返回的 vars，再执行原脚本（已移除 sql）
-  //    选择将 varsFromSql 放在最前面，保证后续脚本能直接使用这些 vars
+  // 5) 合并最终执行脚本：先注入 SQL 返回的 vars，再执行原脚本
   const finalScript = [varsFromSqlScript, scriptWithoutSql].filter(Boolean).join('\n');
   console.log('--- 最终执行脚本 ---\n', finalScript)
 
@@ -360,11 +358,6 @@ async function sandboxByBrowser(context = {}, script) {
   try {
     console.log('--- 将执行的 finalScript ---\n', finalScript);
     eval(beginScript + finalScript);
-
-    // 可选：替换 context.requestBody 中占位变量（若有实现）
-    if (typeof replaceWithEnv === 'function') {
-      context.requestBody = replaceWithEnv(context.requestBody, context.vars);
-    }
   } catch (err) {
     const message = `
 Script:
@@ -391,7 +384,7 @@ ${finalScript}
  * @param {*} commonContext  负责传递一些业务信息，crossRequest 不关注具体传什么，只负责当中间人
  * @param {*} pre_request_script
  */
-async function crossRequest(defaultOptions, preScript, afterScript, pre_request_script,commonContext = {}) {
+async function crossRequest(defaultOptions, preScript, afterScript, pre_request_script ,commonContext = {}) {
   let options = {
     ...defaultOptions
   }
@@ -452,7 +445,6 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
   async function runScript(script, updateUrlHeader = false) {
     if (!isEmptyString(script)) {
       context = await sandbox(context, script);
-      console.log("context",context)
 
       if (updateUrlHeader) {
         options.url = defaultOptions.url = URL.format({
@@ -461,11 +453,9 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
           query: context.query,
           pathname: context.pathname
         });
-
         options.headers = defaultOptions.headers = context.requestHeader;
       }
     }
-
     // 变量替换永远执行
     if (context.requestBody) {
       context.requestBody = replaceWithEnv(context.requestBody, context.vars);
@@ -479,7 +469,6 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
 
   // ==== 再执行 preScript（可能会修改 URL/header）====
   await runScript(preScript, true);
-  console.log("preScript",preScript)
 
   let data;
 
@@ -540,7 +529,6 @@ function NewFile(fileData) {
   });
 }
 async function handleParams(interfaceData, handleValue, requestParams) {
-  console.log('--- handleValue ---',handleValue)
   let interfaceRunData = Object.assign({}, interfaceData);
 
   function paramsToObjectWithEnable(arr) {
@@ -574,7 +562,6 @@ async function handleParams(interfaceData, handleValue, requestParams) {
   currDomain = handleCurrDomain(env, case_env);
 
   interfaceRunData.req_params = interfaceRunData.req_params || [];
-  console.log('--- interfaceRunData ---',interfaceRunData)
   interfaceRunData.req_params.forEach(item => {
     let val = handleValue(item.value, currDomain.global);
     if (requestParams) {
@@ -646,11 +633,7 @@ async function handleParams(interfaceData, handleValue, requestParams) {
         requestBody = handleJson(reqBody, val => handleValue(val, currDomain.global));
       }
     } else if (interfaceRunData.req_body_type === 'xml') {
-      console.log("1111111111111112222",typeof interfaceRunData.req_body_other)
-      console.log("interfaceRunData1111111111",interfaceRunData.req_body_other)
-      console.log("currDomain",currDomain.global)
       requestBody = handleValue(interfaceRunData.req_body_other, currDomain.global);
-      console.log("requestBody11111",requestBody)
     } else {
       requestBody = interfaceRunData.req_body_other;
     }

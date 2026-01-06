@@ -12,6 +12,7 @@ import {
 import { fetchProjectList } from '../../../../reducer/modules/project';
 import axios from 'axios';
 import ImportInterface from './ImportInterface';
+import ImportCol from './ImportCol';
 import { Input, Icon, Button, Modal, message, Tooltip, Tree, Form ,Dropdown,Menu} from 'antd';
 
 // eslint-disable-next-line no-unused-vars
@@ -30,16 +31,16 @@ const ColModalForm = Form.create()(props => {
   const { visible, onCancel, onCreate, form, modalType, isSubDir } = props;
   const { getFieldDecorator } = form;
 
-  const title = isSubDir
-      ? '子目录'
-      : modalType === 'group'
-          ? '循环组'
+  const title = modalType === 'group'
+      ? '循环组'
+      : isSubDir
+          ? '子目录'
           : '集合';
 
   return (
     <Modal visible={visible} title={`${title}`} onCancel={onCancel} onOk={onCreate}>
       <Form layout="vertical">
-        <Form.Item label={title + '名'}>
+        <Form.Item label={title + '名称'}>
           {getFieldDecorator('colName', {
               rules: [{ required: true, message: `请输入${title}名称！` }]
             })(<Input />)}
@@ -107,6 +108,8 @@ export default class InterfaceColMenu extends Component {
     filterValue: '',
     importInterVisible: false,
     importInterIds: [],
+    importColVisible: false,
+    importColList: [],
     importColId: 0,
     expands: null,
     list: [],
@@ -147,7 +150,7 @@ export default class InterfaceColMenu extends Component {
         selectedKeys = ['col_' + firstCol._id];
       }
     }
-    
+
     if (selectedKeys.length > 0) {
       this.setState({ selectedKeys });
     }
@@ -157,26 +160,26 @@ export default class InterfaceColMenu extends Component {
 
 
   componentDidUpdate(prevProps) {
-    // If the route has changed, update the selected keys
-    // 但只有在不是通过自定义事件触发的情况下才更新
-    if (prevProps.location !== this.props.location) {
+      // If the route has changed, update the selected keys
+      // 但只有在不是通过自定义事件触发的情况下才更新
+      if (prevProps.location !== this.props.location) {
       // Extract the selected key from the route
       const { match } = this.props;
       if (match && match.params) {
-        if (match.params.action === 'case' && match.params.actionId) {
-          // 检查是否是通过自定义事件设置的，如果是则不覆盖
-          const expectedSelectedKey = 'case_' + match.params.actionId;
-          if (!this.state.selectedKeys || !this.state.selectedKeys.includes(expectedSelectedKey)) {
-            this.setState({ selectedKeys: ['case_' + match.params.actionId] });
+          if (match.params.action === 'case' && match.params.actionId) {
+              // 检查是否是通过自定义事件设置的，如果是则不覆盖
+              const expectedSelectedKey = 'case_' + match.params.actionId;
+              if (!this.state.selectedKeys || !this.state.selectedKeys.includes(expectedSelectedKey)) {
+                  this.setState({ selectedKeys: ['case_' + match.params.actionId] });
+              }
+          } else if (match.params.actionId) {
+              const expectedSelectedKey = 'col_' + match.params.actionId;
+              if (!this.state.selectedKeys || !this.state.selectedKeys.includes(expectedSelectedKey)) {
+                  this.setState({ selectedKeys: ['col_' + match.params.actionId] });
+              }
           }
-        } else if (match.params.actionId) {
-          const expectedSelectedKey = 'col_' + match.params.actionId;
-          if (!this.state.selectedKeys || !this.state.selectedKeys.includes(expectedSelectedKey)) {
-            this.setState({ selectedKeys: ['col_' + match.params.actionId] });
-          }
-        }
       } else {
-        this.setState({ selectedKeys: null });
+          this.setState({ selectedKeys: null });
       }
     }
     
@@ -184,49 +187,91 @@ export default class InterfaceColMenu extends Component {
     // Or if we're on a case route but selectedKeys doesn't match
     const { match } = this.props;
     if (match && match.params && match.params.action === 'case' && match.params.actionId) {
-      const expectedSelectedKey = 'case_' + match.params.actionId;
-      if (!this.state.selectedKeys || !this.state.selectedKeys.includes(expectedSelectedKey)) {
-        this.setState({ selectedKeys: [expectedSelectedKey] });
-      }
+        const expectedSelectedKey = 'case_' + match.params.actionId;
+        if (!this.state.selectedKeys || !this.state.selectedKeys.includes(expectedSelectedKey)) {
+            this.setState({ selectedKeys: [expectedSelectedKey] });
+        }
     } else if (prevProps.currCaseId !== this.props.currCaseId && this.props.currCaseId) {
-      const expectedSelectedKey = 'case_' + this.props.currCaseId;
-      if (!this.state.selectedKeys || !this.state.selectedKeys.includes(expectedSelectedKey)) {
-        this.setState({ selectedKeys: [expectedSelectedKey] });
-        // 当 currCaseId 发生变化且不是通过路由参数匹配时，展开父节点
-        this.expandParentNodesForCase(this.props.currCaseId);
-      }
+        const expectedSelectedKey = 'case_' + this.props.currCaseId;
+        if (!this.state.selectedKeys || !this.state.selectedKeys.includes(expectedSelectedKey)) {
+            this.setState({ selectedKeys: [expectedSelectedKey] });
+            // 当 currCaseId 发生变化且不是通过路由参数匹配时，展开父节点
+            this.expandParentNodesForCase(this.props.currCaseId);
+        }
     }
-    
+
     // If isRander changes and is true, refresh the list but maintain selection
     if (prevProps.isRander !== this.props.isRander && this.props.isRander) {
-      // Preserve current selection before refreshing
-      const preservedSelection = this.state.selectedKeys;
-      this.getList().then(() => {
-        // Restore selection after refresh
-        if (preservedSelection) {
-          this.setState({ selectedKeys: preservedSelection });
-        }
-      });
-      this.props.setColData({ isRander: false });
-    }
-    
-    // 添加调试信息
-    if (prevProps.interfaceColList !== this.props.interfaceColList) {
-      console.log("interfaceColList updated", this.props.interfaceColList);
+        // Preserve current selection and expansion state before refreshing
+        const preservedSelection = this.state.selectedKeys;
+        const preservedExpands = this.state.expands;  // 保存当前展开状态
+        this.getList().then(() => {
+            // 在下一个渲染周期恢复状态，确保 DOM 已经更新
+            setTimeout(() => {
+                // Restore selection and expansion state after refresh
+                if (preservedSelection) {
+                    this.setState({ selectedKeys: preservedSelection });
+                }
+                
+                // 恢复展开状态，但只恢复仍然有效的键
+                if (preservedExpands && preservedExpands.length > 0) {
+                    // 过滤掉不再存在于列表中的展开键
+                    const validExpands = preservedExpands.filter(key => {
+                        // 检查键是否仍然有效 (格式为 "type_id")
+                        const parts = key.split('_');
+                        if (parts.length !== 2) return false;
+                        
+                        const [type, id] = parts;
+                        const validTypes = ['folder', 'group', 'ref'];
+                        if (!validTypes.includes(type)) return false;
+                        
+                        // 检查是否存在对应 ID 的节点
+                        return this.props.interfaceColList.some(item => 
+                            item._id == id && (item.type === 'folder' || item.type === 'group' || item.type === 'ref')
+                        );
+                    });
+                    
+                    // 如果是将用例拖入循环组，则确保循环组及其父级保持展开
+                    let finalExpands = [...validExpands];
+                    if (this.isDropToGroup && this.dropTargetNode) {
+                        // 添加目标循环组的展开键
+                        const targetGroupKey = `group_${this.dropTargetNode._id}`;
+                        if (!finalExpands.includes(targetGroupKey)) {
+                            finalExpands.push(targetGroupKey);
+                        }
+                        
+                        // 添加目标循环组的父级路径
+                        if (this.dropTargetNode.parent_id && this.dropTargetNode.parent_id !== 0) {
+                            const parentKeys = this.findParentKeys(this.dropTargetNode.parent_id, []);
+                            parentKeys.forEach(key => {
+                                if (!finalExpands.includes(key)) {
+                                    finalExpands.push(key);
+                                }
+                            });
+                        }
+                    }
+                    
+                    this.setState({ expands: finalExpands });  // 恢复有效的展开状态
+                    
+                    // 清除标志
+                    delete this.isDropToGroup;
+                    delete this.dropTargetNode;
+                }
+            }, 0);
+        });
+        this.props.setColData({ isRander: false });
     }
   }
-  
+
   // 根据 case ID 展开父节点
   expandParentNodesForCase = (caseId) => {
     // Find the case in the interfaceColList
     const caseItem = this.props.interfaceColList.find(item => item._id == caseId && item.type === 'case');
-    
     if (caseItem) {
       // Find all parent nodes that need to be expanded
       const expandedKeys = this.findParentKeys(caseItem.parent_id, []);
-      
       // Update both expanded keys and selected keys
-      this.setState({ 
+      this.setState({
         selectedKeys: ['case_' + caseId],
         expands: expandedKeys
       });
@@ -249,18 +294,36 @@ export default class InterfaceColMenu extends Component {
   getAllCasesFromColAndChildren = (colId, list) => {
     const allCases = [];
 
+    // 首先检查是否为 ref 类型集合，如果是，使用其 source_id
+    const currentCol = list.find(item => item._id === colId);
+    const targetId = (currentCol && currentCol.type === 'ref' && currentCol.source_id)
+      ? currentCol.source_id
+      : colId;
+
     // 1. 获取所有子级目录（递归）
-    const collectChildren = (parentId, result) => {
+    const collectChildren = (parentId, result, visited = new Set()) => {
+      // 防止无限递归
+      if (visited.has(parentId)) {
+        console.warn(`检测到循环引用，ID: ${parentId}`);
+        return;
+      }
+      visited.add(parentId);
+
       list.forEach(item => {
-        if ((item.type === 'folder' || item.type === 'group') && item.parent_id === parentId) {
-          result.push(item._id);
-          collectChildren(item._id, result);
+        if ((item.type === 'folder' || item.type === 'group' || item.type === 'ref') && item.parent_id === parentId) {
+          // 对于 ref 类型集合，添加其 source_id
+          if (item.type === 'ref' && item.source_id) {
+            result.push(item.source_id);
+          } else {
+            result.push(item._id);
+          }
+          collectChildren(item._id, result, new Set(visited)); // 使用新的visited集合
         }
       });
     };
 
-    const subIds = [colId];
-    collectChildren(colId, subIds);
+    const subIds = [targetId];
+    collectChildren(targetId, subIds);
 
     // 2. 找出所有 case，其 col_id 在上述所有目录 ID 中
     list.forEach(item => {
@@ -331,7 +394,7 @@ export default class InterfaceColMenu extends Component {
       const id = keys[0].split('_')[1];
       const project_id = this.props.match.params.id;
 
-      if (type === 'folder' || type === 'group' ) {
+      if (type === 'folder' || type === 'group' || type === 'ref') {
         const allColsWithChildren = this.state.allColsWithChildren || [];
         this.props.setColData({
           isRander: false,
@@ -342,16 +405,47 @@ export default class InterfaceColMenu extends Component {
         this.props.history.push('/project/' + project_id + '/interface/col/' + id);
       } else {
         this.props.setColData({
-          isRander: false
+          isRander: false,
+          currCaseId: id // 确保设置当前用例ID
         });
         this.props.history.push('/project/' + project_id + '/interface/case/' + id);
       }
-      
       // Update the selection state to maintain highlight
       this.setState({
         selectedKeys: keys
       });
     }
+  };
+
+  showDelCaseConfirm = caseId => {
+    let that = this;
+    const params = this.props.match.params;
+    confirm({
+      title: '您确认删除此测试用例',
+      content: '温馨提示：用例删除后无法恢复',
+      okText: '确认',
+      cancelText: '取消',
+      async onOk() {
+        const res = await axios.get('/api/col/del_case?caseid=' + caseId);
+        if (!res.data.errcode) {
+          message.success('删除用例成功');
+          await that.getList();
+          // 获取被删除的用例信息，以确定其所属集合ID
+          const deletedCase = that.props.interfaceColList.find(item => item._id == caseId && item.type === 'case');
+          if (deletedCase && deletedCase.col_id) {
+            await that.props.fetchCaseList(deletedCase.col_id);
+          }
+          // 如果删除当前选中 case，切换路由到集合
+          if (+caseId === +that.props.currCaseId) {
+            that.props.history.push('/project/' + params.id + '/interface/col/');
+          } else {
+            that.props.setColData({ isRander: true });
+          }
+        } else {
+          message.error(res.data.errmsg);
+        }
+      }
+    });
   };
 
   showDelColConfirm = colId => {
@@ -363,15 +457,24 @@ export default class InterfaceColMenu extends Component {
       okText: '确认',
       cancelText: '取消',
       async onOk() {
+        // 在删除之前获取当前集合信息
+        const deletedCol = that.props.interfaceColList.find(item => item._id == colId);
+        console.log("deletedCol是否为子集",deletedCol);
         const res = await axios.get('/api/col/del_col?col_id=' + colId);
         if (!res.data.errcode) {
           message.success('删除成功');
           const result = await that.getList();
-
-          // 重定向到第一个集合
-          if (result.payload.data.data.length > 0) {
+          if (deletedCol.parent_id !== 0) {
+            // 删除的是子集合，重定向到父级集合
+              that.props.history.push('/project/' + params.id + '/interface/col/' + deletedCol.parent_id);
+              // 更新用例列表
+              await that.props.fetchCaseList(deletedCol.parent_id);
+          } else {
+            // 删除的是根目录集合，重定向到第一个集合
             const firstCol = that.findFirstCol(result.payload.data.data);
             that.props.history.push('/project/' + params.id + '/interface/col/' + firstCol._id);
+            // 更新用例列表
+            await that.props.fetchCaseList(firstCol._id);
           }
         } else {
           message.error(res.data.errmsg);
@@ -379,7 +482,6 @@ export default class InterfaceColMenu extends Component {
       }
     });
   };
-
   // 查找第一个顶级集合
   findFirstCol = (list) => {
     for (let item of list) {
@@ -389,6 +491,16 @@ export default class InterfaceColMenu extends Component {
     }
     return list[0];
   };
+
+  // 查找父级集合
+  // findParentCol = (colId, list) => {
+  //   const targetCol = list.find(item => item._id == colId);
+  //   if (targetCol && targetCol.parent_id && targetCol.parent_id !== 0) {
+  //     // 如果有父级ID，查找对应的父级集合
+  //     return list.find(item => item._id == targetCol.parent_id);
+  //   }
+  //   return null; // 没有父级，说明是根目录集合
+  // };
 
   // 复制测试集合
   copyInterface = async item => {
@@ -494,40 +606,6 @@ export default class InterfaceColMenu extends Component {
     }
   };
 
-  showDelCaseConfirm = caseId => {
-    let that = this;
-    const params = this.props.match.params;
-    confirm({
-      title: '您确认删除此测试用例',
-      content: '温馨提示：用例删除后无法恢复',
-      okText: '确认',
-      cancelText: '取消',
-      async onOk() {
-        const res = await axios.get('/api/col/del_case?caseid=' + caseId);
-        if (!res.data.errcode) {
-          message.success('删除用例成功');
-          await that.getList();
-
-          // 获取被删除用例所属的集合ID,并刷新该集合的用例列表
-
-          const deletedCase = that.props.interfaceColList.find(item => item.type === 'case');
-          if (deletedCase && deletedCase.col_id) {
-            await that.props.fetchCaseList(deletedCase.col_id);
-          }
-
-          // 如果删除当前选中 case，切换路由到集合
-          if (+caseId === +that.props.currCaseId) {
-            that.props.history.push('/project/' + params.id + '/interface/col/');
-          } else {
-            that.props.setColData({ isRander: true });
-          }
-        } else {
-          message.error(res.data.errmsg);
-        }
-      }
-    });
-  };
-
   showColModal = (type, col, isSubDir = false, parentColId = null) => {
     const editCol =
         type === 'edit' ? { colName: col.name, colDesc: col.desc, repeatCount: col.repeatCount || 1 } : { colName: '', colDesc: '', repeatCount: 1 };
@@ -562,9 +640,11 @@ export default class InterfaceColMenu extends Component {
   };
 
   selectInterface = (importInterIds, selectedProject) => {
-    console.log('importInterIds:', importInterIds);
-    console.log('selectedProject:', selectedProject);
     this.setState({ importInterIds, selectedProject });
+  };
+
+  selectCol = (importColList, selectedProjectId) => {
+    this.setState({ importColList, selectedProjectId });
   };
 
   showImportInterfaceModal = async colId => {
@@ -573,16 +653,47 @@ export default class InterfaceColMenu extends Component {
     this.setState({ importInterVisible: true, importColId: colId });
   };
 
+  showImportColModal = async colId => {
+    this.setState({ importColVisible: true, importColId: colId });
+  };
+
   handleImportOk = async () => {
     const project_id = this.state.selectedProject || this.props.match.params.id;
     const { importColId, importInterIds } = this.state;
+    
+    // 检查当前导入的目标是否为 group 类型
+    const targetCol = this.props.interfaceColList.find(col => col._id == importColId);
+    const groupId = targetCol && targetCol.type === 'group' ? importColId : null;
+    
     const res = await axios.post('/api/col/add_case_list', {
       interface_list: importInterIds,
       col_id: importColId,
+      group_id: groupId,  // 如果是 group 类型，则传递 group_id
       project_id
     });
     if (!res.data.errcode) {
       this.setState({ importInterVisible: false });
+      message.success('导入接口成功');
+      await this.getList();
+      // 刷新当前集合的用例列表
+      await this.props.fetchCaseList(importColId);
+      this.props.setColData({ isRander: true });
+    } else {
+      message.error(res.data.errmsg);
+    }
+  };
+
+  handleImportColOk = async () => {
+    const { importColId, importColList } = this.state;
+    const project_id = this.props.match.params.id;
+
+    const res = await axios.post('/api/col/add_col_list', {
+      col_list: importColList,
+      col_id: importColId,
+      project_id
+    });
+    if (!res.data.errcode) {
+      this.setState({ importColVisible: false });
       message.success('导入集合成功');
       await this.getList();
       // 刷新当前集合的用例列表
@@ -597,6 +708,10 @@ export default class InterfaceColMenu extends Component {
     this.setState({ importInterVisible: false });
   };
 
+  handleImportColCancel = () => {
+    this.setState({ importColVisible: false });
+  };
+
   filterCol = e => {
     const value = e.target.value;
     this.setState({
@@ -607,26 +722,37 @@ export default class InterfaceColMenu extends Component {
 
   onDrop = async e => {
     const { interfaceColList, setColData } = this.props;
+
     const dragNode = e.dragNode.props.dataRef;
     const dropNode = e.node.props.dataRef;
 
-    console.log('dragNode', dragNode);
-    console.log('dropNode', dropNode);
+    /* =========================
+     * 1️⃣ 语义层：一次性翻译拖拽语义
+     * ========================= */
+    const isDropOnGap = e.dropToGap;
+    const isDropOnNode = !e.dropToGap;
+    const isTargetContainer = ['folder', 'group'].includes(dropNode.type);
+    const isDropToGroup = dropNode.type === 'group';
 
-    // 1️⃣ 计算目标父节点
+    /* =========================
+     * 2️⃣ 计算 targetParentId（保持原行为）
+     * ========================= */
     let targetParentId;
-    if (!e.dropToGap) {
-      // 如果不是放在缝隙上，则保持在同一级别（兄弟节点）
+    if (isDropOnNode) {
       targetParentId = dropNode.parent_id;
     } else {
-      // 如果是放在缝隙上，则根据目标节点类型决定父节点
-      targetParentId = (dropNode.type === 'folder') ? dropNode._id : dropNode.parent_id || 0;
+      targetParentId = isTargetContainer
+          ? dropNode._id
+          : dropNode.parent_id || 0;
     }
 
-    // 2️⃣ 校验规则
+    /* =========================
+     * 3️⃣ 校验规则（不动）
+     * ========================= */
     if (dragNode.type === 'case' && targetParentId === 0) {
       return message.error('接口不能直接移动到根目录');
     }
+
     if (dragNode.type === 'group') {
       const parentNode = interfaceColList.find(n => n._id === targetParentId);
       if (!parentNode || parentNode.type !== 'folder') {
@@ -634,28 +760,33 @@ export default class InterfaceColMenu extends Component {
       }
     }
 
-    console.log('targetParentId', targetParentId);
-
-    // 3️⃣ 判断是否跨文件夹
     const isCrossFolder = dragNode.parent_id !== targetParentId;
 
-    // 4️⃣ 获取源文件夹和目标文件夹 siblings 并按 index 排序
+    /* =========================
+     * 4️⃣ siblings 选择逻辑（核心修复点，保留）
+     * ========================= */
     const originSiblings = interfaceColList
         .filter(n => n.parent_id === dragNode.parent_id)
         .sort((a, b) => a.index - b.index);
 
-    const targetSiblings = interfaceColList
-        .filter(n => n.parent_id === targetParentId)
-        .sort((a, b) => a.index - b.index);
+    const isEnterGroup =
+        dropNode.type === 'group' && targetParentId === dropNode._id;
 
-    // 5️⃣ 创建 dragNode 副本并更新信息
+    const targetSiblings = isEnterGroup
+        ? interfaceColList
+            .filter(n => n.group_id === dropNode._id)
+            .sort((a, b) => a.index - b.index)
+        : interfaceColList
+            .filter(n => n.parent_id === targetParentId)
+            .sort((a, b) => a.index - b.index);
+
+    /* =========================
+     * 5️⃣ 构建 dragNode 副本并更新归属
+     * ========================= */
     const dragNodeCopy = { ...dragNode };
-    
-    // 更新父级信息
     dragNodeCopy.parent_id = targetParentId;
-    
-    if (e.dropToGap) {
-      // 只有在放到缝隙上时才改变父子关系
+
+    if (isDropOnGap) {
       if (dropNode.type === 'folder') {
         dragNodeCopy.col_id = dropNode._id;
         dragNodeCopy.group_id = null;
@@ -667,56 +798,65 @@ export default class InterfaceColMenu extends Component {
         dragNodeCopy.group_id = dropNode.group_id || null;
       }
     } else {
-      // 同级移动保持原有的 col_id 和 group_id
-      // dragNodeCopy.parent_id = targetParentId; (already set above)
+      dragNodeCopy.col_id = targetParentId;
+      dragNodeCopy.group_id = isEnterGroup
+          ? dropNode._id
+          : dropNode.group_id || null;
     }
 
-    // 6️⃣ 插入并更新 index
-    if (isCrossFolder) {
-      // 跨文件夹：删除源 siblings 并更新 index
-      const dragIndexInOrigin = originSiblings.findIndex(n => n._id === dragNode._id);
-      if (dragIndexInOrigin > -1) originSiblings.splice(dragIndexInOrigin, 1);
-      originSiblings.forEach((n, idx) => n.index = idx);
+    /* =========================
+     * 6️⃣ 计算插入位置并更新 index
+     * ========================= */
+    const reIndex = list => list.forEach((n, i) => (n.index = i));
 
-      // 更新目标 siblings
+    if (isCrossFolder) {
+      const fromIndex = originSiblings.findIndex(n => n._id === dragNode._id);
+      if (fromIndex > -1) originSiblings.splice(fromIndex, 1);
+      reIndex(originSiblings);
+
       let insertIndex;
-      if (!e.dropToGap) {
-        // 如果不是放在缝隙上，则放在目标文件夹的末尾
+      if (isDropOnNode) {
         insertIndex = targetSiblings.length;
       } else {
-        // 如果是放在缝隙上，则根据位置插入
         const dropIndex = targetSiblings.findIndex(n => n._id === dropNode._id);
-        insertIndex = dropIndex + (e.dropPosition > 0 ? 1 : 0);
+        insertIndex =
+            isEnterGroup && dropIndex === -1
+                ? 0
+                : dropIndex + (e.dropPosition > 0 ? 1 : 0);
       }
+
       targetSiblings.splice(insertIndex, 0, dragNodeCopy);
-      targetSiblings.forEach((n, idx) => n.index = idx);
+      reIndex(targetSiblings);
     } else {
-      // 同级拖拽：只在 originSiblings 移动
-      const dragIndex = originSiblings.findIndex(n => n._id === dragNode._id);
-      originSiblings.splice(dragIndex, 1);
+      const fromIndex = originSiblings.findIndex(n => n._id === dragNode._id);
+      originSiblings.splice(fromIndex, 1);
 
       let insertIndex;
-      if (!e.dropToGap) {
-        // 如果不是放在缝隙上，则放在目标节点之后
+      if (isDropOnNode) {
         const dropIndex = originSiblings.findIndex(n => n._id === dropNode._id);
-        insertIndex = dropIndex + 1; // 放在目标节点后
+        insertIndex = dropIndex + 1;
       } else {
-        // 如果是放在缝隙上，则根据位置插入
         const dropIndex = originSiblings.findIndex(n => n._id === dropNode._id);
-        insertIndex = dropIndex + (e.dropPosition > 0 ? 1 : 0);
+        insertIndex =
+            isEnterGroup && dropIndex === -1
+                ? 0
+                : dropIndex + (e.dropPosition > 0 ? 1 : 0);
       }
 
       originSiblings.splice(insertIndex, 0, dragNodeCopy);
-      originSiblings.forEach((n, idx) => n.index = idx);
+      reIndex(originSiblings);
     }
 
+    /* =========================
+     * 7️⃣ 合并更新列表并提交
+     * ========================= */
+    const allNodes = isCrossFolder
+        ? [...originSiblings, ...targetSiblings]
+        : [...originSiblings];
 
-    // 7️⃣ 合并更新列表并去重
-    const allNodes = isCrossFolder ? [...originSiblings, ...targetSiblings] : [...originSiblings];
-    const uniqueMap = new Map();
-    allNodes.forEach(n => uniqueMap.set(n._id, n));
-
-    const updates = Array.from(uniqueMap.values()).map(n => ({
+    const updates = Array.from(
+        new Map(allNodes.map(n => [n._id, n])).values()
+    ).map(n => ({
       id: n._id,
       index: n.index,
       type: n.type,
@@ -725,26 +865,25 @@ export default class InterfaceColMenu extends Component {
       group_id: n.group_id || null
     }));
 
-    console.log('更新列表', updates);
-
-    // 8️⃣ 调用后端更新
     try {
       await axios.post('/api/col/up_index', { list: updates });
       message.success('顺序更新成功');
 
-      // 9️⃣ 保持跨文件夹目标文件夹展开
-      if (isCrossFolder) {
-        setColData({ isRander: true, keepExpandedFolderId: targetParentId, isCrossFolder });
-      } else {
-        setColData({ isRander: true });
-      }
+      setColData(
+          isCrossFolder
+              ? { isRander: true, keepExpandedFolderId: targetParentId, isCrossFolder }
+              : { isRander: true }
+      );
 
-      this.getList(); // 刷新列表
+      this.isDropToGroup = isDropToGroup;
+      this.dropTargetNode = dropNode;
+      this.getList();
     } catch (err) {
       console.error('拖拽更新失败', err);
       message.error('顺序更新失败');
     }
   };
+
 
   enterItem = id => {
     this.setState({ delIcon: id });
@@ -753,38 +892,54 @@ export default class InterfaceColMenu extends Component {
   leaveItem = () => {
     this.setState({ delIcon: null });
   };
-  
   // 移除 handleCaseSelected 方法，因为我们现在使用 Redux 状态管理
   // 保留 expandParentNodesForCase 方法，因为它仍然被需要
-
   // Helper function to recursively find parent keys
   findParentKeys = (parentId, keys) => {
     if (!parentId || parentId === 0) {
       return keys;
     }
-    
+
     // Find the parent item in the list
-    const parentItem = this.props.interfaceColList.find(item => 
+    const parentItem = this.props.interfaceColList.find(item =>
       item._id == parentId && (item.type === 'folder' || item.type === 'group')
     );
-    
+
     if (parentItem) {
-      // Add the parent key to the list
       const parentKey = `${parentItem.type}_${parentItem._id}`;
       keys.push(parentKey);
-      
-      // Recursively find the parent's parent
+
       return this.findParentKeys(parentItem.parent_id, keys);
     }
-    
+
+    return keys;
+  };
+
+  // Get parent expand keys for a node
+  getParentExpandKeys = (node) => {
+    const keys = [`${node.type}_${node._id}`]; // Include the node itself if it's a container
+    if (node.parent_id && node.parent_id !== 0) {
+      // Add parent chain
+      const parentKeys = this.findParentKeys(node.parent_id, []);
+      return [...keys, ...parentKeys];
+    }
     return keys;
   };
 
   // 递归构建树节点（平铺列表生成，可支持 case 和 folder/group 混排）
-  buildTreeNodes = (data, parentId = 0) => {
-    // 1. 当前层级的目录（folder/group）
+  buildTreeNodes = (data, parentId = 0, visited = new Set()) => {
+    // 防止循环引用导致的无限递归
+    if (visited.has(parentId)) {
+      console.warn(`检测到循环引用，父ID: ${parentId}`);
+      return [];
+    }
+    // 将当前父ID添加到访问记录中
+    const newVisited = new Set(visited);
+    newVisited.add(parentId);
+
+    // 1. 当前层级的目录（folder/group/ref）
     const subDirs = data.filter(
-        item => (item.type === 'folder' || item.type === 'group') && item.parent_id === parentId
+        item => (item.type === 'folder' || item.type === 'group' || item.type === 'ref') && item.parent_id === parentId
     );
 
     // 2. 当前层级的用例（case 的 parent_id 指向父目录）
@@ -795,8 +950,8 @@ export default class InterfaceColMenu extends Component {
 
     // 4. 遍历渲染
     return combined.map(item => {
-      if (item.type === 'folder' || item.type === 'group') {
-        const children = this.buildTreeNodes(data, item._id);
+      if (item.type === 'folder' || item.type === 'group' || item.type === 'ref') {
+        const children = this.buildTreeNodes(data, item._id, newVisited);
         return (
           <TreeNode
                 key={`${item.type}_${item._id}`}
@@ -812,92 +967,9 @@ export default class InterfaceColMenu extends Component {
     });
   };
 
-  // 渲染目录标题，保持原来的按钮和样式
-  // renderColTitle = col => {
-  //   return (
-  //     <div className="menu-title">
-  //       {col.type === 'group' ? (
-  //         <Icon type="sync" style={{ marginRight: 6, color: '#00a854' }} />
-  //       ) : (
-  //         <Icon type="folder-open" style={{ marginRight: 6 }} />
-  //       )}
-  //       <span className={col.type === 'group' ? 'group-title' : ''}>{col.name}</span>
-  //       {col.type === 'group' && (
-  //         <span className="group-repeat-count">[{col.repeatCount || 1}]</span>
-  //       )}
-  //       <span style={{ marginLeft: 8, color: '#999', fontSize: '12px' }}>
-  //         ({this.getAllCasesFromColAndChildren(col._id, this.state.list).length})
-  //       </span>
-  //       <div className="btns">
-  //         <Tooltip title="删除集合">
-  //           <Icon
-  //                 type="delete"
-  //                 className="interface-delete-icon"
-  //                 onClick={() => this.showDelColConfirm(col._id)}
-  //             />
-  //         </Tooltip>
-  //         <Tooltip title={col.type === 'group' ? '编辑循环组' : '编辑集合'}>
-  //           <Icon
-  //               type="edit"
-  //               className="interface-delete-icon"
-  //               onClick={e => {
-  //                 e.stopPropagation();
-  //                 if (col.type === 'group') {
-  //                   this.showGroupModal('edit', col);
-  //                 } else {
-  //                   this.showColModal('edit', col);
-  //                 }
-  //               }}
-  //           />
-  //         </Tooltip>
-  //         <Tooltip title="导入接口">
-  //           <Icon
-  //                 type="plus"
-  //                 className="interface-delete-icon"
-  //                 onClick={e => {
-  //                   e.stopPropagation();
-  //                   this.showImportInterfaceModal(col._id);
-  //                 }}
-  //             />
-  //         </Tooltip>
-  //         <Tooltip title="添加子目录">
-  //           <Icon
-  //               type="folder-add"
-  //               className="interface-delete-icon"
-  //               onClick={e => {
-  //                 e.stopPropagation();
-  //                 this.showColModal('add', null, true, col._id);
-  //               }}
-  //           />
-  //         </Tooltip>
-  //
-  //         <Tooltip title="添加循环组">
-  //           <Icon
-  //               type="sync"
-  //               className="interface-delete-icon"
-  //               onClick={e => {
-  //                 e.stopPropagation();
-  //                 this.showGroupModal('add', null, true, col._id);
-  //               }}
-  //           />
-  //         </Tooltip>
-  //
-  //         <Tooltip title="克隆集合">
-  //           <Icon
-  //                 type="copy"
-  //                 className="interface-delete-icon"
-  //                 onClick={e => {
-  //                   e.stopPropagation();
-  //                   this.copyInterface(col);
-  //                 }}
-  //             />
-  //         </Tooltip>
-  //       </div>
-  //     </div>
-  //   );
-  // };
   renderColTitle = col => {
-    const menu = (
+    // 为非ref类型集合创建完整菜单
+    const fullMenu = (
       <Menu
             onClick={({ key, domEvent }) => {
               domEvent.stopPropagation();
@@ -917,6 +989,9 @@ export default class InterfaceColMenu extends Component {
                 case 'import':
                   this.showImportInterfaceModal(col._id);
                   break;
+                case 'import-col':
+                  this.showImportColModal(col._id);
+                  break;
                 case 'add-child':
                   this.showColModal('add', null, true, col._id);
                   break;
@@ -926,6 +1001,7 @@ export default class InterfaceColMenu extends Component {
                 case 'copy':
                   this.copyInterface(col);
                   break;
+
                 default:
                   break;
               }
@@ -939,6 +1015,11 @@ export default class InterfaceColMenu extends Component {
         <Menu.Item key="import">
           <Icon type="plus" style={{ marginRight: 8 }} />
           导入接口
+        </Menu.Item>
+
+        <Menu.Item key="import-col">
+          <Icon type="fork" style={{ marginRight: 8 }} />
+          导入集合
         </Menu.Item>
 
         <Menu.Item key="add-child">
@@ -956,12 +1037,12 @@ export default class InterfaceColMenu extends Component {
           克隆集合
         </Menu.Item>
 
-        <Menu.Divider />
-
         <Menu.Item key="mark">
-          <Icon type="highlight" />
+          <Icon type="star" style={{ marginRight: 8 }} />
           {this.state.markedCollections[col._id] ? '取消标记' : '标记集合'}
         </Menu.Item>
+
+        <Menu.Divider />
 
         <Menu.Item key="delete" danger>
           <Icon type="delete" style={{ marginRight: 8 }} />
@@ -970,12 +1051,36 @@ export default class InterfaceColMenu extends Component {
       </Menu>
     );
 
+    // 为ref类型集合创建仅包含删除的菜单
+    const refMenu = (
+      <Menu
+            onClick={({ key, domEvent }) => {
+              domEvent.stopPropagation();
+
+              switch (key) {
+                case 'delete':
+                  this.showDelColConfirm(col._id);
+                  break;
+                default:
+                  break;
+              }
+            }}
+        >
+        <Menu.Item key="delete" danger>
+          <Icon type="delete" style={{ marginRight: 8 }} />
+          删除引用
+        </Menu.Item>
+      </Menu>
+    );
+
     return (
       <div className="menu-title">
         {col.type === 'group' ? (
           <Icon type="sync" style={{ marginRight: 6, color: '#00a854' }} />
+          ) : col.type === 'ref' ? (
+            <Icon type="fork" style={{ marginRight: 6, color: '#f5222d' }} />
           ) : (
-            <Icon type="folder-open" style={{ marginRight: 6 }} />
+            <Icon type="folder-open" style={{ marginRight: 6, color: '#1890ff' }} />
           )}
 
         <span
@@ -993,11 +1098,11 @@ export default class InterfaceColMenu extends Component {
           )}
 
         <span style={{ marginLeft: 8, color: '#999', fontSize: 12 }}>
-          ({this.getAllCasesFromColAndChildren(col._id, this.props.interfaceColList).length})
+          ({this.getAllCasesFromColAndChildren(col._id, this.props.interfaceColList || []).length})
         </span>
 
-        {/* 右侧更多按钮 */}
-        <Dropdown overlay={menu} trigger={['click']}>
+        {/* 右侧更多按钮 - ref类型只显示删除 */}
+        <Dropdown overlay={col.type === 'ref' ? refMenu : fullMenu} trigger={['click']}>
           <div 
             className="horizontal-ellipsis"
             onClick={e => e.stopPropagation()}
@@ -1104,6 +1209,9 @@ export default class InterfaceColMenu extends Component {
             this.setState({ selectedKeys: selects });
           }, 0);
         }
+      } else {
+        // 如果已有selectedKeys，使用现有值而不是重新计算
+        selects = this.state.selectedKeys;
       }
 
       return {
@@ -1113,25 +1221,9 @@ export default class InterfaceColMenu extends Component {
     };
 
     let currentKes = defaultExpandedKeys();
-    // Use state.selectedKeys if available, otherwise use default
-    const selectedKeys = currentKes.selects;
-    
-    // let list = this.props.interfaceColList;
-    //
-    // if (this.state.filterValue) {
-    //   // 过滤逻辑保持不变
-    //   list = list.filter(item => {
-    //     item.caseList = item.caseList.filter(inter => {
-    //       if (inter.casename.indexOf(this.state.filterValue) === -1
-    //           && inter.path.indexOf(this.state.filterValue) === -1
-    //       ) {
-    //         return false;
-    //       }
-    //       return true;
-    //     });
-    //     return true;
-    //   });
-    // }
+    // 优先使用 state.selectedKeys，如果不存在则使用计算出的默认值
+    const selectedKeys = this.state.selectedKeys && this.state.selectedKeys.length > 0 ? this.state.selectedKeys : currentKes.selects;
+
 
     return (
       <div>
@@ -1191,6 +1283,21 @@ export default class InterfaceColMenu extends Component {
                 key={this.state.importColId}
                 currProjectId={currProjectId}
                 selectInterface={this.selectInterface}
+            />
+        </Modal>
+        <Modal
+              title="导入集合到集合"
+              visible={this.state.importColVisible}
+              onOk={this.handleImportColOk}
+              onCancel={this.handleImportColCancel}
+              className="import-col-modal"
+              width={800}
+              destroyOnClose={true}
+          >
+          <ImportCol
+                key={this.state.importColId}
+                currProjectId={this.props.match.params.id}
+                selectCol={this.selectCol}
             />
         </Modal>
       </div>

@@ -110,11 +110,9 @@ function handleFilter(str, match, context) {
 
 function handleParamsValue(val, context = {}) {
   const variableRegexp = /\{\{\s*([^}]+?)\s*\}\}/g;
-  if (!val || typeof val !== 'string') return val;
-
+  if (val == null || typeof val !== 'string') return val;
   val = val.trim();
 
-  // 解析 a.b.c 路径
   function getByPath(path, obj) {
     const parts = path.split('.');
     let cur = obj;
@@ -125,14 +123,9 @@ function handleParamsValue(val, context = {}) {
     return cur;
   }
 
-  // 核心取值规则（重点）
   function resolveValue(key, ctx) {
-    // 1️⃣ 带路径：vars.id / global.id
-    if (key.includes('.')) {
-      return getByPath(key, ctx);
-    }
+    if (key.includes('.')) return getByPath(key, ctx);
 
-    // 2️⃣ 裸变量：id
     if (ctx[key] !== undefined) return ctx[key];
     if (ctx.vars && ctx.vars[key] !== undefined) return ctx.vars[key];
     if (ctx.global && ctx.global[key] !== undefined) return ctx.global[key];
@@ -140,7 +133,7 @@ function handleParamsValue(val, context = {}) {
     return undefined;
   }
 
-  // 特殊指令（保持你原有逻辑）
+  // 特殊指令
   if (
       val[0] === '@' ||
       val.indexOf('$.') === 0 ||
@@ -153,13 +146,18 @@ function handleParamsValue(val, context = {}) {
   const fullMatch = val.match(/^\{\{\s*([^\}]+?)\s*\}\}$/);
   if (fullMatch) {
     const value = resolveValue(fullMatch[1], context);
-    return value !== undefined && value !== null ? String(value) : '';
+    // 如果是对象或 XML，不直接拼接到文本节点里，保持原模板
+    if (value == null) return val;
+    if (typeof value === 'object') return val;
+    return String(value);
   }
 
-  // XML / 普通字符串中的 {{xxx}}
+  // 字符串中 {{xxx}} 替换
   return val.replace(variableRegexp, (raw, match) => {
     const value = resolveValue(match, context);
-    return value !== undefined && value !== null ? String(value) : '';
+    // 找不到或是对象/XML就保留原模板
+    if (value == null || typeof value === 'object') return raw;
+    return String(value);
   });
 }
 

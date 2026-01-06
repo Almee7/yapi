@@ -75,6 +75,7 @@ export default class TestReportList extends Component {
   viewReport = record => {
     const projectId = this.props.match.params.id;
     const colId = this.props.match.params.actionId;
+    // 始终在当前页跳转
     this.props.history.push(`/project/${projectId}/interface/col/${colId}/report/${record._id}`);
   };
 
@@ -113,7 +114,7 @@ export default class TestReportList extends Component {
         key: 'col_name',
         width: 200,
         render: (text, record) => (
-          <a onClick={() => this.viewReport(record)}>{text}</a>
+          <a href="javascript:void(0)" onClick={() => this.viewReport(record)}>{text}</a>
         )
       },
       {
@@ -175,12 +176,21 @@ export default class TestReportList extends Component {
       }
     ];
 
+    // 检查 URL 是否包含特定参数，以确定是否为独立页面
+    const urlParams = new URLSearchParams(window.location.search);
+    const isStandalone = urlParams.get('standalone') === 'true';
+
     return (
-      <div className="test-report-list">
-        <div className="report-header">
-          <h2>测试报告记录</h2>
-          <Button onClick={this.goBack}>返回</Button>
-        </div>
+      <div className="test-report-list" style={isStandalone ? { padding: '20px', background: '#f5f5f5', minHeight: '100vh' } : {}}>
+        {!isStandalone && (
+          <div className="report-header">
+            <h2>测试报告记录</h2>
+            <Button onClick={this.goBack}>返回</Button>
+          </div>
+        )}
+        {isStandalone && (
+          <h2 style={{ marginBottom: '20px' }}>测试报告记录</h2>
+        )}
         <Table
           columns={columns}
           dataSource={this.state.list}

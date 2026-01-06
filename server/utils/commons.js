@@ -281,7 +281,6 @@ function replaceVars(template, vars) {
 
 //执行sql
 async function executeQuery(params = [], vars = {}, serverName) {
-    console.log("servername",serverName)
     const client = new GrpcAgentClient(serverName);
     // 替换变量，构造新数组，避免修改原始 asserts
     const replacedAsserts = params.map(item => {
@@ -299,8 +298,6 @@ function assertResult(actualResult, params) {
         const fields = testItem.fields;
         const query = testItem.query;
         const actualRows = actualResult[i];
-        console.log("actualResult",actualResult)
-        console.log("testItem",testItem)
         if (Array.isArray(expect)) {
             if (!actualRows || !Array.isArray(actualRows)) {
                 throw new Error(`断言失败：返回结果为空或格式不正确，SQL: ${query}`);
@@ -316,7 +313,7 @@ function assertResult(actualResult, params) {
                 console.log(`✅ 断言通过: ${JSON.stringify(expect)} == ${JSON.stringify(actualFlat[0])}`);
             } catch (e) {
                 const errMsg = `❌ 断言失败: ${JSON.stringify(expect)} != ${JSON.stringify(actualFlat[0])}\nSQL: ${query}`;
-                // throw new Error(errMsg);
+                throw new Error(errMsg);
             }
         } else {
             const actualValue = actualRows && actualRows[0] ? actualRows[0][fields[0]] : undefined;
@@ -325,7 +322,7 @@ function assertResult(actualResult, params) {
                 console.log(`✅ 断言通过: "${expect}" == "${actualValue}"`);
             } catch (e) {
                 const Error = `❌ 断言失败: ${expect} != ${actualValue}\nSQL: ${query}`;
-                // throw new Error(Error);
+                throw new Error(Error);
             }
         }
     }
@@ -378,7 +375,6 @@ Object.keys(ExtraAssert).forEach(fn => {
 
 exports.sandbox = async (sandbox, script) => {
     try {
-        console.log("sandbox",sandbox)
         let serverName = sandbox.body.serverName;
         sandbox = sandbox || {};
         // ✅ 注入默认变量
@@ -408,7 +404,7 @@ exports.sandbox = async (sandbox, script) => {
                     // 直接传配置对象，使用 context 中的 connectionId
                     actualOptions = idOrOptions;
                 }
-                
+
                 const msg = await WsTestController.readws(actualId, actualOptions);
                 sandbox.wsLog = msg;     // 把结果挂到 sandbox
                 return msg;              // 同时返回，脚本里也能接收
@@ -664,23 +660,41 @@ async function flattenCases(colId, allCols, allCases, memo = new Map()) {
         memo.set(cacheKey, sortedResult);
         return sortedResult;
     }
-    
+
+    // 当前是 ref（引用集合），需要使用 source_id 获取对应的 cases
+    if (col.type === 'ref' && col.source_id) {
+        // 获取引用的集合 ID 对应的 cases
+        const refColId = col.source_id.toString();
+        const refCases = casesByColId.get(refColId) || [];
+        // 按 index 排序
+        const sortedResult = refCases.slice().sort((a, b) => a.index - b.index);
+        memo.set(cacheKey, sortedResult);
+        return sortedResult;
+    }
+
     // 当前 col 下的普通 case（group_id=null）
     const folderCases = (casesByColId.get(colId.toString()) || [])
         .filter(c => !c.group_id);
-    
+
     // 对 folderCases 进行原地排序
     folderCases.sort((a, b) => a.index - b.index);
         
     // 当前 col 下的 group，按 index 排序
     const childGroups = [];
+    // 当前 col 下的 folder（包括 ref 类型），按 index 排序
+    const childFolders = [];
     for (const c of allCols) {
-        if (c.parent_id && c.parent_id.toString() === colId.toString() && c.type === 'group') {
-            childGroups.push(c);
+        if (c.parent_id && c.parent_id.toString() === colId.toString()) {
+            if (c.type === 'group') {
+                childGroups.push(c);
+            } else if (c.type === 'folder' || c.type === 'ref') {
+                childFolders.push(c);
+            }
         }
     }
     childGroups.sort((a, b) => a.index - b.index);
-        
+    childFolders.sort((a, b) => a.index - b.index);
+
     // 预先排序所有 group cases 以避免重复排序
     const sortedGroupCasesMap = new Map();
     for (const g of childGroups) {
@@ -718,18 +732,10 @@ async function flattenCases(colId, allCols, allCases, memo = new Map()) {
         });
     }
     
-    // 添加当前容器的 folders
-    const childFolders = [];
-    for (const f of allCols) {
-        if (f.parent_id && f.parent_id.toString() === colId.toString() && f.type === 'folder') {
-            childFolders.push(f);
-        }
-    }
-    childFolders.sort((a, b) => a.index - b.index);
-    
+    // 添加当前容器的 folders 和 refs
     for (const f of childFolders) {
         directChildren.push({
-            type: 'folder',
+            type: f.type, // 'folder' or 'ref'
             index: f.index,
             element: f
         });
@@ -751,6 +757,12 @@ async function flattenCases(colId, allCols, allCases, memo = new Map()) {
             // 递归获取 folder 的所有 case，传递 memoization map
             const subCases = await flattenCases(child.element._id, allCols, allCases, memo);
             result.push(...subCases);
+        } else if (child.type === 'ref' && child.element.source_id) {
+            // 处理引用集合：直接获取 source_id 对应的 cases
+            const refColId = child.element.source_id.toString();
+            const refCases = casesByColId.get(refColId) || [];
+            const sortedRefCases = refCases.slice().sort((a, b) => a.index - b.index);
+            result.push(...sortedRefCases);
         }
     }
     
@@ -772,26 +784,34 @@ exports.getCaseList = async function getCaseList(id) {
     const interfaceInst = yapi.getInst(interfaceModel);
 
     // 1️⃣ 并行执行数据库查询以提高性能
-    const [colIds, colData] = await Promise.all([
+    const [parentIds, colData] = await Promise.all([
         colInst.getParentId(id),
         colInst.get(id)
     ]);
     
+    // 获取当前集合及其父级的 ID
+    let colIds = parentIds && parentIds.length > 0 ? parentIds : [id];
+
     // 如果没有 colIds，直接返回空结果
     if (!colIds || colIds.length === 0) {
         return yapi.commons.resReturn([]);
     }
     
-    // 2️⃣ 并行获取所有 col 和 case 数据
-    const [allCols, allCases] = await Promise.all([
-        colInst.allColList(colIds,'all'),
-        caseInst.newList(colIds, 'all')
-    ]);
+    // 2️⃣ 获取所有 col 数据
+    const allCols = await colInst.allColList(colIds, 'all');
+    // 检查这些集合中是否有 ref 类型的数据，如果有，需要将 source_id 也加入查询范围
+    const extendedColIds = [...colIds];
+    for (const col of allCols) {
+        if (col.type === 'ref' && col.source_id && !extendedColIds.includes(col.source_id)) {
+            extendedColIds.push(col.source_id);
+        }
+    }
 
+    // 3️⃣ 并行获取所有 case 数据（包括 ref 引用的集合的 case）
+    const allCases = await caseInst.newList(extendedColIds, 'all');
     // 3️⃣ 获取到排序后的caseList
     // 使用共享的 memoization cache 来提高性能
     let resultList = await flattenCases(id, allCols, allCases, new Map());
-    
     // 如果没有结果，直接返回
     if (resultList.length === 0) {
         const ctxBody = yapi.commons.resReturn(resultList);

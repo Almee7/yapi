@@ -198,7 +198,6 @@ class interfaceColController extends baseController {
           return (ctx.body = yapi.commons.resReturn(null, 406, '没有权限'));
         }
       }
-
       ctx.body = await yapi.commons.getCaseList(id);
     } catch (e) {
       ctx.body = yapi.commons.resReturn(null, 402, e.message);
@@ -411,11 +410,11 @@ class interfaceColController extends baseController {
 
       this.colModel.get(params.col_id).then(col => {
         yapi.commons.saveLog({
-          content: `<a href=" ">${username}</a > 在接口集 <a href="/project/${
+          content: `<a href="/user/profile/${this.getUid()}">${username}</a> 在接口集 <a href="/project/${
               params.project_id
-          }/interface/col/${params.col_id}">${col.name}</a > 下添加了测试用例 <a href="/project/${
+          }/interface/col/${params.col_id}">${col.name}</a> 下添加了测试用例 <a href="/project/${
               params.project_id
-          }/interface/case/${result._id}">${params.casename}</a >`,
+          }/interface/case/${result._id}">${params.casename}</a>`,
           type: 'project',
           uid: this.getUid(),
           username: username,
@@ -907,6 +906,124 @@ class interfaceColController extends baseController {
   }
 
   /**
+   * 批量添加集合引用
+   * @interface /col/add_col_list
+   * @method POST
+   * @category col
+   * @foldnumber 10
+   * @param {Array} col_list 需要引用的集合ID列表
+   * @param {Number} col_id 父级集合ID
+   * @param {Number} project_id 项目ID
+   * @returns {Object}
+   * @example
+   */
+  async addColList(ctx) {
+    try {
+      let params = ctx.request.body;
+
+      // 参数校验
+      let { col_list, col_id, project_id } = params;
+      
+      if (!project_id) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '项目id不能为空'));
+      }
+
+      if (!col_id) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '集合id不能为空'));
+      }
+
+      if (!col_list || !Array.isArray(col_list) || col_list.length === 0) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '引用集合列表不能为空'));
+      }
+      
+      // 确保参数类型正确
+      project_id = Number(project_id);
+      col_id = Number(col_id);
+
+      // 权限检查
+      let auth = await this.checkAuth(project_id, 'project', 'edit');
+      if (!auth) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));
+      }
+
+      // 检查目标集合是否存在
+      const targetCol = await this.colModel.get(col_id);
+      if (!targetCol) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '目标集合不存在'));
+      }
+
+      // 检查被引用的集合是否存在并缓存信息
+      const sourceColMap = new Map();
+      for (let sourceId of col_list) {
+        const sourceCol = await this.colModel.get(sourceId);
+        if (!sourceCol) {
+          return (ctx.body = yapi.commons.resReturn(null, 400, `引用的集合 ${sourceId} 不存在`));
+        }
+        sourceColMap.set(sourceId, sourceCol);
+      }
+
+      // 计算当前容器下最大 index
+      const maxColIndex = await this.colModel.getIndexByParentId(project_id, col_id);
+      const maxCaseIndex = await this.caseModel.getMaxIndexByContainer(col_id, null);
+      let startIndex = Math.max(maxColIndex, maxCaseIndex) + 1;
+
+      // 批量创建引用集合记录
+      const createdRefs = [];
+      for (let i = 0; i < col_list.length; i++) {
+        const sourceId = col_list[i];
+        
+        // 获取被引用集合的详细信息
+        const sourceCol = sourceColMap.get(sourceId);
+        
+        // 检查是否已经存在相同的引用
+        const existingRef = await this.colModel.model.findOne({
+          parent_id: col_id,
+          source_id: sourceId,
+          type: 'ref'
+        }).lean().exec();
+        
+        if (existingRef) {
+          continue; // 如果已存在相同引用，跳过
+        }
+        
+        let colData = {
+          name: `引用 ${sourceCol.name}`, // 使用被引用集合的名称
+          project_id: project_id,
+          parent_id: col_id,
+          type: 'ref', // 设置类型为引用
+          source_id: sourceId, // 被引用的集合ID
+          index: startIndex + i,
+          desc: `引用 ${sourceCol.desc}`, // 使用被引用集合的描述
+          uid: this.getUid(),
+          add_time: yapi.commons.time(),
+          up_time: yapi.commons.time()
+        };
+
+        const result = await this.colModel.save(colData);
+        createdRefs.push(result);
+      }
+
+      // 记录日志
+      const username = this.getUsername();
+      yapi.commons.saveLog({
+        content: `<a href="/user/profile/${this.getUid()}">${username}</a> 在集合 <a href="/project/${project_id}/interface/col/${col_id}">${targetCol.name}</a> 中添加了 ${createdRefs.length} 个集合引用`,
+        type: 'project',
+        uid: this.getUid(),
+        username: username,
+        typeid: project_id
+      });
+
+      ctx.body = yapi.commons.resReturn({
+        created_count: createdRefs.length,
+        refs: createdRefs
+      });
+
+    } catch (e) {
+      ctx.body = yapi.commons.resReturn(null, 500, e.message);
+    }
+  }
+
+  /**
    * 更新多个接口case index
    * @interface /col/up_case_index
    * @method POST
@@ -984,35 +1101,11 @@ class interfaceColController extends baseController {
    * @returns {Object}
    * @example
    */
-  // async upIndex(ctx) {
-  //   try {
-  //     const { list } = ctx.request.body;
-  //     for (let item of list) {
-  //       console.log("item", item);
-  //       if (item.type === 'folder' || item.type === 'group') {
-  //         await this.colModel.update(
-  //             { _id: item.id },
-  //             { index: item.index, parent_id: item.parent_id }
-  //         );
-  //       } else if (item.type === 'case') {
-  //         const updateData = { index: item.index, parent_id: item.parent_id};
-  //         if (item.col_id !== undefined) updateData.col_id = item.col_id;
-  //         if (item.group_id !== undefined) updateData.group_id = item.group_id;
-  //
-  //         await this.caseModel.update({ _id: item.id }, updateData);
-  //       }
-  //     }
-  //
-  //     ctx.body = yapi.commons.resReturn('更新成功');
-  //   } catch (err) {
-  //     ctx.body = yapi.commons.resReturn(null, 500, err.message);
-  //   }
-  // }
   async upIndex(ctx) {
     try {
       const {list} = ctx.request.body;
       for (let item of list) {
-        if (item.type === 'folder' || item.type === 'group') {
+        if (item.type === 'folder' || item.type === 'group' || item.type === 'ref') {
           await this.colModel.update(
               {_id: item.id},
               {index: item.index, parent_id: item.parent_id}

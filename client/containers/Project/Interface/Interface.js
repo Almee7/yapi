@@ -102,6 +102,22 @@ class Interface extends Component {
     // const activeKey = this.state.curkey;
     const activeKey = action === 'api' ? 'api' : 'colOrCase';
 
+    // 检查是否为独立的报告页面
+    const isReportPage = this.props.location.pathname.includes('/report-list') || 
+                         this.props.location.pathname.includes('/report/');
+
+    // 如果是报告页面，使用简洁布局
+    if (isReportPage) {
+      return (
+        <div style={{ padding: '20px', background: '#f5f5f5', minHeight: '100vh' }}>
+          <Switch>
+            <Route exact path="/project/:id/interface/col/:actionId/report-list" component={TestReportList} />
+            <Route exact path="/project/:id/interface/col/:actionId/report/:reportId" component={TestReportDetail} />
+          </Switch>
+        </div>
+      );
+    }
+
     return (
       <Layout style={{ minHeight: 'calc(100vh - 156px)', marginLeft: '24px', marginTop: '24px' }}>
         <Sider style={{ height: '100%' }} width={300}>
@@ -136,8 +152,6 @@ class Interface extends Component {
           >
             <div className="right-content">
               <Switch>
-                <Route exact path="/project/:id/interface/col/:actionId/report-list" component={TestReportList} />
-                <Route exact path="/project/:id/interface/col/:actionId/report/:reportId" component={TestReportDetail} />
                 <Route exact path="/project/:id/interface/:action" component={InterfaceRoute} />
                 <Route {...contentRouter} component={InterfaceRoute} />
               </Switch>

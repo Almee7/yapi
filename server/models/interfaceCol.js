@@ -14,6 +14,7 @@ class interfaceCol extends baseModel {
       parent_id: { type: Number, default: 0 },
       desc: String,
       type: { type: String, required: true , default: 'folder' },
+      source_id: { type: Number }, // 引用的集合ID
       add_time: Number,
       up_time: Number,
       repeatCount: Number,
@@ -125,7 +126,7 @@ class interfaceCol extends baseModel {
       .find({
         project_id: project_id
       })
-      .select('name uid project_id desc add_time up_time index parent_id')
+      .select('name uid project_id desc add_time up_time index parent_id type repeatCount source_id')
       .exec();
   }
 
@@ -141,7 +142,7 @@ class interfaceCol extends baseModel {
   newList(project_id) {
     return this.model
         .find({ project_id })
-        .select('name uid project_id desc add_time up_time index parent_id type repeatCount')
+        .select('name uid project_id desc add_time up_time index parent_id type repeatCount source_id')
         .lean() // 返回普通对象
         .exec();
   }

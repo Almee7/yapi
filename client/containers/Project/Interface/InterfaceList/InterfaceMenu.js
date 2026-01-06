@@ -549,7 +549,7 @@ class InterfaceMenu extends Component {
                     }}
                     to={'/project/' + matchParams.id + '/interface/api'}
                   >
-                    <Icon type="folder" style={{ marginRight: 5 }} />
+                    <Icon type="folder" style={{ marginRight: 5, color: '#1890ff' }} />
                     全部接口
                   </Link>
                 }
@@ -572,7 +572,7 @@ class InterfaceMenu extends Component {
                           }}
                           to={'/project/' + matchParams.id + '/interface/api/cat_' + item._id}
                         >
-                          <Icon type="folder-open" style={{ marginRight: 5 }} />
+                          <Icon type="folder-open" style={{ marginRight: 5, color: '#1890ff' }} />
                           {item.name}
                         </Link>
                         <div className="btns">

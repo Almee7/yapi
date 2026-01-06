@@ -204,17 +204,31 @@ export default class TestReportDetail extends Component {
       return <div style={{ padding: 24 }}>报告不存在</div>;
     }
 
+    // 检查 URL 是否包含特定参数，以确定是否为独立页面
+    const urlParams = new URLSearchParams(window.location.search);
+    const isStandalone = urlParams.get('standalone') === 'true';
+
     return (
-      <div className="test-report-detail">
-        <div className="report-header">
-          <div>
+      <div className="test-report-detail" style={isStandalone ? { padding: '20px', background: '#f5f5f5', minHeight: '100vh' } : {}}>
+        {!isStandalone && (
+          <div className="report-header">
+            <div>
+              <h2>测试报告详情</h2>
+              <p style={{ color: '#666', marginBottom: 0 }}>
+                {moment(report.add_time * 1000).format('YYYY-MM-DD HH:mm:ss')}
+              </p>
+            </div>
+            <Button onClick={this.goBack}>返回</Button>
+          </div>
+        )}
+        {isStandalone && (
+          <div style={{ marginBottom: '20px' }}>
             <h2>测试报告详情</h2>
-            <p style={{ color: '#666', marginBottom: 0 }}>
+            <p style={{ color: '#666' }}>
               {moment(report.add_time * 1000).format('YYYY-MM-DD HH:mm:ss')}
             </p>
           </div>
-          <Button onClick={this.goBack}>返回</Button>
-        </div>
+        )}
 
         <Card className="summary-card">
           <Row gutter={24}>

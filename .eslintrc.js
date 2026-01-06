@@ -30,7 +30,7 @@ module.exports = {
         "react/no-deprecated": "off",
         "no-restricted-imports": ["error", { paths: ["react-dom/client"] }],
         // 允许 <>...</> 作为 Fragment 简写
-        "react/jsx-fragments": ["error", "syntax"]
+        "react/jsx-fragments": ["off"]
         // ,"react/no-unescaped-entities": 0
     }
 };

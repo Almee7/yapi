@@ -27,37 +27,19 @@ class GrpcAgentClient {
             throw new Error(`未配置对应的 gRPC 地址: ${serverName}`);
         }
         this.address = address;
-        console.log(`gRPC 服务器地址: ${this.address}`)
         this.client = new GrpcAgentServiceClient(
             this.address,
             grpc.credentials.createInsecure()
         );
-        const deadline = Date.now() + 5000; // 5 秒超时
-        this.client.waitForReady(deadline, (err) => {
-            if (err) {
-                console.error(
-                    `❌ [gRPC] 连接失败: ${this.address}`,
-                    err.message
-                );
-            } else {
-                console.log(
-                    `✅ [gRPC] 连接成功: ${this.address}`
-                );
-            }
-        });
     }
-
     /**
      * 发送请求调用 invoke 方法
      * @param {Object|Array} paramsObj - 要传递的参数对象或数组，内部自动序列化为 JSON 字符串并转 Buffer
      * @returns {Promise<Object|string>} - 解析后的 JSON 对象或字符串结果
      */
     invoke(paramsObj) {
-        console.log('🛰️ gRPC invoke 入参:', paramsObj);
-
         return new Promise((resolve, reject) => {
             const request = new AgentRequest();
-
             // 去掉 expect 字段
             const newParamsObj = Array.isArray(paramsObj)
                 ? paramsObj.map(({expect, ...rest}) => {
@@ -119,6 +101,7 @@ class GrpcAgentClient {
             });
         });
     }
+
 }
 
 module.exports = {

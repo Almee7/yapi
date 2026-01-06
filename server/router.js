@@ -443,6 +443,11 @@ let routerConfig = {
       method: 'post'
     },
     {
+      action: 'addColList',
+      path: 'add_col_list',
+      method: 'post'
+    },
+    {
       action: 'addCaseList',
       path: 'add_case_list',
       method: 'post'
