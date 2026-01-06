@@ -110,9 +110,11 @@ function handleFilter(str, match, context) {
 
 function handleParamsValue(val, context = {}) {
   const variableRegexp = /\{\{\s*([^}]+?)\s*\}\}/g;
-  if (val == null || typeof val !== 'string') return val;
+  if (!val || typeof val !== 'string') return val;
+
   val = val.trim();
 
+  // 解析 a.b.c 路径
   function getByPath(path, obj) {
     const parts = path.split('.');
     let cur = obj;
@@ -123,9 +125,14 @@ function handleParamsValue(val, context = {}) {
     return cur;
   }
 
+  // 核心取值规则（重点）
   function resolveValue(key, ctx) {
-    if (key.includes('.')) return getByPath(key, ctx);
+    // 1️⃣ 带路径：vars.id / global.id
+    if (key.includes('.')) {
+      return getByPath(key, ctx);
+    }
 
+    // 2️⃣ 裸变量：id
     if (ctx[key] !== undefined) return ctx[key];
     if (ctx.vars && ctx.vars[key] !== undefined) return ctx.vars[key];
     if (ctx.global && ctx.global[key] !== undefined) return ctx.global[key];
@@ -133,7 +140,7 @@ function handleParamsValue(val, context = {}) {
     return undefined;
   }
 
-  // 特殊指令
+  // 特殊指令（保持你原有逻辑）
   if (
       val[0] === '@' ||
       val.indexOf('$.') === 0 ||
@@ -146,19 +153,47 @@ function handleParamsValue(val, context = {}) {
   const fullMatch = val.match(/^\{\{\s*([^\}]+?)\s*\}\}$/);
   if (fullMatch) {
     const value = resolveValue(fullMatch[1], context);
-    // 如果是对象或 XML，不直接拼接到文本节点里，保持原模板
-    if (value == null) return val;
-    if (typeof value === 'object') return val;
-    return String(value);
+    return value !== undefined && value !== null ? String(value) : val;
   }
 
-  // 字符串中 {{xxx}} 替换
-  return val.replace(variableRegexp, (raw, match) => {
-    const value = resolveValue(match, context);
-    // 找不到或是对象/XML就保留原模板
-    if (value == null || typeof value === 'object') return raw;
-    return String(value);
-  });
+  // 检查是否为XML内容，如果是则需要特殊处理
+  if (val.includes('<?xml') && val.includes('<') && val.includes('>')) {
+    // 在替换变量前先提取XML声明，避免重复
+    const xmlDeclarationMatch = val.match(/^(<\?xml[^>]*>\s*)/);
+    let xmlDeclaration = '';
+    let contentWithoutDeclaration = val;
+
+    if (xmlDeclarationMatch) {
+      xmlDeclaration = xmlDeclarationMatch[1];
+      contentWithoutDeclaration = val.substring(xmlDeclaration.length);
+    }
+
+    // 对内容部分进行变量替换
+    let replacedContent = contentWithoutDeclaration.replace(variableRegexp, (raw, match) => {
+      const value = resolveValue(match, context);
+      if (value !== undefined && value !== null) {
+        let stringValue = String(value);
+        // 如果替换的值是XML内容，移除其XML声明部分，避免重复
+        if (stringValue.includes('<?xml') && stringValue.includes('<') && stringValue.includes('>')) {
+          const valueXmlDeclarationMatch = stringValue.match(/^(<\?xml[^>]*>\s*)/);
+          if (valueXmlDeclarationMatch) {
+            stringValue = stringValue.substring(valueXmlDeclarationMatch[1].length);
+          }
+        }
+        return stringValue;
+      }
+      return raw; // 如果变量未定义，保持原样
+    });
+
+    // 重新组合XML声明和替换后的内容
+    return xmlDeclaration + replacedContent;
+  } else {
+    // 普通字符串替换
+    return val.replace(variableRegexp, (raw, match) => {
+      const value = resolveValue(match, context);
+      return value !== undefined && value !== null ? String(value) : raw;
+    });
+  }
 }
 
 

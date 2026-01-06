@@ -27,6 +27,7 @@ class GrpcAgentClient {
             throw new Error(`未配置对应的 gRPC 地址: ${serverName}`);
         }
         this.address = address;
+        console.log("address",this.address)
         this.client = new GrpcAgentServiceClient(
             this.address,
             grpc.credentials.createInsecure()
@@ -38,18 +39,21 @@ class GrpcAgentClient {
      * @returns {Promise<Object|string>} - 解析后的 JSON 对象或字符串结果
      */
     invoke(paramsObj) {
+        console.log('🛰️ gRPC invoke 入参:', paramsObj);
+
         return new Promise((resolve, reject) => {
             const request = new AgentRequest();
+
             // 去掉 expect 字段
             const newParamsObj = Array.isArray(paramsObj)
-                ? paramsObj.map(({expect, ...rest}) => {
+                ? paramsObj.map(({ expect, ...rest }) => {
                     // eslint-disable-next-line no-unused-vars
                     const _ = expect; // Mark expect as intentionally unused
                     return rest;
                 })
                 : (() => {
                     // eslint-disable-next-line no-unused-vars
-                    const {expect, ...rest} = paramsObj;
+                    const { expect, ...rest } = paramsObj;
                     return rest;
                 })();
 

@@ -841,7 +841,7 @@ class interfaceColController extends baseController {
               name: field.value.name || 'file',
               type: field.value.type || 'application/octet-stream',
               size: field.value.size || 0,
-              base64: field.value.base64 || '',
+              content: field.value.content || '',
               __isFile: true // 标记前端可转 File
             }
           };
