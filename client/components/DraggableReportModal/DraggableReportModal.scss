@@ -1,0 +1,21 @@
+.draggable-report-modal {
+  position: fixed;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-radius: 4px;
+  border: 1px solid #d9d9d9;
+  background-color: white;
+  min-height: 200px;
+  min-width: 300px;
+  overflow: hidden;
+
+  .draggable-header {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+  }
+
+  .draggable-body {
+    overflow: auto;
+  }
+}
