@@ -388,11 +388,9 @@ export default class InterfaceColContent extends Component {
     // 处理分组循环执行逻辑
     let executionRows = [];
     const groupData = this.state.groupData; // 从 this.state.groupData 获取分组数据
-
     // 检查是否有循环组
     const hasLoopGroups = Array.isArray(groupData) && groupData.length > 0 && groupData.some(group => group.repeatCount >= 1);
 
-    
     if (hasLoopGroups) {
       // 有循环组数据，需要循环执行
       const loopGroups = groupData.filter(group => group.repeatCount >= 1);
@@ -405,7 +403,7 @@ export default class InterfaceColContent extends Component {
       // 收集循环组中的所有用例，并按group_id和index分组
       const loopGroupCases = {};
       this.state.rows.forEach(row => {
-        if (row.group_id && loopGroupMap[row.group_id]) {
+        if (row.group_id && loopGroupMap[row.group_id] && selectedIds.includes(row._id)) {
           if (!loopGroupCases[row.group_id]) {
             loopGroupCases[row.group_id] = [];
           }

@@ -280,6 +280,7 @@ export default class InterfaceColMenu extends Component {
   };
 
   async getList() {
+    console.log("11111--getList",this.props.match.params.id)
     let r = await this.props.fetchInterfaceColList(this.props.match.params.id);
     const listData = r.payload.data.data;
     this.setState({
@@ -426,14 +427,14 @@ export default class InterfaceColMenu extends Component {
       okText: '确认',
       cancelText: '取消',
       async onOk() {
+        const deletedCase = that.props.interfaceColList.find(item => item._id == caseId && item.type === 'case');
         const res = await axios.get('/api/col/del_case?caseid=' + caseId);
         if (!res.data.errcode) {
           message.success('删除用例成功');
           await that.getList();
           // 获取被删除的用例信息，以确定其所属集合ID
-          const deletedCase = that.props.interfaceColList.find(item => item._id == caseId && item.type === 'case');
-          if (deletedCase && deletedCase.col_id) {
-            await that.props.fetchCaseList(deletedCase.col_id);
+          if (deletedCase && deletedCase.parent_id) {
+            await that.props.fetchCaseList(deletedCase.parent_id);
           }
           // 如果删除当前选中 case，切换路由到集合
           if (+caseId === +that.props.currCaseId) {
@@ -502,7 +503,7 @@ export default class InterfaceColMenu extends Component {
   //   return null; // 没有父级，说明是根目录集合
   // };
 
-  // 复制测试集合
+  // 复制测试用例
   copyInterface = async item => {
     if (this._copyInterfaceSign === true) {
       return;
@@ -512,7 +513,7 @@ export default class InterfaceColMenu extends Component {
     let { name } = item;
     name = `${name} copy`;
 
-    // 添加集合
+    // 添加用例
     const add_col_res = await axios.post('/api/col/add_col', {
       name,
       desc,
@@ -528,7 +529,7 @@ export default class InterfaceColMenu extends Component {
 
     const new_col_id = add_col_res.data.data._id;
 
-    // 克隆集合
+    // 克隆用例
     const add_case_list_res = await axios.post('/api/col/clone_case_list', {
       new_col_id,
       col_id,
@@ -544,7 +545,7 @@ export default class InterfaceColMenu extends Component {
 
     this.getList();
     this.props.setColData({ isRander: true });
-    message.success('克隆测试集成功');
+    message.success('克隆用例成功');
   };
 
   // 从 localStorage 加载标记的集合
@@ -658,7 +659,7 @@ export default class InterfaceColMenu extends Component {
   };
 
   handleImportOk = async () => {
-    const project_id = this.state.selectedProject || this.props.match.params.id;
+    const project_id = this.props.match.params.id || this.state.selectedProject;
     const { importColId, importInterIds } = this.state;
     
     // 检查当前导入的目标是否为 group 类型
