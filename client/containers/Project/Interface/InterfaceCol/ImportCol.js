@@ -5,20 +5,15 @@ import { connect } from 'react-redux';
 import { fetchInterfaceColList } from '../../../../reducer/modules/interfaceCol';
 import { fetchProjectList } from '../../../../reducer/modules/project';
 
-const Option = Select.Option;
+const { Option } = Select;
 
 @connect(
-    state => {
-        return {
-            projectList: state.project.projectList,
-            list: state.interfaceCol.interfaceColList,
-            curProject: state.project.currProject // 添加当前项目信息
-        };
-    },
-    {
-        fetchInterfaceColList,
-        fetchProjectList
-    }
+    state => ({
+        projectList: state.project.projectList,
+        list: state.interfaceCol.interfaceColList,
+        curProject: state.project.currProject // 添加当前项目信息
+    }),
+    { fetchInterfaceColList, fetchProjectList }
 )
 export default class ImportCol extends Component {
     constructor(props) {
@@ -29,9 +24,9 @@ export default class ImportCol extends Component {
             project: this.props.currProjectId,
             filter: '',
             searchList: [],
-            list: props.list ? [...props.list] : [], // 初始显示全部数据
-            expandedRowKeys: [],  //自动展开有匹配集合的分类
-            tableFilters: {} // 存储表格的筛选状态
+            list: props.list ? [...props.list] : [],
+            expandedRowKeys: [],
+            tableFilters: {}
         };
     }
 
@@ -47,16 +42,13 @@ export default class ImportCol extends Component {
     };
 
     async componentDidMount() {
-        // 获取项目列表
         const groupId = this.props.curProject ? this.props.curProject.group_id : null;
         if (groupId) {
             await this.props.fetchProjectList(groupId);
         }
-        
         await this.props.fetchInterfaceColList(this.props.currProjectId);
-        this.setState({
-            list: [...this.props.list]
-        });
+        const filteredList = this.props.list ? this.props.list.filter(item => item.type === 'folder') : [];
+        this.setState({ list: [...filteredList] });
     }
 
     // 切换项目
@@ -71,31 +63,26 @@ export default class ImportCol extends Component {
             tableFilters: {}
         });
         await this.props.fetchInterfaceColList(val);
-        const newList = this.props.list || [];
-        this.setState({
-            list: [...newList]
-        });
+        const filteredList = this.props.list ? this.props.list.filter(item => item.type === 'folder') : [];
+        this.setState({ list: [...filteredList] });
     };
 
-    handleSearch = (filter) => {
+    handleSearch = filter => {
         const { list } = this.props;
 
-        // ✅ 输入为空时，恢复完整数据
         if (!filter.trim()) {
             this.setState({
                 searchList: [],
                 expandedRowKeys: [],
                 filter: '',
-                list: [...list]  // 重置为初始数据
+                list: [...list]
             });
             return;
         }
 
         const expandedRowKeys = [];
-        // 只过滤出 folder 类型，排除 case、group 和 ref 类型
         const colList = list.filter(item => item.type === 'folder');
 
-        // 按 parent_id 分组集合
         const groupedCols = {};
         colList.forEach(item => {
             const parentId = item.parent_id || 0;
@@ -105,125 +92,126 @@ export default class ImportCol extends Component {
             groupedCols[parentId].push(item);
         });
 
-        // 处理根目录集合（parent_id 为 0）
-        const rootCols = groupedCols[0] || [];
+        const searchTreeData = (parentId = 0, depth = 0) => {
+            if (depth >= 5) return [];
 
-        // 处理子目录集合
-        const subDirs = {};
-        Object.keys(groupedCols).forEach(parentId => {
-            if (parentId !== '0') {
-                subDirs[parentId] = groupedCols[parentId];
-            }
-        });
+            const items = groupedCols[parentId] || [];
+            return items
+                .map(col => {
+                    const isCurrentMatch = col.name.toLowerCase().includes(filter.toLowerCase());
+                    const subItems = searchTreeData(col._id, depth + 1);
+                    const hasMatchingChildren = subItems.length > 0;
 
-        // 创建根目录数据结构
-        const rootData = rootCols.map(col => {
-            return {
-                _id: col._id,
-                name: col.name,
-                list: subDirs[col._id] || [] // 该集合下的子集合
-            };
-        });
+                    if (isCurrentMatch || hasMatchingChildren) {
+                        if (isCurrentMatch) {
+                            expandedRowKeys.push('category_' + col._id);
+                        }
+                        return {
+                            _id: col._id,
+                            name: col.name,
+                            desc: col.desc,
+                            list: isCurrentMatch ? groupedCols[col._id] || [] : subItems
+                        };
+                    }
+                    return null;
+                })
+                .filter(Boolean);
+        };
 
-        const filteredList = rootData.map(item => {
-            const matchedChildren = item.list
-                ? item.list.filter(
-                    col =>
-                        col.name.toLowerCase().includes(filter.toLowerCase())
-                )
-                : [];
+        const filteredList = searchTreeData(0);
 
-            if (item.name.toLowerCase().includes(filter.toLowerCase()) || matchedChildren.length > 0) {
-                expandedRowKeys.push('category_' + item._id);
-                return {
-                    ...item,
-                    list: item.name.toLowerCase().includes(filter.toLowerCase())
-                        ? item.list // 分类匹配，显示全部子节点
-                        : matchedChildren // 子节点匹配，只显示匹配的子节点
+        const convertTreeToTableData = (treeData, parentPath = []) => {
+            let result = [];
+            treeData.forEach(item => {
+                const currentPath = [...parentPath, item._id];
+                const tableItem = {
+                    key: 'category_' + item._id,
+                    name: item.name,
+                    desc: item.desc,
+                    _id: item._id,
+                    isCategory: true,
+                    categoryLength: item.list ? item.list.length : 0,
+                    categoryKey:
+                        parentPath.length > 0 ? 'category_' + parentPath[parentPath.length - 1] : null
                 };
-            }
-
-            return null;
-        }).filter(Boolean);
+                if (item.list && item.list.length > 0) {
+                    tableItem.children = convertTreeToTableData(item.list, currentPath);
+                }
+                result.push(tableItem);
+            });
+            return result;
+        };
 
         this.setState({
-            searchList: filteredList,
+            searchList: convertTreeToTableData(filteredList),
             expandedRowKeys,
             filter
         });
     };
 
-    // 处理表格筛选变化
     handleTableChange = (pagination, filters) => {
         this.setState({ tableFilters: filters });
     };
 
-    // 清空搜索框
     clearSearch = () => {
         this.setState({
             filter: '',
             searchList: [],
             expandedRowKeys: [],
-            list: [...this.props.list] // ✅ 同样恢复初始数据
+            list: this.props.list ? [...this.props.list.filter(item => item.type === 'folder')] : []
         });
     };
 
     render() {
         const { projectList } = this.props;
         const { list, expandedRowKeys, filter } = this.state;
-        
-        // 只过滤出 folder 类型，排除 case、group 和 ref 类型
-        const colList = list.filter(item => item.type === 'folder');
 
-        // 按 parent_id 分组集合
+        const colList = list.filter(item => item.type === 'folder');
         const groupedCols = {};
         colList.forEach(item => {
             const parentId = item.parent_id || 0;
-            if (!groupedCols[parentId]) {
-                groupedCols[parentId] = [];
-            }
+            if (!groupedCols[parentId]) groupedCols[parentId] = [];
             groupedCols[parentId].push(item);
         });
 
-        // 处理根目录集合（parent_id 为 0）
-        const rootCols = groupedCols[0] || [];
-
-        // 处理子目录集合
-        const subDirs = {};
-        Object.keys(groupedCols).forEach(parentId => {
-            if (parentId !== '0') {
-                subDirs[parentId] = groupedCols[parentId];
-            }
-        });
-
-        // 创建根目录数据结构
-        const rootData = rootCols.map(col => {
-            return {
+        const buildTreeData = (parentId = 0, depth = 0) => {
+            if (depth >= 5) return [];
+            const items = groupedCols[parentId] || [];
+            return items.map(col => ({
                 _id: col._id,
                 name: col.name,
-                list: subDirs[col._id] || [] // 该集合下的子集合
-            };
-        });
+                desc: col.desc,
+                list: buildTreeData(col._id, depth + 1)
+            }));
+        };
 
-        // 转换为表格所需格式
-        const data = rootData.map(item => {
-            return {
-                key: 'category_' + item._id,
-                name: item.name, // 使用 name 作为表格显示字段
-                _id: item._id, // 添加 _id 以便在选择时使用
-                isCategory: true,
-                children: item.list
-                    ? item.list.map(e => {
-                        e.key = e._id;
-                        e.categoryKey = 'category_' + item._id;
-                        e.categoryLength = item.list.length;
-                        return e;
-                    })
-                    : []
-            };
-        });
+        const rootData = buildTreeData(0);
 
+        const convertTreeToTableData = (treeData, parentPath = []) => {
+            let result = [];
+            treeData.forEach(item => {
+                const currentPath = [...parentPath, item._id];
+                const tableItem = {
+                    key: 'category_' + item._id,
+                    name: item.name,
+                    desc: item.desc,
+                    _id: item._id,
+                    isCategory: true,
+                    categoryLength: item.list ? item.list.length : 0,
+                    categoryKey:
+                        parentPath.length > 0 ? 'category_' + parentPath[parentPath.length - 1] : null
+                };
+                if (item.list && item.list.length > 0) {
+                    tableItem.children = convertTreeToTableData(item.list, currentPath);
+                }
+                result.push(tableItem);
+            });
+            return result;
+        };
+
+        const data = convertTreeToTableData(rootData);
         const self = this;
+
         const rowSelection = {
             onSelect: (record, selected) => {
                 const oldSelecteds = self.state.selectedRowKeys;
@@ -231,10 +219,19 @@ export default class ImportCol extends Component {
                 const categoryKey = record.categoryKey;
                 const categoryLength = record.categoryLength;
                 let selectedRowKeys = [];
+
                 if (record.isCategory) {
-                    // 选择分类时，同时选择分类本身和其子项
-                    const childIds = record.children.map(item => item._id);
-                    selectedRowKeys = childIds.concat(record.key);
+                    let allChildIds = [];
+                    const collectAllChildIds = item => {
+                        if (item.children && item.children.length > 0) {
+                            item.children.forEach(child => {
+                                allChildIds.push(child._id);
+                                collectAllChildIds(child);
+                            });
+                        }
+                    };
+                    collectAllChildIds(record);
+                    selectedRowKeys = allChildIds.concat(record.key);
                     if (selected) {
                         selectedRowKeys = selectedRowKeys
                             .filter(id => oldSelecteds.indexOf(id) === -1)
@@ -247,115 +244,87 @@ export default class ImportCol extends Component {
                 } else {
                     if (selected) {
                         selectedRowKeys = oldSelecteds.concat(record._id);
-                        if (categoryCount[categoryKey]) {
-                            categoryCount[categoryKey] += 1;
-                        } else {
-                            categoryCount[categoryKey] = 1;
-                        }
+                        categoryCount[categoryKey] = categoryCount[categoryKey]
+                            ? categoryCount[categoryKey] + 1
+                            : 1;
                         if (categoryCount[categoryKey] === record.categoryLength) {
                             selectedRowKeys.push(categoryKey);
                         }
                     } else {
                         selectedRowKeys = oldSelecteds.filter(id => id !== record._id);
-                        if (categoryCount[categoryKey]) {
-                            categoryCount[categoryKey] -= 1;
-                        }
+                        if (categoryCount[categoryKey]) categoryCount[categoryKey] -= 1;
                         selectedRowKeys = selectedRowKeys.filter(id => id !== categoryKey);
                     }
                 }
+
                 self.setState({ selectedRowKeys, categoryCount });
-                console.log('selectedRowKeys', selectedRowKeys);
-                // 获取实际的集合ID
+
                 const actualColIds = [];
                 selectedRowKeys.forEach(id => {
                     if (('' + id).indexOf('category') === -1) {
-                        // 直接选择的集合ID
                         actualColIds.push(id);
                     } else {
-                        // 通过选择分类间接选择的集合
-                        const categoryData = data.find(item => item.key === id);
-                        if (categoryData) {
-                            // 添加分类本身的ID
-                            actualColIds.push(categoryData._id);
-                        }
+                        actualColIds.push(parseInt(id.replace('category_', '')));
                     }
                 });
-                self.props.selectCol(
-                    actualColIds,
-                    self.state.project
-                );
+
+                self.props.selectCol(actualColIds, self.state.project);
             },
             onSelectAll: selected => {
                 let selectedRowKeys = [];
                 let categoryCount = self.state.categoryCount;
-                if (selected) {
-                    data.forEach(item => {
-                        if (item.children) {
-                            categoryCount['category_' + item._id] = item.children.length;
-                            selectedRowKeys = selectedRowKeys.concat(item.children.map(item => item._id));
-                        }
+
+                const collectAllIds = items => {
+                    let ids = [];
+                    items.forEach(item => {
+                        ids.push(item.key);
+                        if (item._id && ('' + item.key).indexOf('category') === 0) ids.push(item._id);
+                        if (item.children && item.children.length > 0) ids = ids.concat(collectAllIds(item.children));
                     });
-                    selectedRowKeys = selectedRowKeys.concat(data.map(item => item.key));
+                    return ids;
+                };
+
+                if (selected) {
+                    selectedRowKeys = collectAllIds(filter.trim() ? self.state.searchList : data);
                 } else {
                     categoryCount = {};
                     selectedRowKeys = [];
                 }
+
                 self.setState({ selectedRowKeys, categoryCount });
-                
-                // 获取实际的集合ID
+
                 const actualColIds = [];
                 selectedRowKeys.forEach(id => {
                     if (('' + id).indexOf('category') === -1) {
-                        // 直接选择的集合ID
                         actualColIds.push(id);
                     } else {
-                        // 通过选择分类间接选择的集合
                         const categoryData = data.find(item => item.key === id);
-                        if (categoryData) {
-                            // 添加分类本身的ID
-                            actualColIds.push(categoryData._id);
-                        }
+                        if (categoryData) actualColIds.push(categoryData._id);
                     }
                 });
 
-                self.props.selectCol(
-                    actualColIds,
-                    self.state.project
-                );
+                self.props.selectCol(actualColIds, self.state.project);
             },
             selectedRowKeys: self.state.selectedRowKeys
         };
 
         const columns = [
-            {
-                title: '集合名称',
-                dataIndex: 'name',
-                width: '30%'
-            },
-            {
-                title: '描述',
-                dataIndex: 'desc',
-                width: '40%',
-                render: (text) => text || '-'
-            },
-            {
-                title: '类型',
-                dataIndex: 'type',
-                render: () => {
-                    // 由于只显示 folder 类型，始终返回 '文件夹'
-                    return '文件夹';
-                }
-            }
+            { title: '集合名称', dataIndex: 'name', width: '30%' },
+            { title: '描述', dataIndex: 'desc', width: '40%', render: text => text || '-' },
+            { title: '类型', dataIndex: 'type', render: () => '文件夹' }
         ];
 
         return (
           <div>
-            <div className="select-project" style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: 16 }}>
+            <div
+                    className="select-project"
+                    style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: 16 }}
+                >
               <span>选择要导入的项目：</span>
               <Select value={this.state.project} style={{ width: 200 }} onChange={this.onChange}>
                 {projectList.map(item =>
                             item.projectname ? null : (
-                              <Option value={`${item._id}`} key={item._id}>
+                              <Option value={item._id} key={item._id}>
                                 {item.name}
                               </Option>
                             )
@@ -380,10 +349,11 @@ export default class ImportCol extends Component {
                         />
               </div>
             </div>
+
             <Table
                     columns={columns}
                     rowSelection={rowSelection}
-                    dataSource={data}
+                    dataSource={filter.trim() ? this.state.searchList : data}
                     pagination={false}
                     expandedRowKeys={expandedRowKeys}
                     onExpandedRowsChange={expandedRowKeys => this.setState({ expandedRowKeys })}
