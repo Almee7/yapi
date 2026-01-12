@@ -366,6 +366,9 @@ export default class InterfaceColContent extends Component {
       return;
     }
     console.log("开始测试时的集合参数", this.state)
+    this.colExecutionContext = {
+      preScriptExecuted: false
+    };
     // 记录开始时间
     const startTime = Date.now();
 
@@ -589,8 +592,14 @@ export default class InterfaceColContent extends Component {
         result = { code: 1, msg: '用户取消' };
         status = 'invalid';
       } else {
-        console.error(e);
-        result = e;
+        // ⭐ 把 axios 异常统一转成“业务失败结果”
+        result = {
+          code: e.response && e.response.status ? e.response.status : 400,
+          msg: e.response && e.response.data && e.response.data.error || e.message || '请求失败',
+          res_body: e.response && e.response.data,
+          status: 'fail'
+        };
+        status = 'error'; // UI 上标失败
       }
     }
 
@@ -708,6 +717,7 @@ export default class InterfaceColContent extends Component {
     let requestParams = {};
     let options = await handleParams(interfaceData, this.handleValue, requestParams);
     options.vars = scriptVars
+    console.log("handleTest-options.vars",options.vars)
     let result = {
       code: 400,
       msg: '数据异常',
@@ -725,7 +735,7 @@ export default class InterfaceColContent extends Component {
           this.props.curUid,
           this.props.match.params.id,
           interfaceData.interface_id
-      ));
+      ),this.colExecutionContext);
       options.taskId = this.props.curUid;
       let res = (data.res.body = json_parse(data.res.body));
       result = {
@@ -764,6 +774,7 @@ export default class InterfaceColContent extends Component {
       );
 
       // 断言测试
+      console.log("handleTest-scriptVars",scriptVars)
       await this.handleScriptTest(interfaceData, responseData, validRes, requestParams, scriptVars);
       if ([0, 2].includes(validRes[0].message)) {
         validRes[0].message = validRes[0].message === 0 ? "验证通过" : "无脚本";
@@ -798,8 +809,9 @@ export default class InterfaceColContent extends Component {
 
   //response, validRes
   // 断言测试
-  handleScriptTest = async (interfaceData, response, validRes, requestParams, scriptVars) => {
 
+  handleScriptTest = async (interfaceData, response, validRes, requestParams, scriptVars) => {
+    console.log("handleScriptTest-scriptVars",scriptVars)
     let env = interfaceData.case_env
     const getGlobalMap = (envs, envName) => {
       const target = envs.find(e => e.name === envName);

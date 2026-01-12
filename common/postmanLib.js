@@ -384,7 +384,7 @@ ${finalScript}
  * @param {*} commonContext  负责传递一些业务信息，crossRequest 不关注具体传什么，只负责当中间人
  * @param {*} pre_request_script
  */
-async function crossRequest(defaultOptions, preScript, afterScript, pre_request_script ,commonContext = {}) {
+async function crossRequest(defaultOptions, preScript, afterScript, pre_request_script ,commonContext = {},executionContext = {}) {
   let options = {
     ...defaultOptions
   }
@@ -464,11 +464,15 @@ async function crossRequest(defaultOptions, preScript, afterScript, pre_request_
     options.data = defaultOptions.data = context.requestBody;
   }
 
-  // ==== 先执行 pre_request_script（不影响 URL/header）====
+// ==== 1️⃣ 每个 case 都执行：用例前置 ====
   await runScript(pre_request_script, false);
 
-  // ==== 再执行 preScript（可能会修改 URL/header）====
-  await runScript(preScript, true);
+// ==== 2️⃣ 仅第一次 case 执行：全局前置 ====
+  if (!executionContext.preScriptExecuted) {
+    console.log('[col] run pre_script (once)');
+    await runScript(preScript, true);
+    executionContext.preScriptExecuted = true;
+  }
 
   let data;
 
