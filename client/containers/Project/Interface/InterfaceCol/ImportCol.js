@@ -2,7 +2,7 @@ import React, { PureComponent as Component } from 'react';
 import PropTypes from 'prop-types';
 import { Table, Select, Input, Icon } from 'antd';
 import { connect } from 'react-redux';
-import { fetchInterfaceColList } from '../../../../reducer/modules/interfaceCol';
+import axios from 'axios';
 import { fetchProjectList } from '../../../../reducer/modules/project';
 
 const { Option } = Select;
@@ -10,10 +10,9 @@ const { Option } = Select;
 @connect(
     state => ({
         projectList: state.project.projectList,
-        list: state.interfaceCol.interfaceColList,
         curProject: state.project.currProject // 添加当前项目信息
     }),
-    { fetchInterfaceColList, fetchProjectList }
+    { fetchProjectList }
 )
 export default class ImportCol extends Component {
     constructor(props) {
@@ -24,18 +23,16 @@ export default class ImportCol extends Component {
             project: this.props.currProjectId,
             filter: '',
             searchList: [],
-            list: props.list ? [...props.list] : [],
+            list: [], // 初始化为空，将在 componentDidMount 中填充
             expandedRowKeys: [],
             tableFilters: {}
         };
     }
 
     static propTypes = {
-        list: PropTypes.array,
         selectCol: PropTypes.func,
         projectList: PropTypes.array,
         currProjectId: PropTypes.string,
-        fetchInterfaceColList: PropTypes.func,
         fetchProjectList: PropTypes.func,
         curProject: PropTypes.object,
         searchList: PropTypes.array
@@ -46,9 +43,12 @@ export default class ImportCol extends Component {
         if (groupId) {
             await this.props.fetchProjectList(groupId);
         }
-        await this.props.fetchInterfaceColList(this.props.currProjectId);
-        const filteredList = this.props.list ? this.props.list.filter(item => item.type === 'folder') : [];
-        this.setState({ list: [...filteredList] });
+        // 直接从服务器获取当前项目的数据，不更新全局状态
+        const result = await axios.get('/api/col/list', { params: { project_id: this.props.currProjectId } });
+        if (result.data.errcode === 0) {
+          const filteredList = result.data.data ? result.data.data.filter(item => item.type === 'folder') : [];
+          this.setState({ list: [...filteredList] });
+        }
     }
 
     // 切换项目
@@ -62,13 +62,18 @@ export default class ImportCol extends Component {
             expandedRowKeys: [],
             tableFilters: {}
         });
-        await this.props.fetchInterfaceColList(val);
-        const filteredList = this.props.list ? this.props.list.filter(item => item.type === 'folder') : [];
-        this.setState({ list: [...filteredList] });
+        // 直接从服务器获取新项目的数据，不更新全局状态
+        const result = await axios.get('/api/col/list', { params: { project_id: val } });
+        if (result.data.errcode === 0) {
+          const filteredList = result.data.data ? result.data.data.filter(item => item.type === 'folder') : [];
+          this.setState({ list: [...filteredList] });
+        }
     };
 
+
+
     handleSearch = filter => {
-        const { list } = this.props;
+        const { list } = this.state;
 
         if (!filter.trim()) {
             this.setState({
@@ -93,7 +98,7 @@ export default class ImportCol extends Component {
         });
 
         const searchTreeData = (parentId = 0, depth = 0) => {
-            if (depth >= 5) return [];
+            if (depth >= 10) return [];
 
             const items = groupedCols[parentId] || [];
             return items
@@ -158,7 +163,7 @@ export default class ImportCol extends Component {
             filter: '',
             searchList: [],
             expandedRowKeys: [],
-            list: this.props.list ? [...this.props.list.filter(item => item.type === 'folder')] : []
+            list: this.state.list ? [...this.state.list.filter(item => item.type === 'folder')] : []
         });
     };
 
@@ -175,7 +180,7 @@ export default class ImportCol extends Component {
         });
 
         const buildTreeData = (parentId = 0, depth = 0) => {
-            if (depth >= 5) return [];
+            if (depth >= 10) return [];
             const items = groupedCols[parentId] || [];
             return items.map(col => ({
                 _id: col._id,
@@ -309,9 +314,9 @@ export default class ImportCol extends Component {
         };
 
         const columns = [
-            { title: '集合名称', dataIndex: 'name', width: '30%' },
-            { title: '描述', dataIndex: 'desc', width: '40%', render: text => text || '-' },
-            { title: '类型', dataIndex: 'type', render: () => '文件夹' }
+            { title: '集合名称', dataIndex: 'name', width: '50%' },
+            { title: '描述', dataIndex: 'desc', width: '35%', render: text => text || '-' },
+            { title: '类型', dataIndex: 'type', render: () => '文件夹', width: '15%' }
         ];
 
         return (
@@ -324,7 +329,7 @@ export default class ImportCol extends Component {
               <Select value={this.state.project} style={{ width: 200 }} onChange={this.onChange}>
                 {projectList.map(item =>
                             item.projectname ? null : (
-                              <Option value={item._id} key={item._id}>
+                              <Option value={`${item._id}`} key={item._id}>
                                 {item.name}
                               </Option>
                             )
