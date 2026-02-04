@@ -1312,7 +1312,7 @@ export default class Run extends Component {
                     <span className="ws-msg-tag">{msg.type === 'sent' ? 'send' : 'response'}</span>
                     {msg.remark && (
                       <Tooltip title={msg.remark}>
-                        <span className="ws-msg-remark-tag">有备注</span>
+                        <span className="ws-msg-remark-tag">Tips</span>
                       </Tooltip>
                     )}
                     <Tooltip title={<pre style={{ maxWidth: 500, maxHeight: 300, overflow: 'auto', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{msg.content}</pre>} overlayStyle={{ maxWidth: 520 }}>

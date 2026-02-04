@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import { useParams, useHistory } from 'react-router-dom';
-import { message as antdMessage, Modal, Input } from 'antd';
+import { message as antdMessage, Modal, Input, Tooltip } from 'antd';
 import './Websocket.scss';
 
 // localStorage key for saved messages
@@ -116,11 +116,8 @@ const connect = async () => {
         // 重连成功后会生成新的 connectionId，需要跳转到新的详情页
         const newConnectionId = res.data && res.data.body && res.data.body.connectionId;
         if (newConnectionId) {
-            antdMessage.success('重连成功', 1.5);
-            // 先设置 loading，然后柔和跳转
-            setLoading(true);
-            setTab(null);
-            history.replace(`/project/${id}/websocket/${newConnectionId}`);
+            alert('重连成功，点击确定跳转到新连接');
+            window.location.href = `/project/${id}/websocket/${newConnectionId}`;
         } else {
             setTab(prev => prev ? { ...prev, status: 'open' } : prev);
         }
@@ -436,9 +433,19 @@ return (
             ) : (
               savedMessages.map(item => (
                 <div key={item.id} className="saved-item">
-                  <div className="saved-content" title={item.content}>
-                    {item.content.length > 50 ? item.content.slice(0, 50) + '...' : item.content}
-                  </div>
+                  <Tooltip
+                    title={
+                      <pre style={{ maxWidth: 500, maxHeight: 300, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0 }}>
+                        {item.content}
+                      </pre>
+                    }
+                    placement="top"
+                    overlayStyle={{ maxWidth: 520 }}
+                  >
+                    <div className="saved-content">
+                      {item.content.length > 50 ? item.content.slice(0, 50) + '...' : item.content}
+                    </div>
+                  </Tooltip>
                   <div className="saved-actions">
                     <button className="action-btn use" onClick={() => useMessage(item.content)} title="使用此消息">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
