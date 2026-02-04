@@ -206,6 +206,84 @@
     color: #2395f1;
   }
 
+  // WS 消息 Tab 样式
+  .ws-messages-content {
+    padding: 10px;
+    height: 400px;
+    max-height: 400px;
+    overflow-y: auto;
+    
+    .ws-msg-item {
+      display: flex;
+      align-items: center;
+      padding: 8px 12px;
+      margin-bottom: 8px;
+      background: #fafafa;
+      border-radius: 4px;
+      border-left: 3px solid #ccc;
+      
+      &.sent {
+        border-left-color: #52c41a;
+      }
+      &.received, &.log {
+        border-left-color: #1890ff;
+      }
+      
+      .ws-msg-tag {
+        flex-shrink: 0;
+        padding: 2px 8px;
+        font-size: 12px;
+        border-radius: 3px;
+        margin-right: 12px;
+        background: #e6f7ff;
+        color: #1890ff;
+        font-weight: 500;
+      }
+      &.sent .ws-msg-tag {
+        background: #f6ffed;
+        color: #52c41a;
+      }
+      
+      .ws-msg-remark-tag {
+        flex-shrink: 0;
+        padding: 2px 6px;
+        font-size: 11px;
+        border-radius: 3px;
+        margin-right: 8px;
+        background: #fff7e6;
+        color: #fa8c16;
+        cursor: pointer;
+        &:hover {
+          background: #ffe7ba;
+        }
+      }
+      
+      .ws-msg-text {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #333;
+        font-family: monospace;
+        font-size: 13px;
+      }
+      
+      .ws-msg-actions {
+        flex-shrink: 0;
+        margin-left: 12px;
+        
+        .anticon {
+          cursor: pointer;
+          margin-left: 8px;
+          color: #999;
+          &:hover {
+            color: #1890ff;
+          }
+        }
+      }
+    }
+  }
+
 }
 
 .env-modal{

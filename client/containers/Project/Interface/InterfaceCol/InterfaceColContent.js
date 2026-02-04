@@ -649,7 +649,9 @@ export default class InterfaceColContent extends Component {
       const postData = {
         url: options.url,              // ws:// or wss://
         query: options.query || {},   // 如果有 query 参数
-        headers: options.headers || {} // headers 里可能有 cookieId 等
+        headers: options.headers || {}, // headers 里可能有 cookieId 等
+        caseId: interfaceData._id,     // 用例 ID
+        caseName: interfaceData.casename || '' // 用例名称
       };
 
       // 调用后端接口

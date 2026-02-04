@@ -51,7 +51,7 @@ class WsTestController extends baseController {
      * body: { url, headers, query }
      */
     async connect(ctx) {
-        const { url, headers = {}, query = {} } = ctx.request.body;
+        const { url, headers = {}, query = {}, caseId = null, caseName = '' } = ctx.request.body;
         if (!url) {
             ctx.body = this._response(false, {}, { tips: "缺少 url 参数" }, 400, "Bad Request", 0);
             return;
@@ -78,7 +78,9 @@ class WsTestController extends baseController {
             messages: [],
             status: "connecting",
             pingInterval,
-            pongTimeout
+            pongTimeout,
+            caseId,      // 关联的用例 ID
+            caseName     // 关联的用例名称
         };
 
         ws.on("open", () => {
@@ -193,7 +195,9 @@ class WsTestController extends baseController {
                     headers: conn.headers,
                     query: conn.query,
                     status: conn.status,
-                    messages: conn.messages
+                    messages: conn.messages,
+                    caseId: conn.caseId,
+                    caseName: conn.caseName
                 });
             }
         }

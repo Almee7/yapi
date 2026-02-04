@@ -55,7 +55,16 @@ class interfaceCase extends baseModel {
       enable_script: { type: Boolean, default: false },
       enable_async: { type: Boolean, default: false },
       test_script: String,
-      pre_request_script: String
+      pre_request_script: String,
+      // WebSocket 消息列表
+      ws_messages: [
+        {
+          content: String,      // 消息内容
+          type: { type: String, enum: ['sent', 'received', 'log'] }, // 消息类型
+          remark: String,       // 备注
+          add_time: Number      // 添加时间
+        }
+      ]
     };
   }
 

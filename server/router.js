@@ -523,6 +523,16 @@ let routerConfig = {
       method: 'get'
     },
     {
+      action: 'addWsMessage',
+      path: 'add_ws_message',
+      method: 'post'
+    },
+    {
+      action: 'delWsMessage',
+      path: 'del_ws_message',
+      method: 'post'
+    },
+    {
       action: 'runSql',
       path: 'runSql',
       method: 'post'

@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { withRouter } from 'react-router';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { message, Tooltip, Input } from 'antd';
+import { message, Tooltip, Input, Icon, Popconfirm } from 'antd';
 import { getEnv } from '../../../../reducer/modules/project';
 import {
   fetchInterfaceColList,
@@ -170,6 +170,33 @@ export default class InterfaceCaseContent extends Component {
     });
   };
 
+  // 删除 WS 消息
+  deleteWsMessage = async (msgIndex) => {
+    try {
+      const res = await axios.post('/api/col/del_ws_message', {
+        id: this.props.currCase._id,
+        msg_index: msgIndex
+      });
+      if (res.data.errcode) {
+        message.error(res.data.errmsg);
+      } else {
+        message.success('删除成功');
+        this.props.fetchCaseData(this.props.currCase._id);
+      }
+    } catch (err) {
+      message.error('删除失败: ' + err.message);
+    }
+  };
+
+  // 复制到剪贴板
+  copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      message.success('已复制到剪贴板');
+    }).catch(() => {
+      message.error('复制失败');
+    });
+  };
+
   render() {
     const { currCase, currProject, projectEnv } = this.props;
     const { isEditingCasename, editCasename } = this.state;
@@ -225,6 +252,7 @@ export default class InterfaceCaseContent extends Component {
               interfaceId={currCase.interface_id}
               projectId={currCase.project_id}
               curUid={this.props.curUid}
+              onWsMessageDelete={() => this.props.fetchCaseData(currCase._id)}
             />
           )}
         </div>

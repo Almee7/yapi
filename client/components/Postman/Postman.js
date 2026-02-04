@@ -17,7 +17,9 @@ import {
   Switch,
   Row,
   Col,
-  Alert
+  Alert,
+  Popconfirm,
+  message
 } from 'antd';
 import constants from '../../constants/variable.js';
 import AceEditor from 'client/components/AceEditor/AceEditor';
@@ -148,7 +150,8 @@ export default class Run extends Component {
     type: PropTypes.string, //enum[case, inter], 判断是在接口页面使用还是在测试集
     curUid: PropTypes.number.isRequired,
     interfaceId: PropTypes.number.isRequired,
-    projectId: PropTypes.number.isRequired
+    projectId: PropTypes.number.isRequired,
+    onWsMessageDelete: PropTypes.func // WS消息删除回调
   };
 
   constructor(props) {
@@ -431,7 +434,9 @@ export default class Run extends Component {
         const postData = {
           url: options.url,              // ws:// or wss://
           query: options.query || {},   // 如果有 query 参数
-          headers: options.headers || {} // headers 里可能有 cookieId 等
+          headers: options.headers || {}, // headers 里可能有 cookieId 等
+          caseId: this.props.type === 'case' ? this.props.data._id : null,     // 用例 ID
+          caseName: this.props.type === 'case' ? (this.props.data.casename || '') : '' // 用例名称
         };
 
         // 调用后端接口
@@ -1292,6 +1297,68 @@ export default class Run extends Component {
                   </div>
                 </Col>
               </Row>
+            </Tabs.TabPane>
+          ) : null}
+          {/* WS 消息 Tab */}
+          {this.props.type === 'case' && this.props.data.ws_messages && this.props.data.ws_messages.length > 0 ? (
+            <Tabs.TabPane
+              className="ws-messages-tab"
+              tab={<Tooltip title="WebSocket 消息">WS ({this.props.data.ws_messages.length})</Tooltip>}
+              key="ws"
+            >
+              <div className="ws-messages-content">
+                {this.props.data.ws_messages.map((msg, idx) => (
+                  <div key={idx} className={`ws-msg-item ${msg.type || 'log'}`}>
+                    <span className="ws-msg-tag">{msg.type === 'sent' ? 'send' : 'response'}</span>
+                    {msg.remark && (
+                      <Tooltip title={msg.remark}>
+                        <span className="ws-msg-remark-tag">有备注</span>
+                      </Tooltip>
+                    )}
+                    <Tooltip title={<pre style={{ maxWidth: 500, maxHeight: 300, overflow: 'auto', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{msg.content}</pre>} overlayStyle={{ maxWidth: 520 }}>
+                      <span className="ws-msg-text">{msg.content}</span>
+                    </Tooltip>
+                    <div className="ws-msg-actions">
+                      <Tooltip title="复制">
+                        <Icon 
+                          type="copy" 
+                          onClick={() => {
+                            navigator.clipboard.writeText(msg.content).then(() => {
+                              message.success('已复制');
+                            });
+                          }} 
+                        />
+                      </Tooltip>
+                      <Popconfirm
+                        title="确定删除？"
+                        onConfirm={async () => {
+                          try {
+                            const res = await axios.post('/api/col/del_ws_message', {
+                              id: this.props.data._id,
+                              msg_index: idx
+                            });
+                            if (!res.data.errcode) {
+                              message.success('删除成功');
+                              // 触发父组件刷新
+                              if (this.props.onWsMessageDelete) {
+                                this.props.onWsMessageDelete();
+                              }
+                            }
+                          } catch (e) {
+                            message.error('删除失败');
+                          }
+                        }}
+                        okText="确定"
+                        cancelText="取消"
+                      >
+                        <Tooltip title="删除">
+                          <Icon type="delete" style={{ color: '#ff4d4f' }} />
+                        </Tooltip>
+                      </Popconfirm>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </Tabs.TabPane>
           ) : null}
         </Tabs>

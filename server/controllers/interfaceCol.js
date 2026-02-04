@@ -797,6 +797,107 @@ class interfaceColController extends baseController {
   }
 
   /**
+   * 添加 WebSocket 消息到用例
+   * @interface /col/add_ws_message
+   * @method POST
+   * @category col
+   * @param {number} id - 用例 ID
+   * @param {String} content - 消息内容
+   * @param {String} type - 消息类型 (sent/received/log)
+   * @returns {Object}
+   */
+  async addWsMessage(ctx) {
+    try {
+      let params = ctx.request.body;
+      if (!params.id) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '用例 id 不能为空'));
+      }
+      if (!params.content) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '消息内容不能为空'));
+      }
+
+      let caseData = await this.caseModel.get(params.id);
+      if (!caseData) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '用例不存在'));
+      }
+
+      let auth = await this.checkAuth(caseData.project_id, 'project', 'edit');
+      if (!auth) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));
+      }
+
+      // 获取当前的 ws_messages
+      let wsMessages = caseData.ws_messages || [];
+
+      // 检查是否已存在相同内容
+      const exists = wsMessages.some(msg => msg.content === params.content);
+      if (exists) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '该消息已存在，无需重复保存'));
+      }
+
+      // 添加新消息
+      wsMessages.push({
+        content: params.content,
+        type: params.type || 'log',
+        remark: params.remark || '',
+        add_time: yapi.commons.time()
+      });
+
+      // 更新用例
+      let result = await this.caseModel.up(params.id, { ws_messages: wsMessages });
+
+      ctx.body = yapi.commons.resReturn(result);
+    } catch (e) {
+      ctx.body = yapi.commons.resReturn(null, 402, e.message);
+    }
+  }
+
+  /**
+   * 删除用例中的 WebSocket 消息
+   * @interface /col/del_ws_message
+   * @method POST
+   * @category col
+   * @param {number} id - 用例 ID
+   * @param {number} msg_index - 消息索引
+   * @returns {Object}
+   */
+  async delWsMessage(ctx) {
+    try {
+      let params = ctx.request.body;
+      if (!params.id) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '用例 id 不能为空'));
+      }
+      if (params.msg_index === undefined) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '消息索引不能为空'));
+      }
+
+      let caseData = await this.caseModel.get(params.id);
+      if (!caseData) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '用例不存在'));
+      }
+
+      let auth = await this.checkAuth(caseData.project_id, 'project', 'edit');
+      if (!auth) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '没有权限'));
+      }
+
+      let wsMessages = caseData.ws_messages || [];
+      if (params.msg_index < 0 || params.msg_index >= wsMessages.length) {
+        return (ctx.body = yapi.commons.resReturn(null, 400, '消息索引无效'));
+      }
+
+      // 删除指定索引的消息
+      wsMessages.splice(params.msg_index, 1);
+
+      let result = await this.caseModel.up(params.id, { ws_messages: wsMessages });
+
+      ctx.body = yapi.commons.resReturn(result);
+    } catch (e) {
+      ctx.body = yapi.commons.resReturn(null, 402, e.message);
+    }
+  }
+
+  /**
    * 获取一个测试用例详情
    * @interface /col/case
    * @method GET

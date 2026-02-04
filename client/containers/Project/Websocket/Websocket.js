@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import { useParams, useHistory } from 'react-router-dom';
-import { message as antdMessage } from 'antd';
+import { message as antdMessage, Modal, Input } from 'antd';
 import './Websocket.scss';
 
 // localStorage key for saved messages
@@ -16,6 +16,11 @@ export default function WebsocketDetail() {
     const [message, setMessage] = useState('');
     const [savedMessages, setSavedMessages] = useState([]);
     const wsRef = useRef(null);
+    
+    // 备注弹窗状态
+    const [remarkModalVisible, setRemarkModalVisible] = useState(false);
+    const [remarkText, setRemarkText] = useState('');
+    const [pendingSaveData, setPendingSaveData] = useState(null); // { content, msgType }
 
     // 加载已保存的消息
     useEffect(() => {
@@ -103,15 +108,19 @@ const connect = async () => {
         const res = await axios.post('/api/ws-test/connect', {
             url: tab.url,
             headers: tab.headers || {},
-            query: urlHasQuery ? {} : (tab.query || {})  // URL已含参数则不传query
+            query: urlHasQuery ? {} : (tab.query || {}),  // URL已含参数则不传query
+            caseId: tab.caseId || null,      // 保留用例关联
+            caseName: tab.caseName || ''     // 保留用例名称
         });
         
         // 重连成功后会生成新的 connectionId，需要跳转到新的详情页
         const newConnectionId = res.data && res.data.body && res.data.body.connectionId;
         if (newConnectionId) {
-            // 这里必须刷新页面才能成功
-            alert('重连成功，将跳转到新连接详情页');
-            history.push(`/project/${id}/websocket/${newConnectionId}`);
+            antdMessage.success('重连成功', 1.5);
+            // 先设置 loading，然后柔和跳转
+            setLoading(true);
+            setTab(null);
+            history.replace(`/project/${id}/websocket/${newConnectionId}`);
         } else {
             setTab(prev => prev ? { ...prev, status: 'open' } : prev);
         }
@@ -199,6 +208,52 @@ const deleteSavedMessage = (msgId) => {
     }
 };
 
+// 打开备注弹窗（保存到用例前）
+const openRemarkModal = (content, msgType = 'log') => {
+    if (!tab || !tab.caseId) {
+        antdMessage.warning('该连接未关联测试用例', 1.5);
+        return;
+    }
+    setPendingSaveData({ content, msgType });
+    setRemarkText('');
+    setRemarkModalVisible(true);
+};
+
+// 确认保存（带备注）
+const confirmSaveToCase = async () => {
+    if (!pendingSaveData) return;
+    
+    try {
+        const res = await axios.post('/api/col/add_ws_message', {
+            id: Number(tab.caseId),
+            content: pendingSaveData.content,
+            type: pendingSaveData.msgType,
+            remark: remarkText.trim()
+        });
+        if (res.data.errcode) {
+            if (res.data.errmsg.includes('已存在')) {
+                antdMessage.warning('该内容已存在于用例中，无需重复保存', 1.5);
+            } else {
+                antdMessage.error(res.data.errmsg, 1.5);
+            }
+        } else {
+            antdMessage.success(`已保存到用例 [${tab.caseName || tab.caseId}]`, 1.5);
+        }
+    } catch (err) {
+        console.error('保存到用例失败', err);
+        antdMessage.error('保存失败: ' + (err.message || '未知错误'), 1.5);
+    }
+    
+    setRemarkModalVisible(false);
+    setPendingSaveData(null);
+    setRemarkText('');
+};
+
+// 保存消息到关联用例（弹出备注输入框）
+const saveToCase = (content, msgType = 'log') => {
+    openRemarkModal(content, msgType);
+};
+
 // 未找到连接时自动返回管理中心
 useEffect(() => {
     if (!loading && !tab) {
@@ -238,8 +293,17 @@ return (
         </div>
         <div className="info-card">
           <div className="info-label">Cookie ID</div>
-          <div className="info-value">{tab.headers.cookieId}</div>
+          <div className="info-value">{tab.headers.cookieId || '-'}</div>
         </div>
+        {tab.caseId && (
+          <div className="info-card case-card">
+            <div className="info-label">关联用例</div>
+            <div className="info-value">
+              <span className="case-name">{tab.caseName || `用例 ${tab.caseId}`}</span>
+              <span className="case-id">Key: {tab.caseId}</span>
+            </div>
+          </div>
+        )}
         <div className="info-card status-card">
           <div className="info-label">连接状态</div>
           <div className="status-row">
@@ -293,8 +357,24 @@ return (
               const msgType = isObject ? msg.type : 'received';
               return (
                 <div key={idx} className={`log-item ${msgType}`}>
-                  <span className="log-index">[{(tab.messages || []).length - idx}]</span>
-                  <span className="log-content">{content}</span>
+                  <div className="log-main">
+                    <span className="log-index">[{(tab.messages || []).length - idx}]</span>
+                    <span className="log-content">{content}</span>
+                  </div>
+                  <div className="log-actions">
+                    <button className="log-action-btn" onClick={() => copyToClipboard(content)} title="复制">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                      </svg>
+                    </button>
+                    {tab.caseId && (
+                      <button className="log-action-btn save-case" onClick={() => saveToCase(content, msgType)} title="保存到用例">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })
@@ -370,6 +450,13 @@ return (
                         <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
                       </svg>
                     </button>
+                    {tab.caseId && (
+                      <button className="action-btn save-case" onClick={() => saveToCase(item.content, 'sent')} title="保存到用例">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+                        </svg>
+                      </button>
+                    )}
                     <button className="action-btn delete" onClick={() => deleteSavedMessage(item.id)} title="删除">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -383,6 +470,48 @@ return (
         </div>
       </div>
     </div>
+
+    {/* 备注输入弹窗 */}
+    <Modal
+      title="保存到用例"
+      visible={remarkModalVisible}
+      onOk={confirmSaveToCase}
+      onCancel={() => {
+        setRemarkModalVisible(false);
+        setPendingSaveData(null);
+        setRemarkText('');
+      }}
+      okText="保存"
+      cancelText="取消"
+      width={500}
+    >
+      <div style={{ marginBottom: 12 }}>
+        <div style={{ marginBottom: 8, color: '#666' }}>消息内容：</div>
+        <div style={{ 
+          background: '#f5f5f5', 
+          padding: '8px 12px', 
+          borderRadius: 4, 
+          maxHeight: 120, 
+          overflow: 'auto',
+          fontFamily: 'monospace',
+          fontSize: 12,
+          wordBreak: 'break-all'
+        }}>
+          {pendingSaveData && pendingSaveData.content}
+        </div>
+      </div>
+      <div>
+        <div style={{ marginBottom: 8, color: '#666' }}>备注（可选）：</div>
+        <Input.TextArea
+          placeholder="输入备注信息，方便后续查看..."
+          value={remarkText}
+          onChange={e => setRemarkText(e.target.value)}
+          rows={3}
+          maxLength={200}
+          showCount
+        />
+      </div>
+    </Modal>
   </div>
 );
 

@@ -3,7 +3,7 @@ import axios from 'axios';
 import './WebsocketList.scss';
 import { useHistory, useParams, Route, Switch } from 'react-router-dom';
 import WebsocketDetail from './Websocket';
-import { Icon } from 'antd';
+import { Icon, message } from 'antd';
 
 export function WebsocketList() {
     const [list, setList] = useState([]);
@@ -69,7 +69,7 @@ export function WebsocketList() {
             await Promise.all(deletePromises);
 
             setList(list.filter(item => item.status !== 'closed'));
-            alert(`成功清除 ${closedList.length} 个已关闭的连接`);
+            message.success(`成功清除 ${closedList.length} 个已关闭的连接`, 1.5);
         } catch (err) {
             console.error('批量删除失败', err);
             alert('批量删除失败，请重试');

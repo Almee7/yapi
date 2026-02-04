@@ -30,4 +30,98 @@
       bottom: 4px;
     }
   }
+
+  // WebSocket 消息列表样式
+  .ws-messages-section {
+    margin-top: 24px;
+    padding: 16px;
+    background: #fafafa;
+    border-radius: 8px;
+    border: 1px solid #e8e8e8;
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      margin: 0 0 16px 0;
+      display: flex;
+      align-items: center;
+    }
+
+    .ws-messages-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      .ws-message-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        padding: 12px;
+        background: #fff;
+        border-radius: 6px;
+        border-left: 3px solid #d9d9d9;
+        transition: all 0.2s ease;
+
+        &:hover {
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        &.sent {
+          border-left-color: #1890ff;
+        }
+
+        &.received {
+          border-left-color: #52c41a;
+        }
+
+        &.log {
+          border-left-color: #faad14;
+        }
+
+        .msg-content {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          align-items: flex-start;
+          gap: 8px;
+
+          .msg-type-tag {
+            flex-shrink: 0;
+            padding: 2px 8px;
+            font-size: 12px;
+            border-radius: 4px;
+            background: #f0f0f0;
+            color: #666;
+          }
+
+          .msg-text {
+            font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+            font-size: 13px;
+            color: #333;
+            word-break: break-all;
+            line-height: 1.5;
+          }
+        }
+
+        .msg-actions {
+          display: flex;
+          gap: 12px;
+          flex-shrink: 0;
+          margin-left: 12px;
+
+          .anticon {
+            cursor: pointer;
+            font-size: 14px;
+            color: #999;
+            transition: color 0.2s;
+
+            &:hover {
+              color: #1890ff;
+            }
+          }
+        }
+      }
+    }
+  }
 }

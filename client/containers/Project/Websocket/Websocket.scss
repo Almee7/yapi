@@ -63,7 +63,7 @@
 
     .info-cards {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 16px;
 
       .info-card {
@@ -92,6 +92,25 @@
           color: #1f2937;
           font-weight: 500;
           word-break: break-all;
+        }
+
+        // 关联用例卡片
+        &.case-card {
+          .info-value {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+
+            .case-name {
+              font-weight: 600;
+            }
+
+            .case-id {
+              font-size: 12px;
+              color: #6b7280;
+              font-weight: 400;
+            }
+          }
         }
 
         .status-badge {
@@ -258,10 +277,17 @@
           border-radius: 4px;
           box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
           transition: all 0.2s ease;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 8px;
 
           &:hover {
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            transform: translateX(2px);
+
+            .log-actions {
+              opacity: 1;
+            }
           }
 
           // 发送的消息 - 蓝色竖条
@@ -272,6 +298,11 @@
           // 接收的消息 - 绿色竖条
           &.received {
             border-left-color: #10b981;
+          }
+
+          .log-main {
+            flex: 1;
+            min-width: 0;
           }
 
           .log-index {
@@ -288,6 +319,40 @@
             color: #374151;
             font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
             word-break: break-all;
+          }
+
+          .log-actions {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+
+            .log-action-btn {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              width: 24px;
+              height: 24px;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              background: #f3f4f6;
+              color: #6b7280;
+              transition: all 0.2s ease;
+
+              &:hover {
+                background: #e5e7eb;
+                color: #374151;
+              }
+
+              &.save-case {
+                color: #8b5cf6;
+                &:hover {
+                  background: #ede9fe;
+                }
+              }
+            }
           }
         }
 
@@ -597,6 +662,13 @@
                   color: #10b981;
                   &:hover {
                     background: #d1fae5;
+                  }
+                }
+
+                &.save-case {
+                  color: #8b5cf6;
+                  &:hover {
+                    background: #ede9fe;
                   }
                 }
 
