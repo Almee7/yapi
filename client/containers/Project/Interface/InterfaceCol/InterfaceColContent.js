@@ -666,20 +666,20 @@ export default class InterfaceColContent extends Component {
 
       // data 格式示例:
       // { header: {}, body: "...", status: 101, statusText: 'WebSocket连接关闭', messages: [...] }
-      result = result = {
+       result = {
         ...options,
-        header: data.header,
-        body: data.body,
-        status: 200,
-        statusText: data.message
+        res_header: data.header || {},
+        res_body: data.body,
+        status: data.status || 200,
+        statusText: data.statusText || data.message
       };
 
       let responseData = Object.assign(
           {},
           {
-            status: 200,
+            status: data.status || 200,
             body: data.body,
-            header: data.header,
+            header: data.header || {},
             statusText: data.statusText
           }
       );

@@ -2,7 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import { useParams, useHistory } from 'react-router-dom';
+import { message as antdMessage } from 'antd';
 import './Websocket.scss';
+
+// localStorage key for saved messages
+const SAVED_MESSAGES_KEY = 'ws_saved_messages';
 
 export default function WebsocketDetail() {
     const { connectionId, id } = useParams(); // 从路由参数获取 connectionId 和项目 id
@@ -10,7 +14,20 @@ export default function WebsocketDetail() {
     const [tab, setTab] = useState(null);
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState('');
+    const [savedMessages, setSavedMessages] = useState([]);
     const wsRef = useRef(null);
+
+    // 加载已保存的消息
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem(SAVED_MESSAGES_KEY);
+            if (saved) {
+                setSavedMessages(JSON.parse(saved));
+            }
+        } catch (e) {
+            console.error('加载已保存消息失败', e);
+        }
+    }, []);
     
 
 
@@ -44,7 +61,7 @@ useEffect(() => {
                     const newMessages = prev.messages ? [...prev.messages] : [];
                     // 后端已经过滤了 ping/pong，直接添加消息
                     if (data.type === 'message') {
-                        newMessages.push(data.message);
+                        newMessages.push({ content: data.message, type: 'received' });
                     }
                     return {
                         ...prev,
@@ -81,26 +98,28 @@ const disconnect = async () => {
 const connect = async () => {
     try {
         if (!tab) return;
+        // 判断URL是否已包含查询参数，避免重复拼接
+        const urlHasQuery = tab.url && tab.url.includes('?');
         const res = await axios.post('/api/ws-test/connect', {
             url: tab.url,
             headers: tab.headers || {},
-            query: tab.query || {}
+            query: urlHasQuery ? {} : (tab.query || {})  // URL已含参数则不传query
         });
         
         // 重连成功后会生成新的 connectionId，需要跳转到新的详情页
         const newConnectionId = res.data && res.data.body && res.data.body.connectionId;
         if (newConnectionId) {
+            // 这里必须刷新页面才能成功
             alert('重连成功，将跳转到新连接详情页');
             history.push(`/project/${id}/websocket/${newConnectionId}`);
         } else {
             setTab(prev => prev ? { ...prev, status: 'open' } : prev);
         }
     } catch (err) {
-        console.error('重新连接失败', err);
         const errorMsg = err.response && err.response.data && err.response.data.body && err.response.data.body.tips 
             ? err.response.data.body.tips 
             : err.message;
-        alert('重新连接失败: ' + errorMsg);
+        antdMessage.error('重新连接失败: ' + errorMsg, 1.5);
     }
 };
 
@@ -115,12 +134,87 @@ const sendMessage = () => {
     if (wsRef.current) {
         wsRef.current.send(JSON.stringify({ connectionId, message }));
     }
-    setTab(prev => prev ? { ...prev, messages: [...(prev.messages || []), message] } : prev);
+    setTab(prev => prev ? { ...prev, messages: [...(prev.messages || []), { content: message, type: 'sent' }] } : prev);
     setMessage('');
 };
 
+// 发送消息并保存
+const sendAndSave = () => {
+    if (!message.trim() || !tab) return;
+    // 先发送消息
+    if (wsRef.current) {
+        wsRef.current.send(JSON.stringify({ connectionId, message }));
+    }
+    setTab(prev => prev ? { ...prev, messages: [...(prev.messages || []), { content: message, type: 'sent' }] } : prev);
+    
+    // 检查是否已存在相同内容
+    const exists = savedMessages.some(item => item.content === message);
+    if (exists) {
+        antdMessage.warning('该消息已保存过，无需重复保存', 1.5);
+        setMessage('');
+        return;
+    }
+    
+    // 保存消息到本地存储
+    const newSaved = {
+        id: Date.now(),
+        content: message,
+        time: new Date().toLocaleString(),
+        url: tab.url
+    };
+    const updated = [newSaved, ...savedMessages].slice(0, 50); // 最多保存50条
+    setSavedMessages(updated);
+    try {
+        localStorage.setItem(SAVED_MESSAGES_KEY, JSON.stringify(updated));
+        antdMessage.success('消息已保存', 1.5);
+    } catch (e) {
+        console.error('保存消息失败', e);
+    }
+    setMessage('');
+};
+
+// 复制消息到剪贴板
+const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+        antdMessage.success('已复制到剪贴板', 1.5);
+    }).catch(err => {
+        console.error('复制失败', err);
+        antdMessage.error('复制失败', 1.5);
+    });
+};
+
+// 使用已保存的消息（填充到输入框）
+const useMessage = (text) => {
+    setMessage(text);
+};
+
+// 删除已保存的消息
+const deleteSavedMessage = (msgId) => {
+    const updated = savedMessages.filter(m => m.id !== msgId);
+    setSavedMessages(updated);
+    try {
+        localStorage.setItem(SAVED_MESSAGES_KEY, JSON.stringify(updated));
+    } catch (e) {
+        console.error('删除消息失败', e);
+    }
+};
+
+// 未找到连接时自动返回管理中心
+useEffect(() => {
+    if (!loading && !tab) {
+        const timer = setTimeout(() => {
+            history.push(`/project/${id}/websocket`);
+        }, 2000); // 2秒后自动返回
+        return () => clearTimeout(timer);
+    }
+}, [loading, tab, history, id]);
+
 if (loading) return <div className="empty">加载中...</div>;
-if (!tab) return <div className="empty">未找到该连接</div>;
+if (!tab) return (
+  <div className="empty">
+    <div>未找到该连接，2秒后自动返回管理中心...</div>
+  </div>
+);
 
 return (
   <div className="ws-detail-page">
@@ -146,10 +240,27 @@ return (
           <div className="info-label">Cookie ID</div>
           <div className="info-value">{tab.headers.cookieId}</div>
         </div>
-        <div className="info-card">
+        <div className="info-card status-card">
           <div className="info-label">连接状态</div>
-          <div className={`status-badge ${tab.status === 'open' ? 'closed' : 'open'}`}>
-            {tab.status === 'open' ? '已连接' : '已断开'}
+          <div className="status-row">
+            <div className={`status-badge ${tab.status === 'open' ? 'connected' : 'disconnected'}`}>
+              {tab.status === 'open' ? '已连接' : '已断开'}
+            </div>
+            {tab.status === 'open' ? (
+              <button className="control-btn disconnect" onClick={disconnect}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+                断开
+              </button>
+            ) : (
+              <button className="control-btn connect" onClick={connect}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                重连
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -175,12 +286,18 @@ return (
           {(tab.messages || []).length === 0 ? (
             <div className="empty-logs">暂无消息</div>
           ) : (
-            [...(tab.messages || [])].reverse().map((msg, idx) => (
-              <div key={idx} className="log-item">
-                <span className="log-index">[{(tab.messages || []).length - idx}]</span>
-                <span className="log-content">{msg}</span>
-              </div>
-            ))
+            [...(tab.messages || [])].reverse().map((msg, idx) => {
+              // 兼容旧格式（纯字符串）和新格式（对象）
+              const isObject = typeof msg === 'object' && msg !== null;
+              const content = isObject ? msg.content : msg;
+              const msgType = isObject ? msg.type : 'received';
+              return (
+                <div key={idx} className={`log-item ${msgType}`}>
+                  <span className="log-index">[{(tab.messages || []).length - idx}]</span>
+                  <span className="log-content">{content}</span>
+                </div>
+              );
+            })
           )}
         </div>
       </div>
@@ -204,43 +321,65 @@ return (
               }}
               rows={4}
             />
-            <button 
-              className="send-btn" 
-              onClick={sendMessage}
-              disabled={!message.trim() || tab.status !== 'open'}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-              </svg>
-              发送消息
-            </button>
+            <div className="btn-group">
+              <button 
+                className="send-btn" 
+                onClick={sendMessage}
+                disabled={!message.trim() || tab.status !== 'open'}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+                发送消息
+              </button>
+              <button 
+                className="send-btn save-btn" 
+                onClick={sendAndSave}
+                disabled={!message.trim() || tab.status !== 'open'}
+                title="发送消息并保存到本地，方便下次复用"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/>
+                </svg>
+                发送并保存
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* 连接控制 */}
-        <div className="control-box">
-          <div className="section-title">连接控制</div>
-          {tab.status === 'open' ? (
-            <button
-                className="disconnect-btn"
-                onClick={disconnect}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-              </svg>
-              断开连接
-            </button>
-          ) : (
-            <button 
-              className="connect-btn" 
-              onClick={connect}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-              </svg>
-              重新连接
-            </button>
-          )}
+        {/* 已保存的消息 */}
+        <div className="saved-box">
+          <div className="section-title">已保存的消息 <span className="count">({savedMessages.length})</span></div>
+          <div className="saved-list">
+            {savedMessages.length === 0 ? (
+              <div className="empty-saved">暂无保存的消息</div>
+            ) : (
+              savedMessages.map(item => (
+                <div key={item.id} className="saved-item">
+                  <div className="saved-content" title={item.content}>
+                    {item.content.length > 50 ? item.content.slice(0, 50) + '...' : item.content}
+                  </div>
+                  <div className="saved-actions">
+                    <button className="action-btn use" onClick={() => useMessage(item.content)} title="使用此消息">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+                      </svg>
+                    </button>
+                    <button className="action-btn copy" onClick={() => copyToClipboard(item.content)} title="复制">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                      </svg>
+                    </button>
+                    <button className="action-btn delete" onClick={() => deleteSavedMessage(item.id)} title="删除">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>

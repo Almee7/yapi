@@ -58,7 +58,12 @@ class WsTestController extends baseController {
         }
 
         const connectionId = uuidv4();
-        const wsUrl = url + (Object.keys(query).length ? "?" + new URLSearchParams(query).toString() : "");
+        // 检测URL是否已包含查询参数，避免重复拼接
+        let wsUrl = url;
+        if (Object.keys(query).length) {
+            const separator = url.includes('?') ? '&' : '?';
+            wsUrl = url + separator + new URLSearchParams(query).toString();
+        }
         const ws = new WebSocket(wsUrl, { headers });
 
         let seq = 1;
@@ -168,8 +173,7 @@ class WsTestController extends baseController {
      * GET /api/ws-test/list
      */
     async list(ctx) {
-        const seenKeys = new Set(); // 用于存储 url+cookieId 的组合键
-        const list = [];
+        const connectionMap = new Map(); // 用于存储 url+cookieId -> 连接信息
 
         for (const [id, conn] of wsConnections.entries()) {
             // 从 headers中获取cookie，提取cookieId
@@ -179,10 +183,11 @@ class WsTestController extends baseController {
             // 组合url和cookieId作为唯一键
             const uniqueKey = `${conn.url}|${cookieId}`;
             
-            if (!seenKeys.has(uniqueKey)) {
-                seenKeys.add(uniqueKey);
-
-                list.push({
+            const existing = connectionMap.get(uniqueKey);
+            
+            // 如果还没有这个key，或者当前连接是open状态而旧的不是，则替换
+            if (!existing || (conn.status === 'open' && existing.status !== 'open')) {
+                connectionMap.set(uniqueKey, {
                     connectionId: id,
                     url: conn.url,
                     headers: conn.headers,
@@ -193,6 +198,7 @@ class WsTestController extends baseController {
             }
         }
 
+        const list = Array.from(connectionMap.values());
         ctx.body = this._response(true, {}, { list, tips: "当前连接列表" }, 200, "OK", 0);
     }
 

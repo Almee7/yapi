@@ -448,11 +448,11 @@ export default class Run extends Component {
 
         // data 格式示例:
         // { header: {}, body: "...", status: 101, statusText: 'WebSocket连接关闭', messages: [...] }
-        result = result = {
+        result = {
           header: data.header,
           body: data.body,
-          status: 200,
-          statusText: data.message
+          status: data.status,
+          statusText: data.statusText
         };
 
       } catch (e) {

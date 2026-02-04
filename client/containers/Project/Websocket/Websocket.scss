@@ -111,6 +111,54 @@
             color: #991b1b;
           }
         }
+
+        &.status-card {
+          .status-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-top: 4px;
+          }
+
+          .control-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+
+            svg {
+              flex-shrink: 0;
+            }
+
+            &.disconnect {
+              background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+              color: white;
+
+              &:hover {
+                background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+                box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+                transform: translateY(-1px);
+              }
+            }
+
+            &.connect {
+              background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+              color: white;
+
+              &:hover {
+                background: linear-gradient(135deg, #059669 0%, #047857 100%);
+                box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+                transform: translateY(-1px);
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -216,6 +264,16 @@
             transform: translateX(2px);
           }
 
+          // 发送的消息 - 蓝色竖条
+          &.sent {
+            border-left-color: #3b82f6;
+          }
+
+          // 接收的消息 - 绿色竖条
+          &.received {
+            border-left-color: #10b981;
+          }
+
           .log-index {
             display: inline-block;
             font-size: 11px;
@@ -257,7 +315,8 @@
     .action-section {
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      gap: 16px;
+      height: 600px;
 
       .section-title {
         font-size: 14px;
@@ -333,6 +392,33 @@
               background: #e5e7eb;
               color: #9ca3af;
               cursor: not-allowed;
+            }
+
+            &.save-btn {
+              background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+
+              &:hover:not(:disabled) {
+                background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+                box-shadow: 0 4px 12px rgba(6, 182, 212, 0.3);
+              }
+
+              &:disabled {
+                background: #e5e7eb;
+                color: #9ca3af;
+                cursor: not-allowed;
+                box-shadow: none;
+              }
+            }
+          }
+
+          .btn-group {
+            display: flex;
+            gap: 10px;
+
+            .send-btn {
+              flex: 1;
+              padding: 10px 12px;
+              font-size: 13px;
             }
           }
         }
@@ -416,6 +502,126 @@
             background: #e5e7eb;
             color: #9ca3af;
             cursor: not-allowed;
+          }
+        }
+      }
+
+      /* 已保存的消息 */
+      .saved-box {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+
+        .section-title {
+          flex-shrink: 0;
+          .count {
+            font-size: 12px;
+            color: #6b7280;
+            font-weight: 400;
+          }
+        }
+
+        .saved-list {
+          flex: 1;
+          overflow-y: auto;
+          min-height: 0;
+
+          .empty-saved {
+            padding: 20px;
+            text-align: center;
+            color: #9ca3af;
+            font-size: 13px;
+          }
+
+          .saved-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            background: #f9fafb;
+            transition: all 0.2s ease;
+
+            &:hover {
+              background: #f3f4f6;
+              border-color: #d1d5db;
+            }
+
+            &:last-child {
+              margin-bottom: 0;
+            }
+
+            .saved-content {
+              flex: 1;
+              font-size: 13px;
+              color: #374151;
+              font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+              white-space: nowrap;
+              overflow: hidden;
+              text-overflow: ellipsis;
+              margin-right: 10px;
+            }
+
+            .saved-actions {
+              display: flex;
+              gap: 4px;
+              flex-shrink: 0;
+
+              .action-btn {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                width: 28px;
+                height: 28px;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                transition: all 0.2s ease;
+                background: transparent;
+
+                &.use {
+                  color: #3b82f6;
+                  &:hover {
+                    background: #dbeafe;
+                  }
+                }
+
+                &.copy {
+                  color: #10b981;
+                  &:hover {
+                    background: #d1fae5;
+                  }
+                }
+
+                &.delete {
+                  color: #ef4444;
+                  &:hover {
+                    background: #fee2e2;
+                  }
+                }
+              }
+            }
+          }
+
+          &::-webkit-scrollbar {
+            width: 6px;
+          }
+
+          &::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+          }
+
+          &::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
           }
         }
       }

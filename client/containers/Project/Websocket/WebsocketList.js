@@ -3,6 +3,7 @@ import axios from 'axios';
 import './WebsocketList.scss';
 import { useHistory, useParams, Route, Switch } from 'react-router-dom';
 import WebsocketDetail from './Websocket';
+import { Icon } from 'antd';
 
 export function WebsocketList() {
     const [list, setList] = useState([]);
@@ -35,16 +36,43 @@ export function WebsocketList() {
     const deleteItem = async (connectionId) => {
         if (!window.confirm('确认删除该连接?')) return;
         try {
-            // 调用 disconnect 接口断开连接
             await axios.post('/api/ws-test/disconnect', { connectionId });
-            // 从列表中移除
             setList(list.filter(item => item.connectionId !== connectionId));
         } catch (err) {
-            console.error('删除失败', err);
-            const errorMsg = err.response && err.response.data && err.response.data.body && err.response.data.body.tips 
-                ? err.response.data.body.tips 
+            const errorMsg = err.response && err.response.data && err.response.data.body && err.response.data.body.tips
+                ? err.response.data.body.tips
                 : err.message;
             alert('删除失败: ' + errorMsg);
+        }
+    };
+
+    /** 一键清除所有 closed 状态的连接 */
+    const clearClosedConnections = async () => {
+        const closedList = list.filter(item => item.status === 'closed');
+
+        if (closedList.length === 0) {
+            alert('没有需要清除的连接');
+            return;
+        }
+
+        if (!window.confirm(`确认删除 ${closedList.length} 个已关闭的连接?`)) return;
+
+        try {
+            const deletePromises = closedList.map(item =>
+                axios.post('/api/ws-test/disconnect', { connectionId: item.connectionId })
+                    .catch(err => {
+                        console.error(`删除连接 ${item.connectionId} 失败`, err);
+                        return null;
+                    })
+            );
+
+            await Promise.all(deletePromises);
+
+            setList(list.filter(item => item.status !== 'closed'));
+            alert(`成功清除 ${closedList.length} 个已关闭的连接`);
+        } catch (err) {
+            console.error('批量删除失败', err);
+            alert('批量删除失败，请重试');
         }
     };
 
@@ -60,11 +88,12 @@ export function WebsocketList() {
                         : row
                 ));
             } else {
-                // 重新连接 - 需要传递 url, headers, query
+                // 重新连接 - 判断URL是否已包含查询参数
+                const urlHasQuery = item.url && item.url.includes('?');
                 const res = await axios.post('/api/ws-test/connect', {
                     url: item.url,
                     headers: item.headers || {},
-                    query: item.query || {}
+                    query: urlHasQuery ? {} : (item.query || {})  // URL已含参数则不传query
                 });
                 
                 // 重连后会生成新的 connectionId，需要更新列表
@@ -108,7 +137,39 @@ export function WebsocketList() {
         {/* 列表页路由 */}
         <Route path="/project/:id/websocket">
           <div className="ws-list-page">
-            <h2>WebSocket 管理中心</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ margin: 0 }}>WebSocket 管理中心</h2>
+              <button
+                      className="text-btn"
+                      onClick={clearClosedConnections}
+                      disabled={loading || list.filter(item => item.status === 'closed').length === 0}
+                      style={{
+                          padding: '8px 16px',
+                          fontSize: '14px',
+                          backgroundColor: '#2395f1',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: list.filter(item => item.status === 'closed').length === 0 ? 'not-allowed' : 'pointer',
+                          opacity: list.filter(item => item.status === 'closed').length === 0 ? 0.6 : 1,
+                          transition: 'all 0.3s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                      }}
+                      onMouseEnter={(e) => {
+                          if (list.filter(item => item.status === 'closed').length > 0) {
+                              e.currentTarget.style.backgroundColor = '#108ee9';
+                          }
+                      }}
+                      onMouseLeave={(e) => {
+                          e.currentTarget.style.backgroundColor = '#2395f1';
+                      }}
+                  >
+                <Icon type="delete" />
+                一键清除已关闭链接 ({list.filter(item => item.status === 'closed').length})
+              </button>
+            </div>
 
             <div className="excel-table">
               {/* 表头 */}
@@ -127,54 +188,54 @@ export function WebsocketList() {
                     加载中...
                   </div>
                 </div>
-                ) : list.length === 0 ? (
-                  <div className="table-row no-data">
-                    <div className="cell" style={{ gridColumn: '1 / span 4' }}>
-                      暂无数据
-                    </div>
-                  </div>
-                ) : (
-                    list.map(item => {
-                        const url = item.url || '-';
-                        const cookieId = item.headers.cookieId || '-';
-                        const status = item.status || '未知';
-                        const connectBtn = getConnectBtn(item.status);
-
-                        return (
-                          <div className="table-row" key={item.connectionId}>
-                            <div className="cell">{url}</div>
-                            <div className="cell">{cookieId}</div>
-                            <div className="cell">{item.connectionId}</div>
-                            <div className="cell">
-                              <span className={`status ${status}`}>{status}</span>
-                            </div>
-
-                            <div className="cell actions">
-                              <button
-                                        className="text-btn detail"
-                                        onClick={() => goToDetail(item.connectionId)}
-                                    >
-                                查看详情
-                              </button>
-
-                              <button
-                                        className="text-btn delete"
-                                        onClick={() => deleteItem(item.connectionId)}
-                                    >
-                                删除
-                              </button>
-
-                              <button
-                                        className={`text-btn ${connectBtn.className}`}
-                                        onClick={() => toggleConnect(item)}
-                                    >
-                                {connectBtn.text}
-                              </button>
-                            </div>
+                      ) : list.length === 0 ? (
+                        <div className="table-row no-data">
+                          <div className="cell" style={{ gridColumn: '1 / span 4' }}>
+                            暂无数据
                           </div>
-                        );
-                    })
-                )}
+                        </div>
+                      ) : (
+                          list.map(item => {
+                              const url = item.url || '-';
+                              const cookieId = item.headers.cookieId || '-';
+                              const status = item.status || '未知';
+                              const connectBtn = getConnectBtn(item.status);
+
+                              return (
+                                <div className="table-row" key={item.connectionId}>
+                                  <div className="cell">{url}</div>
+                                  <div className="cell">{cookieId}</div>
+                                  <div className="cell">{item.connectionId}</div>
+                                  <div className="cell">
+                                    <span className={`status ${status}`}>{status}</span>
+                                  </div>
+
+                                  <div className="cell actions">
+                                    <button
+                                              className="text-btn detail"
+                                              onClick={() => goToDetail(item.connectionId)}
+                                          >
+                                      查看详情
+                                    </button>
+
+                                    <button
+                                              className="text-btn delete"
+                                              onClick={() => deleteItem(item.connectionId)}
+                                          >
+                                      删除
+                                    </button>
+
+                                    <button
+                                              className={`text-btn ${connectBtn.className}`}
+                                              onClick={() => toggleConnect(item)}
+                                          >
+                                      {connectBtn.text}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                          })
+                      )}
             </div>
           </div>
         </Route>
