@@ -4,7 +4,7 @@ import PropTypes from 'prop-types';
 import { withRouter } from 'react-router';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { message, Tooltip, Input, Icon, Popconfirm } from 'antd';
+import { message, Tooltip, Input} from 'antd';
 import { getEnv } from '../../../../reducer/modules/project';
 import {
   fetchInterfaceColList,
